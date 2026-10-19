@@ -1,6 +1,6 @@
 # QuantPilot BTC
 
-Bitcoin research with technical indicators, derivatives positioning, daily sentiment, calibrated ML, simulated perpetual-futures accounting source-linked news analysis and ten read-only MCP tools.
+Bitcoin research with technical indicators, derivatives positioning, daily sentiment, calibrated ML, simulated perpetual-futures accounting source-linked news analysis and eleven read-only MCP tools.
 
 **PostgreSQL chart workspace:** open [localhost:5173/#chart](http://localhost:5173/#chart). **BTCUSDT is the only active symbol**, backed by Binance USD-M perpetual data for consistent chart, prediction and paper accounting. The native workspace offers 86 selectable studies, seven timeframes and saved drawing tools, with an optional official TradingView hosted chart. Actual provider price changes have been verified through PostgreSQL onto the chart. The five-year perpetual candle audit contains 525,888 observations with zero gaps at its recorded cutoff. Previously imported spot/reference records are retained as inactive archives; they are not merged into BTCUSDT or synchronized by the updated collector. See [market setup and exact status](docs/market-platform.md). Run `node scripts/start.cjs --restart-services` once from your regular network-enabled terminal to activate this update in already-running services; subsequent starts use `node scripts/start.cjs`.
 
@@ -10,7 +10,7 @@ Bitcoin research with technical indicators, derivatives positioning, daily senti
 
 **Fast live chart:** BTCUSDT candles update incrementally through the exchange WebSocket, with reconnect and PostgreSQL fallback. The agent-controlled browser's provider WebSocket is blocked by network policy; actual stream latency remains unverified here. A separate actual-database sample observed four saved snapshots at a median interval of 5.638 seconds, with median local API request time of 159.5 ms. These are save intervals rather than exchange latency. See [live-data behavior](docs/live-data.md) and [sample evidence](docs/persistence-runtime.json).
 
-**Frozen research release: `24c8238525d4`.** The experiment below and the nine original read-only MCP tools remain available (a tenth, `get_news_events`, was added later). Original release evidence is preserved separately from later storage, chart and operational work.
+**Frozen research release: `24c8238525d4`.** The experiment below and the nine original read-only MCP tools remain available (`get_news_events` and `get_macro_calendar` were added later). Original release evidence is preserved separately from later storage, chart and operational work.
 
 **Local recovery verified:** the full PostgreSQL backup restores seven tables and 3,639,242 rows in an isolated drill. Use `uv run quantpilot doctor` for current readiness and see [backup/recovery commands](docs/recovery.md). [Latest doctor evidence](docs/local-doctor.json) retains its actual check time; earlier runtime reports remain historical snapshots.
 
@@ -52,6 +52,12 @@ npm --prefix frontend run dev
 Open [the dashboard](http://localhost:5173) and [API documentation](http://127.0.0.1:8000/docs). Local Parquet and research artifacts are excluded from source control. This workspace contains them; a fresh checkout must acquire data and train, or use the trusted exported model with operational database snapshots. Missing inputs produce explicit blocked states. `/?preview=1` provides a labeled synthetic interface preview.
 
 News: the data supervisor polls the Fed, BLS and CoinDesk feeds every five minutes and runs `codex exec` (saved ChatGPT login, never an API key) at most once per 15 minutes, up to 48 batches/day. When the ChatGPT usage limit is reached, analysis pauses for an hour and the dashboard shows it as delayed; missing analysis is never treated as neutral. News results are shadow research and do not change the trading policy. Manual commands: `uv run quantpilot collect-news --once`, `analyze-news`, `news-status`.
+
+Macro calendar: `uv run quantpilot macro-calendar` stores CPI, jobs-report and FOMC schedules from official sources (FRED's release calendar from 2025, earlier BLS dates from the first ALFRED vintage containing each month, the Federal Reserve's FOMC calendar) with first-release values from release-day ALFRED vintages. No consensus forecasts are available, so surprises are never computed. The supervisor refreshes it hourly; `GET /api/v1/macro` and the MCP tool `get_macro_calendar` serve it.
+
+Research (descriptive and experimental only; nothing is released or traded):
+- `uv run quantpilot event-study` — five-year hourly study of 5% drops and rallies with matched ordinary controls; results in [docs/event-study.md](docs/event-study.md).
+- `uv run quantpilot research-events --output <new dir> --folds 4` — 1h/4h/24h direction, return ranges, large-drop risk and EWMA vs GARCH volatility, on identical walk-forward timestamps.
 
 Run `uv run quantpilot worker` for one public-feed update or let the supervisor schedule attempts. The existing network-enabled supervisor has recorded forward no-trade decisions; the agent process itself is denied outbound provider sockets. `uv run quantpilot status` shows current readiness and recorded outcomes. Owner commands `pause` and `resume` control entries while exits/reconciliation continue. There is no real-order API.
 
@@ -104,7 +110,7 @@ flowchart LR
     Model --> Services
     Ledger --> Services
     Services --> API[FastAPI]
-    Services --> MCP[Ten MCP tools]
+    Services --> MCP[Eleven MCP tools]
     API --> UI[React dashboard]
 ```
 
@@ -119,6 +125,8 @@ Four dashboard views: Market, Prediction, Research and Paper portfolio. FastAPI/
 | Live ingestion/reconciliation/projections | `live.py`, `worker.py`, `snapshots.py` |
 | Readiness and persistent run monitoring | `operations.py`, `frontend/src/PaperOperations.tsx` |
 | News collection and Codex reasoning (shadow only) | `news.py`, `frontend/src/NewsPanel.tsx` |
+| Macro release calendar | `macro.py`, `frontend/src/MacroCalendar.tsx` |
+| Event study and multi-horizon research | `event_study.py`, `event_research.py` |
 | Shared API/MCP | `services.py`, `api.py`, `mcp_server.py` |
 | Dashboard and browser checks | `frontend/` |
 | Migrations and CI | `migrations/`, `.github/workflows/` |
