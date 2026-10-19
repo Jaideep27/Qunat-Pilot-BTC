@@ -236,14 +236,31 @@ def drop_risk(x, target, windows, seed):
 def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None, min_days=90,
                      groups=('price', 'technical', 'derivatives', 'full', 'macro'), horizons=tuple(HORIZONS),
                      reserve_months=2, seed=42, train_step=3):
-    """New research directory only. Historical tests are explicitly previously observed.
+    """New research directory, or resume of an interrupted run with the identical configuration.
 
     The last `reserve_months` are left unused for later forward-design checks. No holdout is
-    relabeled 'untouched' and no model is released or allowed to trade.
+    relabeled 'untouched' and no model is released or allowed to trade. Every finished result
+    is appended to progress.jsonl, so a terminated run resumes instead of refitting.
     """
     from .macro import macro_features
     output = Path(output)
-    output.mkdir(parents=True, exist_ok=False)
+    config = dict(folds=folds, min_days=min_days, groups=list(groups), horizons=list(horizons),
+                  reserve_months=reserve_months, seed=seed, train_step=train_step,
+                  code=sha256(Path(__file__).read_bytes()).hexdigest())
+    progress, done = output/'progress.jsonl', {}
+    if output.exists():
+        if not progress.exists():
+            raise FileExistsError('Output exists without resumable progress; choose a new directory')
+        lines = progress.read_text(encoding='utf-8').splitlines()
+        if json.loads(lines[0]).get('config') != config:
+            raise ValueError('Existing progress was produced by a different configuration or code version')
+        done = {row['id']: row for row in map(json.loads, lines[1:])}
+    else:
+        output.mkdir(parents=True)
+        progress.write_text(json.dumps({'config': config})+'\n', encoding='utf-8')
+    def record(row):
+        with progress.open('a', encoding='utf-8') as stream:
+            stream.write(json.dumps(row, default=str)+'\n')
     frames = frames if frames is not None else load_frames(settings.data_dir)
     if runs is None:
         from sqlalchemy import select
@@ -287,6 +304,10 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                 columns = group_columns[group]
                 x = f[columns]
                 for horizon in horizons:
+                    key = f'{fold}-{strategy}-{group}-{horizon}'
+                    if key in done:
+                        rows.append(done[key])
+                        continue
                     target = y['up_'+horizon]
                     if min(target.loc[tr].nunique(), target.loc[ca].nunique()) < 2:
                         continue
@@ -319,7 +340,6 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                     expected = ridge.predict(x.loc[te])
                     quantile_model, ranges = quantile_ranges(x, returns, tr, te, seed)
                     constant = np.repeat(target.loc[tr].mean(), len(te))
-                    key = f'{fold}-{strategy}-{group}-{horizon}'
                     row = dict(id=key, fold=fold, training=strategy, group=group, horizon=horizon,
                         train_rows=len(tr), test_rows=len(te),
                         windows={k: [v.min().isoformat(), v.max().isoformat()] for k, v in windows.items()},
@@ -332,12 +352,18 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                     artifacts[key] = dict(models=calibrated, weights=weights, return_model=ridge,
                                           quantile_model=quantile_model, columns=columns)
                     rows.append(row)
+                    record(row)
                     print(json.dumps({'completed': key, 'brier': row['brier'], 'constant': row['constant_brier']}),
                           flush=True)
+                key = f'{fold}-{strategy}-{group}-drop5'
+                if key in done:
+                    risk.append(done[key])
+                    continue
                 model, result = drop_risk(x, y['drop5_24h'], windows, seed)
-                risk.append(dict(fold=fold, training=strategy, group=group, **result))
+                risk.append(dict(id=key, fold=fold, training=strategy, group=group, **result))
+                record(risk[-1])
                 if model is not None:
-                    artifacts[f'{fold}-{strategy}-{group}-drop5'] = dict(model=model, columns=columns)
+                    artifacts[key] = dict(model=model, columns=columns)
     volatility = volatility_comparison(d.close, vol_windows, {h: HORIZONS[h] for h in horizons})
     report = dict(status='research_only', promotion_allowed=False, seed=seed, purge_hours=24, train_step=train_step,
         data_hashes=dataset_hashes(settings.data_dir) if frames is None else 'supplied_frames',
@@ -348,6 +374,7 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
         historical_test_status='Previously inspected data; not an untouched holdout',
         incomplete=['news ablation (needs forward news history)', 'cost-aware shared-engine replay',
                     'fresh forward validation'],
+        resumed_results=len(done), models_saved=sorted(artifacts),
         comparisons=rows, drop_risk=risk, volatility=volatility, summary=summarize(rows, risk, volatility))
     (output/'evaluation.json').write_text(json.dumps(report, indent=2, allow_nan=False, default=str), encoding='utf-8')
     (output/'report.md').write_text(render(report), encoding='utf-8')

@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -63,7 +65,7 @@ def test_block_bootstrap_resamples_whole_days():
     assert result['brier_improvement'] <= result['ci95'][1]+1e-12
 
 
-def test_experiment_runs_end_to_end_without_leaking_or_promoting(account, tmp_path):
+def synthetic_inputs():
     rng = np.random.default_rng(0)
     n = 288*120
     events = pd.date_range('2025-01-01', periods=n, freq='5min', tz='UTC')
@@ -82,6 +84,14 @@ def test_experiment_runs_end_to_end_without_leaking_or_promoting(account, tmp_pa
                   sentiment=frame.iloc[::288].assign(fear_greed=50.))
     macro_events = [dict(kind='cpi', scheduled_at=t.isoformat(), values={'CPIAUCSL': dict(change_pct=.2)})
                     for t in pd.date_range('2024-12-15 13:30', periods=6, freq='30D', tz='UTC')]
+    return frames, macro_events
+
+
+SMALL = dict(folds=1, runs=[], min_days=40, groups=('technical', 'macro'), horizons=('1h', '24h'), reserve_months=0)
+
+
+def test_experiment_runs_end_to_end_without_leaking_or_promoting(account, tmp_path):
+    frames, macro_events = synthetic_inputs()
     report = er.train_experiment(tmp_path/'run', folds=1, frames=frames, runs=[], macro_events=macro_events,
                                  min_days=40, groups=('technical', 'macro'), horizons=('1h', '24h'),
                                  reserve_months=0)
@@ -101,3 +111,25 @@ def test_training_windows_are_thinned_but_evaluation_keeps_every_cutoff():
     assert list(thinned['train']) == [index[0], index[3]]
     assert list(thinned['calibration']) == [index[6]]
     assert list(thinned['test']) == [index[9]] and thinned['validation'].equals(windows['validation'])
+
+
+def test_interrupted_experiment_resumes_without_refitting_finished_work(account, tmp_path, monkeypatch):
+    frames, macro_events = synthetic_inputs()
+    real_drop, real_ranges = er.drop_risk, er.quantile_ranges
+    def crash(*args, **kwargs):
+        raise RuntimeError('simulated termination after the first group')
+    monkeypatch.setattr(er, 'drop_risk', crash)
+    with pytest.raises(RuntimeError):
+        er.train_experiment(tmp_path/'run', frames=frames, macro_events=macro_events, **SMALL)
+    first = [json.loads(line) for line in (tmp_path/'run'/'progress.jsonl').read_text().splitlines()[1:]]
+    assert [r['group'] for r in first] == ['technical', 'technical']
+    fitted = []
+    monkeypatch.setattr(er, 'drop_risk', real_drop)
+    monkeypatch.setattr(er, 'quantile_ranges', lambda *a, **k: (fitted.append(1), real_ranges(*a, **k))[1])
+    report = er.train_experiment(tmp_path/'run', frames=frames, macro_events=macro_events, **SMALL)
+    # Exactly the unfinished combinations are fitted on resume; finished ones are reused verbatim.
+    assert len(fitted) == len(report['comparisons'])-len(first) > 0
+    assert [r for r in report['comparisons'] if r['id'] in {f['id'] for f in first}] == first
+    assert report['resumed_results'] == len(first)
+    with pytest.raises(ValueError, match='different configuration'):
+        er.train_experiment(tmp_path/'run', frames=frames, macro_events=macro_events, **{**SMALL, 'folds': 2})
