@@ -36,7 +36,9 @@ def main():
     try:
         name=ctypes.create_unicode_buffer(32768);size=wintypes.DWORD(len(name))
         if not kernel.QueryFullProcessImageNameW(handle,0,name,ctypes.byref(size)):
-            raise ctypes.WinError(ctypes.get_last_error())
+            # The recorded PID was reused by a process we cannot inspect, so it is not ours.
+            print(f'Recorded {service} PID {pid} now belongs to an inaccessible process; nothing stopped.')
+            return
         executable=Path(name.value).resolve()
         allowed=any(executable.is_relative_to(root/directory) for directory in ('.venv','.python'))
         if not allowed or executable.name.lower()!='python.exe':
