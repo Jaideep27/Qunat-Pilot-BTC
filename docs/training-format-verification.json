@@ -1,0 +1,128 @@
+{
+  "status": "verified",
+  "checked_at": "2026-10-19T18:31:44.604493+00:00",
+  "model_version": "24c8238525d4",
+  "algorithm": "xgboost",
+  "calibration": "sigmoid",
+  "forecast": "Probability of positive versus non-positive close return over the next 60 minutes",
+  "row_format": "One UTC completed five-minute cutoff per row; numeric historical features; target stored separately",
+  "research_start": "2024-10-01T00:00:00+00:00",
+  "research_end_exclusive": "2026-10-01T00:00:00+00:00",
+  "eligible_dataset_rows": 209983,
+  "catalogue_features": 106,
+  "selected_features": [
+    "return_12",
+    "return_288",
+    "ema_9_distance",
+    "ema_9_slope",
+    "ema_21_distance",
+    "ema_21_slope",
+    "ema_50_distance",
+    "ema_50_slope",
+    "ema_200_distance",
+    "ema_200_slope",
+    "sma_20_distance",
+    "sma_50_distance",
+    "sma_200_distance",
+    "ema_cross",
+    "macd",
+    "rsi_7",
+    "rsi_14",
+    "rsi_21",
+    "stochastic",
+    "williams_r",
+    "roc",
+    "cci",
+    "obv_change",
+    "mfi",
+    "vwap_distance",
+    "bollinger_position",
+    "keltner_position",
+    "channel_high_20",
+    "channel_low_20",
+    "channel_low_288",
+    "swing_high_distance",
+    "swing_low_distance",
+    "pivot_distance",
+    "15min_rsi_14",
+    "15min_ema_21_distance",
+    "15min_ema_50_distance",
+    "15min_macd",
+    "1h_rsi_14",
+    "1h_ema_21_distance",
+    "timeframe_alignment"
+  ],
+  "selected_by_family": {
+    "technical": 40,
+    "derivatives": 0,
+    "sentiment": 0
+  },
+  "split": {
+    "train": {
+      "rows": 174848,
+      "first": "2024-10-01T00:00:00+00:00",
+      "last": "2026-05-31T22:55:00+00:00"
+    },
+    "calibration": {
+      "rows": 8772,
+      "first": "2026-06-01T00:00:00+00:00",
+      "last": "2026-07-01T10:55:00+00:00"
+    },
+    "validation": {
+      "rows": 8772,
+      "first": "2026-07-01T12:00:00+00:00",
+      "last": "2026-07-31T22:55:00+00:00"
+    },
+    "holdout": {
+      "rows": 17555,
+      "first": "2026-08-01T00:00:00+00:00",
+      "last": "2026-09-30T22:55:00+00:00"
+    }
+  },
+  "purge_minutes": 60,
+  "threshold": 0.6,
+  "seed": 42,
+  "checks": [
+    "Frozen dataset SHA256 identity",
+    "Chronological unique UTC cutoffs",
+    "Elapsed-hour target alignment",
+    "No target columns in model inputs",
+    "Disjoint purged fitting/calibration/validation/holdout windows",
+    "Saved scaler row count, feature names, means and variances match training only",
+    "Saved feature-selection scores match training-only labels",
+    "Isolated calibration replica reproduces saved probabilities using calibration rows only",
+    "Frozen holdout probability metrics reproduce",
+    "Released/exported model bytes match"
+  ],
+  "holdout_metrics": {
+    "brier": 0.25107617374316393,
+    "roc_auc": 0.5387725418275516,
+    "balanced_accuracy": 0.5064898400304677
+  },
+  "holdout_trades": 0,
+  "focused_tests_passed": 13,
+  "released_model_modified_or_retuned_by_this_audit": false,
+  "base_model_retrained_by_this_audit": false,
+  "isolated_calibration_replica_fitted_for_verification": true,
+  "five_year_history_used_for_this_experiment": false,
+  "limitations": [
+    "Research spans 24 months; five-year storage coverage applies to price candles",
+    "Source positioning gaps use the documented authorized quarantine policy",
+    "Current forecast is direction classification; no separate price-level or multi-horizon model is trained",
+    "Modest holdout performance and zero holdout trades do not establish profitability"
+  ],
+  "dataset_sha256": {
+    "candles.parquet": "c5c231b11b114be35927776250f82d6b5042d8ff2b06b732337d11e0f94f7ee8",
+    "mark.parquet": "2b0db083c073e83b808f351212a4fcbf2151f8ad7bc1357d2c410c9e41f3dc32",
+    "index.parquet": "bcf44cca3d77122d67b0c418472d0114457d4cca95916d2c048a22144fbd092d",
+    "positioning.parquet": "cd92cf401167ee23d18196466404d538499bc3dbf3ca405f52cb2c58f0051b60",
+    "funding.parquet": "56e063d24bc97950f4904ee61d1dba76bfef1b3691f5190be4c252d6e18af9aa",
+    "sentiment.parquet": "73d26df95c59a6ff7f1241452157ccf6bf00fe0e95daba9e3270a2e85a00f9f7"
+  },
+  "model_sha256": "1c21011a34487710f27048fa1e6e16065fb6a17f35f623fcfd964837a01ba6ad",
+  "source_sha256": {
+    "src/quantpilot/research.py": "8de9837946785746681cf8ae8489bac3c747414396b4a2c42db4ded8eb00496b",
+    "src/quantpilot/features.py": "dfd1423669ef4c86bdbc6190b40c03c02ebb67eb0be3643d2a1cd3f87a8a2bd8",
+    "scripts/verify_training.py": "60171a135faeb236b4e238d13142e918edb054308f7942d023f044d2fdeac8d9"
+  }
+}

@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: quantpilot
+      POSTGRES_USER: quantpilot
+      POSTGRES_PASSWORD: ${QUANTPILOT_PG_PASSWORD:?Set the private PostgreSQL password}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    ports: ["127.0.0.1:55433:5432"]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U quantpilot -d quantpilot"]
+      interval: 5s
+      retries: 12
+  api:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      QUANTPILOT_DATABASE_URL: ${QUANTPILOT_DOCKER_DATABASE_URL:?Set the private PostgreSQL URL using host db}
+      QUANTPILOT_MARKET_DATABASE_URL: ${QUANTPILOT_DOCKER_DATABASE_URL}
+      QUANTPILOT_CORS_ORIGINS: '["http://localhost:5173"]'
+    volumes:
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts:ro
+    depends_on:
+      db:
+        condition: service_healthy
+  collector:
+    build: .
+    command: [python, -m, quantpilot.cli, collect-live]
+    restart: unless-stopped
+    environment:
+      QUANTPILOT_DATABASE_URL: ${QUANTPILOT_DOCKER_DATABASE_URL}
+      QUANTPILOT_MARKET_DATABASE_URL: ${QUANTPILOT_DOCKER_DATABASE_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  pgdata:
+

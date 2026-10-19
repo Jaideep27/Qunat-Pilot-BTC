@@ -1,0 +1,115 @@
+{
+  "checked_at": "2026-10-19T18:14:40.147Z",
+  "market": "BTCUSDT",
+  "source": "Actual local API reads of PostgreSQL forming/completed candle snapshots",
+  "scope": "Read-only persistence observation; no exchange requests, worker execution or fixture writes",
+  "observations": [
+    {
+      "observed_at": "2026-10-19T18:14:40.412Z",
+      "received_at": "2026-10-19T23:44:35.553250+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 263
+    },
+    {
+      "observed_at": "2026-10-19T18:14:41.590Z",
+      "received_at": "2026-10-19T23:44:35.553250+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 163
+    },
+    {
+      "observed_at": "2026-10-19T18:14:42.926Z",
+      "received_at": "2026-10-19T23:44:41.718352+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 322
+    },
+    {
+      "observed_at": "2026-10-19T18:14:44.106Z",
+      "received_at": "2026-10-19T23:44:41.718352+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 165
+    },
+    {
+      "observed_at": "2026-10-19T18:14:45.270Z",
+      "received_at": "2026-10-19T23:44:41.718352+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 157
+    },
+    {
+      "observed_at": "2026-10-19T18:14:46.444Z",
+      "received_at": "2026-10-19T23:44:41.718352+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 162
+    },
+    {
+      "observed_at": "2026-10-19T18:14:47.638Z",
+      "received_at": "2026-10-19T23:44:47.356816+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 183
+    },
+    {
+      "observed_at": "2026-10-19T18:14:48.783Z",
+      "received_at": "2026-10-19T23:44:47.356816+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 139
+    },
+    {
+      "observed_at": "2026-10-19T18:14:49.914Z",
+      "received_at": "2026-10-19T23:44:47.356816+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 127
+    },
+    {
+      "observed_at": "2026-10-19T18:14:51.064Z",
+      "received_at": "2026-10-19T23:44:47.356816+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 144
+    },
+    {
+      "observed_at": "2026-10-19T18:14:52.194Z",
+      "received_at": "2026-10-19T23:44:47.356816+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 124
+    },
+    {
+      "observed_at": "2026-10-19T18:14:53.317Z",
+      "received_at": "2026-10-19T23:44:52.868033+05:30",
+      "event_time": "2026-10-19T18:10:00+00:00",
+      "close": 82012.4,
+      "source": "https://fapi.binance.com/fapi/v1/klines",
+      "request_ms": 118
+    }
+  ],
+  "distinct_saved_observations": 4,
+  "saved_snapshot_intervals_ms": [
+    6165,
+    5638,
+    5512
+  ],
+  "median_saved_snapshot_interval_ms": 5638,
+  "median_local_api_request_ms": 159.5,
+  "price_changed": false,
+  "status": "periodic_postgresql_updates_verified",
+  "note": "Intervals describe observed receipt timestamps, not exchange-to-database or exchange-to-browser latency. A small local sample does not establish uptime."
+}

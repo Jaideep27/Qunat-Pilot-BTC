@@ -1,0 +1,6 @@
+{
+  "ready": false,
+  "status": "reload_required",
+  "message": "The running API has not loaded monitoring. Reload with node scripts/start.cjs --restart-services from the regular terminal.",
+  "checked_at": "2026-10-19T18:22:39.516510+00:00"
+}

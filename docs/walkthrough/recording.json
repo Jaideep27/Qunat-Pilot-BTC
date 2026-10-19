@@ -1,0 +1,85 @@
+{
+  "format": "video/webm;codecs=vp8",
+  "seconds": 120,
+  "width": 1440,
+  "height": 1000,
+  "scenes": [
+    {
+      "view": "Chart workspace",
+      "scroll": 0,
+      "seconds": 20,
+      "caption": "BTCUSDT PostgreSQL workspace: 525,888 of 525,888 five-minute candles in five years; 0 gaps. Seven timeframes, 86 studies and saved drawings. This recording disables the exchange socket and shows stored prices. Actual WebSocket latency is not demonstrated."
+    },
+    {
+      "view": "Market",
+      "scroll": 0,
+      "seconds": 15,
+      "caption": "Market context combines price, volume, positioning and daily sentiment with observation times. The independent collector reports a 5-second polling target. These are actual local database observations; this is a snapshot walkthrough, not continuous live trading."
+    },
+    {
+      "view": "Prediction",
+      "scroll": 0,
+      "seconds": 20,
+      "caption": "Frozen calibrated model 24c8238525d4. Snapshot decision: NO_TRADE; reasons: STALE_DATA, WEAK_FORECAST, INSUFFICIENT_EDGE. Predictions face cost, availability and risk gates. Explanations describe model associations; no thresholds were retuned for this recording."
+    },
+    {
+      "view": "Research",
+      "scroll": 0,
+      "seconds": 20,
+      "caption": "The research experiment uses 24 complete months, 209,983 common eligible observations and 106 features. The authorized policy quarantines 62 affected positioning rows and dependent windows without interpolation. Five-year price storage is separate from the 24-month ML experiment."
+    },
+    {
+      "view": "Research",
+      "scroll": 850,
+      "seconds": 20,
+      "caption": "Untouched August-September 2026 holdout: ROC-AUC 0.5388, Brier 0.2511 and balanced accuracy 50.65%. The frozen cost and risk policy produced zero holdout trades and zero return. These measured research results do not establish profitability."
+    },
+    {
+      "view": "Paper portfolio",
+      "scroll": 0,
+      "seconds": 25,
+      "caption": "Actual snapshot: 37 forward decisions, 0 forward fills, 0 replayed fills; equity 10,000 USDT. Monitor: reload required. Verified: 88 Python cases, 14 browser cases, nine SDK tool/API comparisons and a 7-table restore drill. Observation span is not uptime. Public deployment is deferred."
+    }
+  ],
+  "recorded_at": "2026-10-19T18:19:08.792Z",
+  "captures": [
+    {
+      "file": "scene-01.png",
+      "sha256": "0f28967a2b3a2447a3e7ae63070dc12eb5b756b8fd26207b5d61f736be9be1f0",
+      "captured_at": "2026-10-19T18:16:56.558Z"
+    },
+    {
+      "file": "scene-02.png",
+      "sha256": "251c0450d6015bc4f718ce90e76bc1bd8b598157a50a43fac7ff94cd088443bb",
+      "captured_at": "2026-10-19T18:16:58.369Z"
+    },
+    {
+      "file": "scene-03.png",
+      "sha256": "1dc13af45d7c37812f17180ee98c08b0e4ff3797b566708c6cfd98aa9f9f652c",
+      "captured_at": "2026-10-19T18:16:59.727Z"
+    },
+    {
+      "file": "scene-04.png",
+      "sha256": "ee6a50907d52fa3929fc3e40beda8bcf4e6d95276b13a667a120bc0d644c6b22",
+      "captured_at": "2026-10-19T18:17:05.861Z"
+    },
+    {
+      "file": "scene-05.png",
+      "sha256": "e0f7e8e79d7ff048f63aae90bf36ad276d550d8377ff8836618c8068fc897cbe",
+      "captured_at": "2026-10-19T18:17:07.095Z"
+    },
+    {
+      "file": "scene-06.png",
+      "sha256": "3ffb2189aa885d97a6930753158c7b4498ce5678dee909a1c4fc232f276e5bb8",
+      "captured_at": "2026-10-19T18:17:08.347Z"
+    }
+  ],
+  "page_errors": [],
+  "provider_socket": "Intentionally disabled for recording; actual WebSocket latency remains unverified",
+  "service_readiness": false,
+  "running_monitor": "reload_required",
+  "runtime_evidence": "runtime-snapshot.json",
+  "video_sha256": "de033fae57eb0b0c43aadc1bb5b9fb9814f6d671daa46291c57433173e9f7e24",
+  "style": "Captioned snapshots of actual local UI/database; no voiceover or continuous stream demonstration",
+  "model_version": "24c8238525d4"
+}

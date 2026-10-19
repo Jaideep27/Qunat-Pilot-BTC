@@ -1,0 +1,19 @@
+{
+  "verified_at": "2026-10-19T07:36:09.003352+00:00",
+  "scope": "real release plus fixture/failure states",
+  "passed": true,
+  "browser_cases_passed": 5,
+  "browser_duration_seconds": 20.4,
+  "browser": "Installed Chrome through Playwright",
+  "log": ".verification/browser-release-final.log",
+  "log_sha256": "53a69ac7089462f820323332c4779b7587b756bd5a2fa73df89a2a3055bf8e55",
+  "build": "TypeScript and Vite passed; main chunk approximately 801 kB advisory",
+  "sha256": {
+    "frontend/package-lock.json": "d8c7e328dee1277c2a5e22b3ae3806fd0132fd70b448d2a32e857be3b36024d2",
+    "frontend/dist/index.html": "8ccd00e30acaef7029bd27ed8a316423590e73d9f02ae4dcdfdda09c8e6f4c41",
+    "docs/screenshots/release-market.png": "20c51eebc85c0e2c23b072172381f24556933e957c77d9f3bbef56988c306bbf",
+    "docs/screenshots/release-paper.png": "5497c461bab0d6c85ab42b04104fcd2c306a4176ce720e340e30e1390918cf4c",
+    "docs/screenshots/release-prediction.png": "12cf2415a43a86ac98653d205a8d43b9c4eae60d7e6b3d59b7ed18723342a448",
+    "docs/screenshots/release-research.png": "60dbc64c6ea4553d86aca3e98585e3aa60542296894010e352c9efe95c7f86fc"
+  }
+}

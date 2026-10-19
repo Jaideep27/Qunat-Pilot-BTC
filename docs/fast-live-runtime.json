@@ -1,0 +1,96 @@
+{
+  "verified_at": "2026-10-19T13:44:26.031Z",
+  "source": "Actual Binance stream and actual PostgreSQL reads; no mocked messages",
+  "stream_verified": true,
+  "database_advanced": true,
+  "socket_errors": [
+    "WebSocket is closed before the connection is established."
+  ],
+  "sample_frames": [
+    "{\"e\":\"kline\",\"E\":1792417467719,\"s\":\"BTCUSDT\",\"k\":{\"t\":1792417200000, \"T\":1792417499999, \"s\":\"BTCUSDT\", \"i\":\"5m\", \"f\":8186234654, \"L\":8186254832, \"o\":\"82212.00\", \"c\":\"82325.10\", \"h\":\"82362.00\", \"l\":\"82160.20\", \"v\":\"642.125\", \"n\":20160, \"x\":false, \"q\":\"52816247.42590\", \"V\":\"322.940\", \"Q\":\"26562128.16410\", \"B\":\"0\"}}",
+    "{\"e\":\"kline\",\"E\":1792417468085,\"s\":\"BTCUSDT\",\"k\":{\"t\":1792417200000, \"T\":1792417499999, \"s\":\"BTCUSDT\", \"i\":\"5m\", \"f\":8186234654, \"L\":8186254835, \"o\":\"82212.00\", \"c\":\"82325.20\", \"h\":\"82362.00\", \"l\":\"82160.20\", \"v\":\"642.143\", \"n\":20162, \"x\":false, \"q\":\"52817729.27930\", \"V\":\"322.956\", \"Q\":\"26563445.36730\", \"B\":\"0\"}}"
+  ],
+  "first_database_observation": {
+    "event_time": "2026-10-19T13:40:00+00:00",
+    "open": 82212,
+    "high": 82362,
+    "low": 82160.2,
+    "close": 82296.5,
+    "volume": 624.156,
+    "trade_count": 19685,
+    "taker_buy_volume": 305.907,
+    "received_at": "2026-10-19T19:14:25.437123+05:30",
+    "source": "https://fapi.binance.com/fapi/v1/klines",
+    "complete": false,
+    "available_at": "2026-10-19T13:45:00+00:00"
+  },
+  "stream_status": "Live stream connected",
+  "messages": [
+    {
+      "eventAt": 1792417468931,
+      "receivedAt": 1792417468988,
+      "paintedAt": 1792417469207,
+      "price": "Live 82333.50"
+    },
+    {
+      "eventAt": 1792417469208,
+      "receivedAt": 1792417469269,
+      "paintedAt": 1792417469279,
+      "price": "Live 82333.50"
+    },
+    {
+      "eventAt": 1792417469550,
+      "receivedAt": 1792417469610,
+      "paintedAt": 1792417469614,
+      "price": "Live 82333.60"
+    },
+    {
+      "eventAt": 1792417469902,
+      "receivedAt": 1792417469959,
+      "paintedAt": 1792417469972,
+      "price": "Live 82333.50"
+    },
+    {
+      "eventAt": 1792417470378,
+      "receivedAt": 1792417470438,
+      "paintedAt": 1792417470443,
+      "price": "Live 82333.50"
+    },
+    {
+      "eventAt": 1792417470652,
+      "receivedAt": 1792417470715,
+      "paintedAt": 1792417470720,
+      "price": "Live 82333.50"
+    },
+    {
+      "eventAt": 1792417471051,
+      "receivedAt": 1792417471113,
+      "paintedAt": 1792417471119,
+      "price": "Live 82325.10"
+    },
+    {
+      "eventAt": 1792417471360,
+      "receivedAt": 1792417471421,
+      "paintedAt": 1792417471427,
+      "price": "Live 82311.90"
+    }
+  ],
+  "median_observed_message_interval_ms": 341,
+  "maximum_observed_DOM_update_ms": 219,
+  "last_database_observation": {
+    "event_time": "2026-10-19T13:40:00+00:00",
+    "open": 82212,
+    "high": 82362,
+    "low": 82160.2,
+    "close": 82325.1,
+    "volume": 641.76,
+    "trade_count": 20151,
+    "taker_buy_volume": 322.935,
+    "received_at": "2026-10-19T19:14:31.685778+05:30",
+    "source": "https://fapi.binance.com/fapi/v1/klines",
+    "complete": false,
+    "available_at": "2026-10-19T13:45:00+00:00"
+  },
+  "collector_poll_interval_seconds": 5,
+  "status": "actual_stream_and_periodic_postgres_verified"
+}

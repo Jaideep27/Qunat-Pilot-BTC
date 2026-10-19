@@ -1,0 +1,40 @@
+{
+  "status": "passed",
+  "model_version": "24c8238525d4",
+  "readonly_api_routes": 10,
+  "mcp_tools_matched": 9,
+  "coverage_policy": {
+    "mode": "positioning_quarantine_v1",
+    "maximum_affected_fraction": 0.001,
+    "authorized_by": "User delegated coverage decision and requested autonomous completion",
+    "handling": "No interpolation; missing/invalid positioning and 12 subsequent bars excluded"
+  },
+  "quarantine": {
+    "source_rows": 62,
+    "expected_rows": 221760,
+    "source_fraction": 0.0002795815295815296,
+    "maximum_fraction": 0.001,
+    "feature_lookback_bars": 12,
+    "status": "accepted"
+  },
+  "prediction_action": "NO_TRADE",
+  "prediction_reasons": [
+    "STALE_DATA",
+    "WEAK_FORECAST",
+    "INSUFFICIENT_EDGE"
+  ],
+  "equity": 10000.0,
+  "fills": 0,
+  "latency_seconds": {
+    "candles": 0.7508,
+    "indicators": 14.6893,
+    "positioning": 0.2701,
+    "sentiment": 0.1618,
+    "coverage": 0.2236,
+    "predictions": 9.6346,
+    "decisions": 0.4373,
+    "backtests": 3.3872,
+    "portfolio": 0.2668,
+    "indicators_warm": 0.2708
+  }
+}

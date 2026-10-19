@@ -1,0 +1,244 @@
+{
+  "start": "2024-10-01T00:00:00+00:00",
+  "end_exclusive": "2026-10-01T00:00:00+00:00",
+  "warmup_start": "2024-08-22T00:00:00+00:00",
+  "release_ready": true,
+  "families": {
+    "candles": {
+      "rows": 227808,
+      "missing_windows": 0,
+      "gap_ranges": [],
+      "native_missing_count": 0,
+      "native_gap_ranges": [],
+      "invalid_rows": 0,
+      "invalid_columns": {},
+      "invalid_ranges": [],
+      "issues": []
+    },
+    "mark": {
+      "rows": 227808,
+      "missing_windows": 0,
+      "gap_ranges": [],
+      "native_missing_count": 0,
+      "native_gap_ranges": [],
+      "invalid_rows": 0,
+      "invalid_columns": {},
+      "invalid_ranges": [],
+      "issues": []
+    },
+    "index": {
+      "rows": 227808,
+      "missing_windows": 0,
+      "gap_ranges": [],
+      "native_missing_count": 0,
+      "native_gap_ranges": [],
+      "invalid_rows": 0,
+      "invalid_columns": {},
+      "invalid_ranges": [],
+      "issues": []
+    },
+    "positioning": {
+      "rows": 221755,
+      "missing_windows": 57,
+      "gap_ranges": [
+        [
+          "2025-01-23T14:45:00+00:00",
+          "2025-01-23T15:00:00+00:00"
+        ],
+        [
+          "2025-01-23T15:20:00+00:00",
+          "2025-01-23T15:30:00+00:00"
+        ],
+        [
+          "2025-02-03T02:05:00+00:00",
+          "2025-02-03T02:10:00+00:00"
+        ],
+        [
+          "2025-04-15T07:55:00+00:00",
+          "2025-04-15T08:10:00+00:00"
+        ],
+        [
+          "2025-04-15T08:40:00+00:00",
+          "2025-04-15T08:40:00+00:00"
+        ],
+        [
+          "2025-07-21T14:30:00+00:00",
+          "2025-07-21T14:30:00+00:00"
+        ],
+        [
+          "2025-07-21T14:40:00+00:00",
+          "2025-07-21T14:40:00+00:00"
+        ],
+        [
+          "2025-07-21T16:20:00+00:00",
+          "2025-07-21T17:10:00+00:00"
+        ],
+        [
+          "2025-07-22T13:45:00+00:00",
+          "2025-07-22T16:10:00+00:00"
+        ]
+      ],
+      "native_missing_count": 5,
+      "native_gap_ranges": [
+        [
+          "2024-10-28T16:25:00+00:00",
+          "2024-10-28T16:30:00+00:00"
+        ],
+        [
+          "2025-08-29T06:20:00+00:00",
+          "2025-08-29T06:30:00+00:00"
+        ]
+      ],
+      "invalid_rows": 57,
+      "invalid_columns": {
+        "global_ratio": 19,
+        "top_account_ratio": 54,
+        "top_position_ratio": 18
+      },
+      "invalid_ranges": [
+        [
+          "2025-01-23T14:40:00+00:00",
+          "2025-01-23T14:55:00+00:00"
+        ],
+        [
+          "2025-01-23T15:15:00+00:00",
+          "2025-01-23T15:25:00+00:00"
+        ],
+        [
+          "2025-02-03T02:00:00+00:00",
+          "2025-02-03T02:05:00+00:00"
+        ],
+        [
+          "2025-04-15T07:50:00+00:00",
+          "2025-04-15T08:05:00+00:00"
+        ],
+        [
+          "2025-04-15T08:35:00+00:00",
+          "2025-04-15T08:35:00+00:00"
+        ],
+        [
+          "2025-07-21T14:25:00+00:00",
+          "2025-07-21T14:25:00+00:00"
+        ],
+        [
+          "2025-07-21T14:35:00+00:00",
+          "2025-07-21T14:35:00+00:00"
+        ],
+        [
+          "2025-07-21T16:15:00+00:00",
+          "2025-07-21T17:05:00+00:00"
+        ],
+        [
+          "2025-07-22T13:40:00+00:00",
+          "2025-07-22T16:05:00+00:00"
+        ]
+      ],
+      "issues": [
+        "invalid numeric values",
+        "5 missing native observations",
+        "missing or stale windows"
+      ]
+    },
+    "funding": {
+      "rows": 2373,
+      "missing_windows": 0,
+      "gap_ranges": [],
+      "native_missing_count": 0,
+      "native_gap_ranges": [],
+      "invalid_rows": 0,
+      "invalid_columns": {},
+      "invalid_ranges": [],
+      "issues": []
+    },
+    "sentiment": {
+      "rows": 3178,
+      "missing_windows": 0,
+      "gap_ranges": [],
+      "native_missing_count": 0,
+      "native_gap_ranges": [],
+      "invalid_rows": 0,
+      "invalid_columns": {},
+      "invalid_ranges": [],
+      "issues": []
+    }
+  },
+  "availability_assumptions": {
+    "bars": "close time",
+    "positioning": "event + 5 minutes",
+    "funding": "event + 1 second; settlement gap tolerance 1 second",
+    "sentiment": "event + 24 hours"
+  },
+  "dataset_hashes": {
+    "candles.parquet": "c5c231b11b114be35927776250f82d6b5042d8ff2b06b732337d11e0f94f7ee8",
+    "mark.parquet": "2b0db083c073e83b808f351212a4fcbf2151f8ad7bc1357d2c410c9e41f3dc32",
+    "index.parquet": "bcf44cca3d77122d67b0c418472d0114457d4cca95916d2c048a22144fbd092d",
+    "positioning.parquet": "cd92cf401167ee23d18196466404d538499bc3dbf3ca405f52cb2c58f0051b60",
+    "funding.parquet": "56e063d24bc97950f4904ee61d1dba76bfef1b3691f5190be4c252d6e18af9aa",
+    "sentiment.parquet": "73d26df95c59a6ff7f1241452157ccf6bf00fe0e95daba9e3270a2e85a00f9f7"
+  },
+  "audit_mode": "cached_hash_verified",
+  "audited_at": "2026-10-19T06:48:29.194015+00:00",
+  "anchor": "2026-10-18T00:00:00Z",
+  "status": "eligible_with_quarantine",
+  "expected_archives": 874,
+  "verified_archives": 874,
+  "expected_5m_windows": 221760,
+  "archive_counts": {
+    "candles": {
+      "expected": 26,
+      "verified": 26
+    },
+    "mark": {
+      "expected": 26,
+      "verified": 26
+    },
+    "index": {
+      "expected": 26,
+      "verified": 26
+    },
+    "funding": {
+      "expected": 26,
+      "verified": 26
+    },
+    "positioning": {
+      "expected": 770,
+      "verified": 770
+    }
+  },
+  "reason": "User-authorized quarantine of bounded positioning gaps; all 24 months and mandatory feature families retained. Raw gaps remain disclosed.",
+  "full_report": "data/coverage.json",
+  "full_report_sha256": "71ba312c5a8fed1f49a454e59535ec591947bb47767fb921676b16843ef52432",
+  "repair_sources": [
+    {
+      "family": "mark",
+      "filename": "repair-15fbb82a71-mark-BTCUSDT-5m-2026-06-29.zip",
+      "url": "https://data.binance.vision/data/futures/um/daily/markPriceKlines/BTCUSDT/5m/BTCUSDT-5m-2026-06-29.zip",
+      "status": "verified",
+      "sha256": "eef21086c97542d63dcc88d311e9c3835d107f9d4b4497f6b488e32640e778c7",
+      "received_at": "2026-10-19T06:40:12.016675+00:00"
+    },
+    {
+      "family": "index",
+      "filename": "repair-148499c4af-index-BTCUSDT-5m-2026-06-29.zip",
+      "url": "https://data.binance.vision/data/futures/um/daily/indexPriceKlines/BTCUSDT/5m/BTCUSDT-5m-2026-06-29.zip",
+      "status": "verified",
+      "sha256": "3e013d9db506e6327a8d0f40504517ede0303d8c46618665d727f6f82559de1a",
+      "received_at": "2026-10-19T06:40:20.700795+00:00"
+    }
+  ],
+  "strict_release_ready": false,
+  "coverage_policy": {
+    "mode": "positioning_quarantine_v1",
+    "maximum_affected_fraction": 0.001,
+    "authorized_by": "User delegated coverage decision and requested autonomous completion",
+    "handling": "No interpolation; missing/invalid positioning and 12 subsequent bars excluded"
+  },
+  "quarantine": {
+    "source_rows": 62,
+    "expected_rows": 221760,
+    "source_fraction": 0.0002795815295815296,
+    "maximum_fraction": 0.001,
+    "feature_lookback_bars": 12,
+    "status": "accepted"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "ready": false,
+  "checked_at": "2026-10-19T14:19:25.735057+00:00",
+  "checks": {
+    "database": {
+      "ok": true,
+      "status": "connected"
+    },
+    "completed_candles": {
+      "ok": true,
+      "status": "fresh",
+      "age_seconds": 265.735057
+    },
+    "paper_worker": {
+      "ok": true,
+      "status": "healthy",
+      "age_seconds": 284.162675
+    },
+    "run_monitoring": {
+      "ok": false,
+      "status": "not_started"
+    },
+    "model": {
+      "ok": true,
+      "status": "released"
+    },
+    "coverage": {
+      "ok": true,
+      "status": "eligible"
+    },
+    "prediction_inputs": {
+      "ok": true,
+      "status": "observed"
+    }
+  },
+  "worker": {
+    "status": "healthy",
+    "last_checkpoint": "2026-10-19T14:14:41.572382+00:00",
+    "age_seconds": 284.162675,
+    "max_age_seconds": 1800,
+    "next_scheduled_at": "2026-10-19T14:32:00+00:00",
+    "schedule_utc": "2,17,32,47 * * * *",
+    "runs": [],
+    "run_totals": {},
+    "latency_sample_count": 0,
+    "latency_sample_scope": "Latest 100 recorded runs; successful runs only",
+    "duration_p50_seconds": null,
+    "duration_p95_seconds": null
+  },
+  "collector": {
+    "status": "connected",
+    "age_seconds": 2.910517,
+    "poll_interval_seconds": 5.0
+  },
+  "forward_evidence": {
+    "forward_decisions": 22,
+    "first_forward_decision": "2026-10-19T08:55:27.110604+00:00",
+    "last_forward_decision": "2026-10-19T14:14:37.889106+00:00",
+    "forward_fills": 0,
+    "replayed_fills": 0,
+    "note": "Counts come from the immutable ledger. Observation span is not an uptime percentage.",
+    "observed_span_hours": 5.320683827222222
+  },
+  "verification": {
+    "mode": "Actual PostgreSQL state; current code inspected in-process without worker execution",
+    "readiness_http_status": 503,
+    "checks": [
+      "Current-code operations response",
+      "Readiness HTTP semantics",
+      "Bounded input",
+      "Read-only endpoint"
+    ],
+    "running_api_operations_status": 404,
+    "running_api_loaded_monitoring": false,
+    "running_api_error_type": null
+  }
+}

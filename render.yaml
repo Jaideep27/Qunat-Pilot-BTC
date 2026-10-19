@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: quantpilot-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: QUANTPILOT_DATABASE_URL
+        sync: false
+      - key: QUANTPILOT_CORS_ORIGINS
+        sync: false
+

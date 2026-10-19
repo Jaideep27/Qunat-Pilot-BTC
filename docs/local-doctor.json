@@ -1,0 +1,114 @@
+{
+  "ready": false,
+  "checked_at": "2026-10-19T17:54:14.530533+00:00",
+  "checks": {
+    "current_code_ready": {
+      "ok": false,
+      "status": "needs_attention"
+    },
+    "five_year_candles": {
+      "ok": true,
+      "status": "complete"
+    },
+    "running_api": {
+      "ok": true,
+      "status": "reachable",
+      "http_status": 200
+    },
+    "running_monitor": {
+      "ok": false,
+      "status": "reload_required",
+      "http_status": 404
+    },
+    "dashboard": {
+      "ok": true,
+      "status": "reachable",
+      "http_status": 200
+    }
+  },
+  "details": {
+    "operations": {
+      "ready": false,
+      "checked_at": "2026-10-19T17:54:08.255027+00:00",
+      "checks": {
+        "database": {
+          "ok": true,
+          "status": "connected"
+        },
+        "completed_candles": {
+          "ok": true,
+          "status": "fresh",
+          "age_seconds": 248.255027
+        },
+        "paper_worker": {
+          "ok": true,
+          "status": "healthy",
+          "age_seconds": 347.813004
+        },
+        "run_monitoring": {
+          "ok": false,
+          "status": "not_started"
+        },
+        "model": {
+          "ok": true,
+          "status": "released"
+        },
+        "coverage": {
+          "ok": true,
+          "status": "eligible"
+        },
+        "prediction_inputs": {
+          "ok": true,
+          "status": "observed"
+        }
+      },
+      "worker": {
+        "status": "healthy",
+        "last_checkpoint": "2026-10-19T17:48:20.442023+00:00",
+        "age_seconds": 347.813004,
+        "max_age_seconds": 1800,
+        "next_scheduled_at": "2026-10-19T18:02:00+00:00",
+        "schedule_utc": "2,17,32,47 * * * *",
+        "runs": [],
+        "run_totals": {},
+        "latency_sample_count": 0,
+        "latency_sample_scope": "Latest 100 recorded runs; successful runs only",
+        "duration_p50_seconds": null,
+        "duration_p95_seconds": null
+      },
+      "collector": {
+        "status": "connected",
+        "age_seconds": 0.265176,
+        "poll_interval_seconds": 5.0
+      },
+      "forward_evidence": {
+        "forward_decisions": 36,
+        "first_forward_decision": "2026-10-19T08:55:27.110604+00:00",
+        "last_forward_decision": "2026-10-19T17:48:16.965790+00:00",
+        "forward_fills": 0,
+        "replayed_fills": 0,
+        "note": "Counts come from the immutable ledger. Observation span is not an uptime percentage.",
+        "observed_span_hours": 8.881480949722222
+      }
+    },
+    "candle_coverage": {
+      "start": "2021-10-19T17:50:00+00:00",
+      "end_exclusive": "2026-10-19T17:50:00+00:00",
+      "years": 5,
+      "markets": {
+        "BTCUSDT": {
+          "expected": 525888,
+          "stored": 525888,
+          "missing": 0,
+          "complete": true,
+          "gap_ranges": []
+        }
+      },
+      "scope": "Completed five-minute price candles; external families have separate source coverage."
+    },
+    "market_database_bytes": 1427486399,
+    "free_disk_bytes": 95964053504
+  },
+  "next_action": "node scripts/start.cjs --restart-services",
+  "scope": "Read-only local checks; no provider requests, worker execution, fills or service restarts"
+}

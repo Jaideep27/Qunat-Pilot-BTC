@@ -1,0 +1,48 @@
+{
+  "verified_at": "2026-10-19T13:02:46.264708+00:00",
+  "status": "implementation_verified_activation_requires_local_restart",
+  "symbol": "BTCUSDT",
+  "source_market": "Binance USD-M perpetual",
+  "internal_storage_key": "BTCUSDT_PERP",
+  "python": {
+    "tests": 67,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "focused_python_passed": 12,
+  "schema_check_passed": true,
+  "browser": {
+    "passed": 6,
+    "scope": "Five passed in the initial suite; the corrected real-release case passed in a targeted rerun. Workspace uses actual PostgreSQL via the existing API."
+  },
+  "postgres_integration_checks_passed": 5,
+  "static_checks_passed": 7,
+  "production_build": "passed",
+  "screenshot_visually_reviewed": true,
+  "preserved_inactive_archives": true,
+  "running_services_reloaded": false,
+  "activation_command": "node scripts/start.cjs --restart-services",
+  "activation_check": "uv run python scripts/verify_single_market.py",
+  "blocker": "Automatic approval review rejected stopping the existing API; sandbox approval is disabled. Agent outbound provider sockets are denied. Existing connected services were preserved.",
+  "runtime_evidence": "docs/single-market-status.json",
+  "source_sha256": {
+    "src/quantpilot/market_store.py": "498d1e8b6e8ceb972890385799341d645107f7c8949e8fff603220a2f6283369",
+    "src/quantpilot/history.py": "fa4aecfc7ec06f229e3f2cefe0c43297d21d459ecd6d82f3a47a3b83f9df5ede",
+    "src/quantpilot/collector.py": "a9969fc41a8ec4d997fc6ec235a6f9190cdb5373d195b6934296051dcd598fc4",
+    "src/quantpilot/api.py": "9e1e3ccac8d56d1461c3889c399477d12f2a75e046e178198d082fa2baa3d3ea",
+    "src/quantpilot/cli.py": "bfddf6ce5ce2ee77267578409ec1801272cac04b909ee85e52eb5e5530b6adc5",
+    "frontend/src/TradingWorkspace.tsx": "87e95035836351618b1eb9d5911cd61f6ab10eefb028d9c7697f841fdda987cc",
+    "frontend/src/TradingViewPanel.tsx": "3ebfdae79810ce30471eb2e6f72d30d462d992e0cf8295527270bc2b1f931e5f",
+    "frontend/tests/workspace.spec.ts": "42fb9d3e30d45ef06acffa61fcc02561a4d44f03c4e99023da29696897523e4c",
+    "frontend/tests/release.spec.ts": "bdc14478c7e4339381ceb715b563b673b96c16173a70357323d02d1775c2a505",
+    "scripts/start.cjs": "40ec726759fb22a9e54f7a8553e0a72247e1c0190653f2c60983db930aacded7",
+    "scripts/stop_data_supervisor.py": "2efee40f442f217bbedab1ead3ee6e811f2459fa17b95dcf5749c7cb1eae7037",
+    "scripts/serve_api.py": "5e58ee00fc1e9dcff246dccf1cc55ead741734a3820521a61de0ad699d9a2132",
+    "scripts/verify_single_market.py": "70627057a1a8085f8522b5b837e6cfe7d69c227b534c29c4fad315a89392966f",
+    "scripts/verify_postgres.py": "bfa2a84d10c5e1df34dd059099c94eea749ac3f52628a64ac9319f04abf97668",
+    "tests/test_market_store.py": "761658b1af2b2be48df79a5ec89ce9c7d7051f02873c4ed6520a1b1bd1fec9a5",
+    "tests/test_history_collector.py": "48ec050d337710de6d20cece30f3e1fa024ae6dafe4b22b4ab4e2a8a5a860fac",
+    "docs/screenshots/btcusdt-workspace.png": "2b240e5289d54da43929ba0298f65a093292c3e3923eba09934e62cf2fe910cf"
+  }
+}

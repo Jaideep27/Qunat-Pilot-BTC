@@ -1,0 +1,85 @@
+name: quality
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.lock
+      - run: pip install --require-hashes -r requirements-dev.lock
+      - run: pip install --no-deps -e .
+      - run: python -c "import numpy, numba, shap, xgboost, sklearn; print({m.__name__: m.__version__ for m in (numpy, numba, shap, xgboost, sklearn)})"
+      - run: python -m pip freeze > verification-dependencies.txt
+      - run: python -m compileall -q src tests migrations scripts
+      - run: pytest -q --junitxml=verification-pytest.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-evidence
+          path: |
+            verification-pytest.xml
+            verification-dependencies.txt
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: quantpilot
+          POSTGRES_PASSWORD: ci-only-quantpilot
+          POSTGRES_DB: quantpilot
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U quantpilot -d quantpilot"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      QUANTPILOT_DATABASE_URL: postgresql+psycopg://quantpilot:ci-only-quantpilot@127.0.0.1:5432/quantpilot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --require-hashes -r requirements-dev.lock
+      - run: pip install --no-deps .
+      - run: quantpilot init-db
+      - run: python scripts/verify_postgres.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: postgres-evidence
+          path: .verification/postgres-platform.json
+  browser:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test tests/service-readiness.test.cjs
+        working-directory: .
+      - run: node scripts/check-structure.cjs
+        working-directory: .
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence
+          path: |
+            frontend/test-results
+            frontend/package-lock.json
+

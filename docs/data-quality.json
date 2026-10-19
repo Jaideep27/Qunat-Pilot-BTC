@@ -1,0 +1,46 @@
+{
+  "coverage_policy": {
+    "mode": "positioning_quarantine_v1",
+    "maximum_affected_fraction": 0.001,
+    "authorized_by": "User delegated coverage decision and requested autonomous completion",
+    "handling": "No interpolation; missing/invalid positioning and 12 subsequent bars excluded"
+  },
+  "quarantine": {
+    "source_rows": 62,
+    "expected_rows": 221760,
+    "source_fraction": 0.0002795815295815296,
+    "maximum_fraction": 0.001,
+    "feature_lookback_bars": 12,
+    "status": "accepted"
+  },
+  "expected_research_rows": 210240,
+  "eligible_rows": 209983,
+  "excluded_rows": 257,
+  "positioning_lookback_exclusions": 177,
+  "eligible_by_month": {
+    "2024-10": 8888,
+    "2024-11": 8640,
+    "2024-12": 8925,
+    "2025-01": 8888,
+    "2025-02": 8047,
+    "2025-03": 8925,
+    "2025-04": 8613,
+    "2025-05": 8927,
+    "2025-06": 8635,
+    "2025-07": 8848,
+    "2025-08": 8913,
+    "2025-09": 8639,
+    "2025-10": 8928,
+    "2025-11": 8640,
+    "2025-12": 8927,
+    "2026-01": 8926,
+    "2026-02": 8064,
+    "2026-03": 8925,
+    "2026-04": 8638,
+    "2026-05": 8924,
+    "2026-06": 8640,
+    "2026-07": 8928,
+    "2026-08": 8928,
+    "2026-09": 8627
+  }
+}

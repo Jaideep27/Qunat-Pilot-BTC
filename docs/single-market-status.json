@@ -1,0 +1,44 @@
+{
+  "verified_at": "2026-10-19T12:57:52.939567+00:00",
+  "status": "restart_or_connection_check_required",
+  "symbol": "BTCUSDT",
+  "source_market": "Binance USD-M perpetual",
+  "storage": [
+    {
+      "market": "BTCUSDT",
+      "rows": 715260,
+      "first": "2020-01-01 05:30:00+05:30",
+      "last": "2026-10-19 18:25:00+05:30"
+    }
+  ],
+  "five_year_coverage": {
+    "start": "2021-10-19T12:55:00+00:00",
+    "end_exclusive": "2026-10-19T12:55:00+00:00",
+    "years": 5,
+    "markets": {
+      "BTCUSDT": {
+        "expected": 525888,
+        "stored": 525888,
+        "missing": 0,
+        "complete": true,
+        "gap_ranges": []
+      }
+    },
+    "scope": "Completed five-minute price candles; external families have separate source coverage."
+  },
+  "collector_connected": true,
+  "collector_single_market": false,
+  "api_market_values": [
+    "BTCUSDT_PERP",
+    "BTCUSDT_SPOT"
+  ],
+  "api_error": null,
+  "preserved_inactive_candles": [
+    {
+      "market": "BTCUSDT_SPOT",
+      "rows": 958489
+    }
+  ],
+  "restart_command": "node scripts/start.cjs --restart-services",
+  "note": "Inactive archives are preserved and never merged into BTCUSDT. Coverage applies to price candles only."
+}

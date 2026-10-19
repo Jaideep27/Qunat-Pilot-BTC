@@ -1,0 +1,299 @@
+{
+  "verified_at": "2026-10-19T18:01:54.176057+00:00",
+  "status": "local_code_verified_monitor_activation_pending",
+  "public_deployment": "deferred_by_owner",
+  "frozen_model_version": "24c8238525d4",
+  "symbol": "BTCUSDT",
+  "static": {
+    "passed": 7,
+    "checks": [
+      "Bootstrap configuration uses UTF-8 without BOM",
+      "JSON configuration syntax",
+      "Nine unique read-only MCP tools and shared services",
+      "Manifest uniqueness, UTC boundaries and warm-up",
+      "Python relative module imports resolve",
+      "Local Markdown document links resolve",
+      "Four dashboard views, attribution and browser audit source exist"
+    ]
+  },
+  "recovery": {
+    "evidence": "docs/recovery-verification.json",
+    "status": "passed",
+    "archives": [
+      {
+        "role": "combined",
+        "bytes": 90880746,
+        "sha256": "ca10df460da78a4abc39831b8248973c74e59d7fa9166a3f0d362424aea2e4a2",
+        "source_bytes": 1427486399,
+        "backup_seconds": 75.98399999999674
+      }
+    ],
+    "databases": [
+      {
+        "role": "combined",
+        "status": "passed",
+        "tables": 7,
+        "rows": 3639242,
+        "seconds": 139.78100000001723
+      }
+    ]
+  },
+  "doctor": {
+    "evidence": "docs/local-doctor.json",
+    "checked_at": "2026-10-19T17:54:14.530533+00:00",
+    "ready": false,
+    "checks": {
+      "current_code_ready": {
+        "ok": false,
+        "status": "needs_attention"
+      },
+      "five_year_candles": {
+        "ok": true,
+        "status": "complete"
+      },
+      "running_api": {
+        "ok": true,
+        "status": "reachable",
+        "http_status": 200
+      },
+      "running_monitor": {
+        "ok": false,
+        "status": "reload_required",
+        "http_status": 404
+      },
+      "dashboard": {
+        "ok": true,
+        "status": "reachable",
+        "http_status": 200
+      }
+    },
+    "forward_evidence": {
+      "forward_decisions": 36,
+      "first_forward_decision": "2026-10-19T08:55:27.110604+00:00",
+      "last_forward_decision": "2026-10-19T17:48:16.965790+00:00",
+      "forward_fills": 0,
+      "replayed_fills": 0,
+      "note": "Counts come from the immutable ledger. Observation span is not an uptime percentage.",
+      "observed_span_hours": 8.881480949722222
+    },
+    "candle_coverage": {
+      "start": "2021-10-19T17:50:00+00:00",
+      "end_exclusive": "2026-10-19T17:50:00+00:00",
+      "years": 5,
+      "markets": {
+        "BTCUSDT": {
+          "expected": 525888,
+          "stored": 525888,
+          "missing": 0,
+          "complete": true,
+          "gap_ranges": []
+        }
+      },
+      "scope": "Completed five-minute price candles; external families have separate source coverage."
+    }
+  },
+  "python": {
+    "passed": 88,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 37.687
+  },
+  "browser": {
+    "passed": 14,
+    "failures": 0,
+    "seconds": 56.411162000000004,
+    "engine": "Playwright with installed Chrome",
+    "includes_actual_release_and_postgresql_workspace": true
+  },
+  "postgres": {
+    "passed": 7,
+    "checks": [
+      "COPY upsert idempotency",
+      "forming/complete separation",
+      "JSON NULL quality flag",
+      "completed candle query",
+      "continuous ingestion persistence",
+      "fresh Alembic migration through worker-run schema",
+      "persistent worker outcomes and readiness"
+    ],
+    "fixtures_isolated_from_real_account": true
+  },
+  "build": {
+    "status": "passed",
+    "typecheck": "passed",
+    "entry_bytes": 439013,
+    "chunk_advisory_threshold_bytes": 500000,
+    "oversized_chunks": 0,
+    "assets": [
+      {
+        "path": "frontend/dist/assets/index-CIalurlS.js",
+        "bytes": 439013,
+        "gzip_bytes": 137589,
+        "sha256": "edc69907e620eeb34fb28e03b98dead795be4aba4f5c2bb6aa42345df06f63e2"
+      },
+      {
+        "path": "frontend/dist/assets/PaperOperations-BJESJzQg.js",
+        "bytes": 4614,
+        "gzip_bytes": 1715,
+        "sha256": "20ad30043b3b3d0192cf700aca4500946088d19e60bf0add935575c2feafdee2"
+      },
+      {
+        "path": "frontend/dist/assets/preview-B8iluRWy.js",
+        "bytes": 1553,
+        "gzip_bytes": 926,
+        "sha256": "b6d3d15055c659959c5ba298720536026bf7c3674b41c0f0080ee30e294360c3"
+      },
+      {
+        "path": "frontend/dist/assets/ResearchPlots-CqH8nu-o.js",
+        "bytes": 367798,
+        "gzip_bytes": 107316,
+        "sha256": "1d1823b584979ba023c2a8fc5428653388cb4f108a5842d9515a214c688863a3"
+      },
+      {
+        "path": "frontend/dist/assets/TradingWorkspace-CTBJAeVH.js",
+        "bytes": 18385,
+        "gzip_bytes": 6875,
+        "sha256": "14f178188f7e83003b10a919bd5375e60bb934c3140a36a0062fcde612dfd686"
+      }
+    ]
+  },
+  "runtime": {
+    "evidence": "docs/operations-runtime.json",
+    "checked_at": "2026-10-19T14:19:25.735057+00:00",
+    "ready": false,
+    "checks": {
+      "database": {
+        "ok": true,
+        "status": "connected"
+      },
+      "completed_candles": {
+        "ok": true,
+        "status": "fresh",
+        "age_seconds": 265.735057
+      },
+      "paper_worker": {
+        "ok": true,
+        "status": "healthy",
+        "age_seconds": 284.162675
+      },
+      "run_monitoring": {
+        "ok": false,
+        "status": "not_started"
+      },
+      "model": {
+        "ok": true,
+        "status": "released"
+      },
+      "coverage": {
+        "ok": true,
+        "status": "eligible"
+      },
+      "prediction_inputs": {
+        "ok": true,
+        "status": "observed"
+      }
+    },
+    "collector": {
+      "status": "connected",
+      "age_seconds": 2.910517,
+      "poll_interval_seconds": 5.0
+    },
+    "forward_evidence": {
+      "forward_decisions": 22,
+      "first_forward_decision": "2026-10-19T08:55:27.110604+00:00",
+      "last_forward_decision": "2026-10-19T14:14:37.889106+00:00",
+      "forward_fills": 0,
+      "replayed_fills": 0,
+      "note": "Counts come from the immutable ledger. Observation span is not an uptime percentage.",
+      "observed_span_hours": 5.320683827222222
+    },
+    "running_api_loaded_monitoring": false,
+    "reload_command": "node scripts/start.cjs --restart-services",
+    "activation_blocker": "Automatic approval review rejected stopping the existing API: sandbox approval disabled",
+    "actual_websocket_latency_verified": false,
+    "websocket_blocker": "Agent-controlled browser network policy returned ERR_NETWORK_ACCESS_DENIED"
+  },
+  "screenshot": {
+    "path": "docs/screenshots/worker-monitoring-fixture.png",
+    "sha256": "f48224e2242c8b9f8fb026c28f2be63a27db52c44852f6a2c2c1086a3f003068",
+    "kind": "Controlled browser fixture; not actual account data"
+  },
+  "source_sha256": {
+    ".env.example": "83701dd4b11f75f7fa53798a05d8bad845376f5f79b8fcf4a24f250c0650127e",
+    ".github/workflows/ci.yml": "35bc5b0c937b5343a3ce4ad2ee48275f61b2b36d48f4e55237bec651f6ed9dfa",
+    "frontend/src/api.ts": "3d5ae87b7b7402abe8613ab521fa4eaa9800234c72c6a43f065c978e91d0fe3f",
+    "frontend/src/liveFeed.ts": "04c0c071367d80a45730f83d0ed0c99c963bde7853919830793a0ba326d290c6",
+    "frontend/src/main.tsx": "5001d4107d3621716aace277931cb1289d7cea58b6cad5391675d51489b6dc36",
+    "frontend/src/MarketChart.tsx": "f948122c3ae555a90f8e7889862fd870c0c3382c296c4fdd6cab7bfcd0febd04",
+    "frontend/src/PaperOperations.tsx": "fe46467d5c01dfc203b461e1c5f75f5c2d94b0a58519dfa6de765d9ec6b55372",
+    "frontend/src/preview.ts": "cdb455d9d4a2c667ad26904a4cfb3c6dcae1100c6b7c02a84187cb4ab3849a74",
+    "frontend/src/ResearchPlots.tsx": "89b907855cb902c571a0deb6dc8ae0325aa4b816419558d1d9fa22c9f09d455e",
+    "frontend/src/styles.css": "0fb3937ab24082c1af7cd839ed62e8438bde7971cd21a1147d1726c15eb40637",
+    "frontend/src/TradingViewPanel.tsx": "25b548be474c80cdb1689e4d3d21d316eb157ce4a2bb3a4b4bd33bf23ae22c21",
+    "frontend/src/TradingWorkspace.tsx": "74484fd6d4ce4467a9c38d508a40d6fa5eeaeb087e46a78924aa59ca8abf74d7",
+    "frontend/src/workspace.css": "97004816a380a70a65ff3a34225ef4c1064125b9536a6d5c4bcb9fa36b5b81db",
+    "frontend/tests/dashboard.spec.ts": "17518c0c50ab0581e02ccdb3700d7444f6228d7b49052cf4a0e2161f79d506df",
+    "frontend/tests/live-feed.spec.ts": "cf86dfad0990c18505454a774954f4041dfba3ade7b8d5c6f64c947a296c3846",
+    "frontend/tests/loading.spec.ts": "fafe22c8376140e9ba069a3acc584ccc2ea2ef1c2d21795039450064b1068974",
+    "frontend/tests/operations.spec.ts": "56beaa232ad59b57cbf5c8efb3691a1a7ff24315098fcacd9d103b9e6f48bb45",
+    "frontend/tests/release.spec.ts": "bdc14478c7e4339381ceb715b563b673b96c16173a70357323d02d1775c2a505",
+    "frontend/tests/workspace.spec.ts": "f23f61a617685a1e4e5593e28aeed47154509f12cabb5c0e239606c649e01828",
+    "migrations/env.py": "24c5de21da3e266555ed52f66a024b8d09aed430803e698e5fff1f48c1e3d391",
+    "migrations/versions/0001_ledger.py": "db6f1170eeecb21cf4ae52c584b4ec583378aa1d9179a1c78b82452ec1d5b51e",
+    "migrations/versions/0002_snapshots.py": "ce9c15fbe3a14093d064e4b145fa06f2099da137b8e429d2bdcae6a3215b4abd",
+    "migrations/versions/0003_market_history.py": "76aa4ce6a42989fc2ba493dc12622ff501b7902bfd540ee2e66e0f0e9ad619f3",
+    "migrations/versions/0004_worker_runs.py": "3053ac56d47736b13bbd7e18677e7e5277da90ede572525a949e6d882d6db239",
+    "scripts/data_supervisor.py": "f8381b7e266d2c7723a5d2cddf4b7fc32c7bc22f57da9a4e7882afb71e610cd2",
+    "scripts/verify_operations.py": "ddca954b17469987b9bfdb90e559143c6dbd189e404fea4108ba5df49f8a0477",
+    "scripts/verify_postgres.py": "2beda4103337909b7812330c3fead72f19187c51e4714a476b2fe68bafc96264",
+    "scripts/verify_recovery.py": "dfeca32e126df9c38151ec586c2c8a7dde65071126c3c7b4160743ad145f3891",
+    "src/quantpilot/__init__.py": "3cb1d78cf26b74da58a21a601b51f1a662d2e476accf88a6c6ae65e384adf70d",
+    "src/quantpilot/api.py": "8f2047ba89d54b236d98ff66fad88eb7be2eb4a2bc5f42837322f143fc103e4d",
+    "src/quantpilot/benchmarks.py": "4dede54970fa04ad77285a4678bb0ff018a66d00c9a63c2cb710d246a9379832",
+    "src/quantpilot/charting.py": "377bba7b0881e8a28399f0f9fef86fdb1027e4c70c75efbba70c0352fb75b113",
+    "src/quantpilot/cli.py": "c22a4cd364608150848053c6decdb6b4e13933be221466b636fdb1a10a85a9af",
+    "src/quantpilot/collector.py": "22b3a43bd879c050f49f91c9e67ca0ea819d8b8f9d2d5c118fbf86b99ad5daaa",
+    "src/quantpilot/config.py": "4e5a154675886191e0a89e5a3e3d84bfa226f353c6505c042add3165d91097a8",
+    "src/quantpilot/data.py": "a07392654d83336963baaff6cefaaaa49b95792716c9f3884a9549ea0f204707",
+    "src/quantpilot/diagnostics.py": "58c5f76ccf139019a45188e54b5b8d548323ec88a67ee80127f6d80b0eb5f7af",
+    "src/quantpilot/engine.py": "cf6bee89f9739b00e31ddfbbde2c081e72b2a174f7f4438fdf8746e7ff4018d3",
+    "src/quantpilot/features.py": "dfd1423669ef4c86bdbc6190b40c03c02ebb67eb0be3643d2a1cd3f87a8a2bd8",
+    "src/quantpilot/history.py": "fa4aecfc7ec06f229e3f2cefe0c43297d21d459ecd6d82f3a47a3b83f9df5ede",
+    "src/quantpilot/live.py": "cc1fdc8422a8b3f33218d054a1448344ca25a7e3657eb6b6533085df560fe760",
+    "src/quantpilot/market_store.py": "720256cb0929f8e7b08f7a1345f4966e7a1dc3873a0aa3eeefb7576653d0b604",
+    "src/quantpilot/mcp_server.py": "41a7cb6d798ca3e3ea54467e2cbf2236ae446caffa9fc85cfc8f02180782e4e3",
+    "src/quantpilot/operations.py": "ba1c571dd6f681fe03d81664c778a1a82f90211517ea7f51b297c8584461454c",
+    "src/quantpilot/recovery.py": "12e7d46b1f528a266d1caa7594bb85fe793165890dbe9e5e6354ac5b179ee5bd",
+    "src/quantpilot/repair.py": "bf29e1245e13a06ea72d14acd23f0f83d831d9e2a4da8fe4504409d020def4f7",
+    "src/quantpilot/replay.py": "5ab2290cf1d66f041c6ef84986b3683157e90aed31d397757675fe26df9221c9",
+    "src/quantpilot/research.py": "8de9837946785746681cf8ae8489bac3c747414396b4a2c42db4ded8eb00496b",
+    "src/quantpilot/services.py": "7d02ac6bc8773f6a65c6dd7b75cc6207fbd237a870472ee973d0d9b54740f155",
+    "src/quantpilot/snapshots.py": "1c97099aa404ec19de8da6433fa6de4ebe510ba446f0650b9a34db621376ada2",
+    "src/quantpilot/store.py": "02adc7613b39e6f487607cad4387eb117b88b9568c41414e1ecac7bac876d987",
+    "src/quantpilot/worker.py": "4f5fa0ff4e678107b3a551644bab50cd32816feeeb52dd2576a61386c0517426",
+    "tests/conftest.py": "d18991c922dc02b8ca9c205cbaa868e27a4898984dbc2a55b18c5e1a956f0884",
+    "tests/test_benchmarks.py": "8a26c6fbe4141a48ed67f8031848ef6921c6b38bb995eaf2f051a5805855ed27",
+    "tests/test_data.py": "953e9a49c0aad418fe08962b72a356856212f147b8553c8300d37cb6469bb4b6",
+    "tests/test_engine.py": "2d043a3c3101a1111a7a3cf5acd64e8323cfb435383efb6042a381122dbcb2d7",
+    "tests/test_features.py": "197a73fc03b458d02dac30ee52664dcaaee2d7c597b5f2890c4b0bae4ab7ce82",
+    "tests/test_history_collector.py": "2e4d11ff85f7b7dd2c79bf8ec3d769385ef89fa48b835a768523ac4f07e08736",
+    "tests/test_market_store.py": "761658b1af2b2be48df79a5ec89ce9c7d7051f02873c4ed6520a1b1bd1fec9a5",
+    "tests/test_operations.py": "a6354e93162e843ce09c489e17e494174805871c09f5eb4b33a46991d24cffb9",
+    "tests/test_quarantine.py": "b476d110681cf56960ac65cb5ad502ce13ced1db1b384829c8f5672fc58a4593",
+    "tests/test_recovery.py": "1cadad630c29b403f3a39260146024d83c04d33083b4d31a78072655906de6a8",
+    "tests/test_repair.py": "c7ed3bd2c26f1bf93e1c9de3738ff1b853b5043a7bb5e8c784b2f2d1b22cd46b",
+    "tests/test_research.py": "b580d886f39b3898f878be6b246070dc35c446085754c7de2087d6d947de73af",
+    "tests/test_services_mcp.py": "5954cf90a39c18caeffbf75484aa8c5242504058efa83fed5e47bead14f1dd0d",
+    "tests/test_snapshots.py": "1dfaccf7854f1a642f1c996f9fd4c2029d4645a8c9b0ff47ff17f1953236cc36",
+    "tests/test_worker.py": "136af2cfdfcf16f85081737ea5842040535187e5bb2b215fbbe1596e29e587f8"
+  },
+  "evidence_sha256": {
+    ".verification/local-readiness-pytest.xml": "a1efcb6c6369bdcb1c731cd7bbe20e77750d93e40af513b4fc26cc935a2f1d7f",
+    ".verification/local-readiness-browser.json": "16bdf0febea4700ac1a6a64c9f98a1ec6fde901dc639b2262ca2072e840b4a29",
+    ".verification/postgres-platform.json": "242c593b3e87229a0eaffe04945e1ed690ca9fe9bed0d0205444c47b4911dfb3",
+    "docs/operations-runtime.json": "eef23dbaa5c9d86821ac42ed0b3b5885fa7650631a4e9b2e39262984dd37bff6",
+    "docs/static-checks.json": "7087bb3e933d2b8b016b1dbba52ce32d5bd20e981f65a2eda86f2bcb5bd3c6e2",
+    "docs/local-doctor.json": "8a76c8a45a850bf44cfa8496d618f452b0149846187dbc549fd73290e001a7f4",
+    "docs/recovery-verification.json": "ee54b214f8826387586a7a4336e1fcadb7bfc906bbad22551f9ec9caefe266e1"
+  }
+}

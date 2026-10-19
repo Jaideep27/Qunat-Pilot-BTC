@@ -1,0 +1,57 @@
+{
+  "verified_at": "2026-10-19T09:11:14.420902+00:00",
+  "status": "five_year_perpetual_candles_and_live_chart_verified",
+  "history": {
+    "start": "2021-10-19T09:05:00+00:00",
+    "end_exclusive": "2026-10-19T09:05:00+00:00",
+    "years": 5,
+    "markets": {
+      "BTCUSDT_PERP": {
+        "expected": 525888,
+        "stored": 525888,
+        "missing": 0,
+        "complete": true,
+        "gap_ranges": []
+      },
+      "BTCUSDT_SPOT": {
+        "expected": 525888,
+        "stored": 577,
+        "missing": 525311,
+        "complete": false,
+        "gap_ranges": [
+          [
+            "2021-10-19T09:05:00+00:00",
+            "2026-10-17T08:55:00+00:00"
+          ]
+        ]
+      }
+    },
+    "scope": "Completed five-minute price candles; external families have separate source coverage."
+  },
+  "actual_live_reflection": {
+    "status": "passed",
+    "before": "Last 82743.20",
+    "after": "Last 82742.50",
+    "first_received_at": "2026-10-19T14:38:32.863195+05:30",
+    "last_received_at": "2026-10-19T14:38:45.085111+05:30",
+    "collector_connected": true,
+    "verified_at": "2026-10-19T09:08:49.646Z",
+    "source": "Actual provider -> PostgreSQL -> API -> browser; no mock price writes"
+  },
+  "focused_python_tests_passed": 11,
+  "frontend_build": "passed",
+  "collector_interval_seconds": 10,
+  "chart_price_poll_seconds": 5,
+  "spot_backfill": "in progress",
+  "older_imported_rows": "preserved",
+  "source_sha256": {
+    "src/quantpilot/history.py": "f07d47f2684e0fbaacc33947fafa18d97091472788d82f72dd8a56eccb354d4f",
+    "src/quantpilot/market_store.py": "fb70792ae5ce2d60082dec4f74751046b0d2a84db2c65a300e5a02bc90319ceb",
+    "src/quantpilot/cli.py": "c1d0735aee9fc925a3d30a8470e577dcebc71baba1172c473571e18e4b96d477",
+    "src/quantpilot/config.py": "24ccf660841ab70a5cb0f19eb9e3de0ff2a190950f1f5edcbaf47c0449757268",
+    "frontend/src/TradingWorkspace.tsx": "d7dae41c9295e47e55b13c56607deea4b1cdcddf12e98835c7a97dd20bf2698c",
+    "tests/test_history_collector.py": "766c9a192edf616dc52f9086ae30f04082c077f05f38579a74faf7c4bdd6d8e9",
+    "tests/test_market_store.py": "a5a1b42b409806f426436f35f9644fdf747bdd6aebba916ff1e94ff8cc18a63c",
+    "docs/screenshots/live-postgres.png": "54d65c879aa8c70a03a1d7fab88aa069a5edbc8d6bfb6a22cbc7f50c3095975a"
+  }
+}

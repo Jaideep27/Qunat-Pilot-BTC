@@ -1,0 +1,1333 @@
+{
+  "captured_at": "2026-10-19T18:16:47.836Z",
+  "doctor": {
+    "ready": false,
+    "checked_at": "2026-10-19T18:16:46.490182+00:00",
+    "checks": {
+      "current_code_ready": {
+        "ok": false,
+        "status": "needs_attention"
+      },
+      "five_year_candles": {
+        "ok": true,
+        "status": "complete"
+      },
+      "running_api": {
+        "ok": true,
+        "status": "reachable",
+        "http_status": 200
+      },
+      "running_monitor": {
+        "ok": false,
+        "status": "reload_required",
+        "http_status": 404
+      },
+      "dashboard": {
+        "ok": true,
+        "status": "reachable",
+        "http_status": 200
+      }
+    },
+    "details": {
+      "operations": {
+        "ready": false,
+        "checked_at": "2026-10-19T18:16:30.498573+00:00",
+        "checks": {
+          "database": {
+            "ok": true,
+            "status": "connected"
+          },
+          "completed_candles": {
+            "ok": true,
+            "status": "fresh",
+            "age_seconds": 90.498573
+          },
+          "paper_worker": {
+            "ok": true,
+            "status": "healthy",
+            "age_seconds": 765.111043
+          },
+          "run_monitoring": {
+            "ok": false,
+            "status": "not_started"
+          },
+          "model": {
+            "ok": true,
+            "status": "released"
+          },
+          "coverage": {
+            "ok": true,
+            "status": "eligible"
+          },
+          "prediction_inputs": {
+            "ok": true,
+            "status": "observed"
+          }
+        },
+        "worker": {
+          "status": "healthy",
+          "last_checkpoint": "2026-10-19T18:03:45.387530+00:00",
+          "age_seconds": 765.111043,
+          "max_age_seconds": 1800,
+          "next_scheduled_at": "2026-10-19T18:17:00+00:00",
+          "schedule_utc": "2,17,32,47 * * * *",
+          "runs": [],
+          "run_totals": {},
+          "latency_sample_count": 0,
+          "latency_sample_scope": "Latest 100 recorded runs; successful runs only",
+          "duration_p50_seconds": null,
+          "duration_p95_seconds": null
+        },
+        "collector": {
+          "status": "connected",
+          "age_seconds": 4.852181,
+          "poll_interval_seconds": 5
+        },
+        "forward_evidence": {
+          "forward_decisions": 37,
+          "first_forward_decision": "2026-10-19T08:55:27.110604+00:00",
+          "last_forward_decision": "2026-10-19T18:03:42.419994+00:00",
+          "forward_fills": 0,
+          "replayed_fills": 0,
+          "note": "Counts come from the immutable ledger. Observation span is not an uptime percentage.",
+          "observed_span_hours": 9.138410257222223
+        }
+      },
+      "candle_coverage": {
+        "start": "2021-10-19T18:15:00+00:00",
+        "end_exclusive": "2026-10-19T18:15:00+00:00",
+        "years": 5,
+        "markets": {
+          "BTCUSDT": {
+            "expected": 525888,
+            "stored": 525888,
+            "missing": 0,
+            "complete": true,
+            "gap_ranges": []
+          }
+        },
+        "scope": "Completed five-minute price candles; external families have separate source coverage."
+      },
+      "market_database_bytes": 1428403903,
+      "free_disk_bytes": 94945726464
+    },
+    "next_action": "node scripts/start.cjs --restart-services",
+    "scope": "Read-only local checks; no provider requests, worker execution, fills or service restarts"
+  },
+  "health": {
+    "data": {
+      "status": "ok",
+      "model_released": true,
+      "worker_last_updated": "2026-10-19T18:03:45.387530+00:00",
+      "coverage_ready": true
+    },
+    "provenance": {
+      "source": "QuantPilot",
+      "observed_at": null,
+      "served_at": "2026-10-19T18:16:47.516358+00:00",
+      "age_seconds": null,
+      "freshness": "missing"
+    },
+    "config_version": "risk-v1:e814a649e3",
+    "model_version": "24c8238525d4"
+  },
+  "portfolio": {
+    "data": {
+      "cash": 10000,
+      "equity": 10000,
+      "mark": 81968.05467016,
+      "position": null,
+      "pending": null,
+      "day": "2026-10-19",
+      "day_start": 10000,
+      "halted": false,
+      "paused": false,
+      "last_event": "2026-10-19T18:03:45.387530+00:00",
+      "last_worker": "2026-10-19T18:03:45.387530+00:00",
+      "last_control_at": null,
+      "config": {
+        "version": "risk-v1",
+        "starting_balance": 10000,
+        "max_exposure": 0.25,
+        "risk_budget": 0.0025,
+        "stop_atr": 1.5,
+        "max_hold_minutes": 60,
+        "daily_loss": 0.02,
+        "threshold": 0.6,
+        "fee_bps": 5,
+        "slippage_bps": 3,
+        "buffer_bps": 5,
+        "maintenance_margin": 0.005,
+        "execution_delay_seconds": 1,
+        "max_age_seconds": 600
+      },
+      "fills": [],
+      "funding": [],
+      "decisions": [
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00032521683463076936,
+          "cost_budget": 0.0016,
+          "probability": 0.45036923352610797,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T08:55:27.110604+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0003282885647870879,
+          "cost_budget": 0.0016,
+          "probability": 0.449880613681313,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T09:11:05.395754+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00046781488852563457,
+          "cost_budget": 0.0016,
+          "probability": 0.42768617368152523,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T09:26:34.670457+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0004950216924251146,
+          "cost_budget": 0.0016,
+          "probability": 0.42335838978703577,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T09:42:49.670413+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0003847765294702106,
+          "cost_budget": 0.0016,
+          "probability": 0.4408950781258934,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T09:59:21.629573+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.000300182174557166,
+          "cost_budget": 0.0016,
+          "probability": 0.45435149469397085,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T10:15:24.663420+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00006545395952204953,
+          "cost_budget": 0.0016,
+          "probability": 0.4916896911379363,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T10:31:22.972736+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.000130363701025702,
+          "cost_budget": 0.0016,
+          "probability": 0.48136450428714456,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T10:47:31.875247+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0002572073406995588,
+          "cost_budget": 0.0016,
+          "probability": 0.46118749772190704,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T11:03:05.430354+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0001173009261322066,
+          "cost_budget": 0.0016,
+          "probability": 0.4834423987362787,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T11:18:51.964851+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00015401024603050998,
+          "cost_budget": 0.0016,
+          "probability": 0.47760305046073304,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T11:34:46.874971+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00020325930143022335,
+          "cost_budget": 0.0016,
+          "probability": 0.46976900756597867,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T11:50:34.593505+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00022082128769849866,
+          "cost_budget": 0.0016,
+          "probability": 0.46697542396064606,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T12:06:01.809704+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00032122402958544255,
+          "cost_budget": 0.0016,
+          "probability": 0.4510043686721856,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T12:21:32.605458+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0003039527141354974,
+          "cost_budget": 0.0016,
+          "probability": 0.4537517152961067,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T12:37:19.763830+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0002615031024435278,
+          "cost_budget": 0.0016,
+          "probability": 0.46050417128052124,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T12:52:44.366378+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0003895592907254919,
+          "cost_budget": 0.0016,
+          "probability": 0.44013428471523514,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T13:07:58.485284+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0002777559957778213,
+          "cost_budget": 0.0016,
+          "probability": 0.45791882497263114,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T13:23:11.438691+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0002382305840790671,
+          "cost_budget": 0.0016,
+          "probability": 0.46420612872227157,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T13:38:46.795206+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00019664677163909895,
+          "cost_budget": 0.0016,
+          "probability": 0.47082086209610247,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T13:44:01.242334+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0002042030399657742,
+          "cost_budget": 0.0016,
+          "probability": 0.46961888716044126,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T13:59:19.290918+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00004486172149619221,
+          "cost_budget": 0.0016,
+          "probability": 0.49496529662283856,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T14:14:37.889106+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00021895686380035782,
+          "cost_budget": 0.0016,
+          "probability": 0.467271997705533,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T14:30:11.785698+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00023980329314901962,
+          "cost_budget": 0.0016,
+          "probability": 0.4639559580293521,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T14:45:43.251711+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0003091724300085122,
+          "cost_budget": 0.0016,
+          "probability": 0.4529214155529797,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T15:00:54.878467+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0003047741233836907,
+          "cost_budget": 0.0016,
+          "probability": 0.4536210537995101,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T15:16:08.137231+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0003060571453142491,
+          "cost_budget": 0.0016,
+          "probability": 0.4534169636142807,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T15:31:20.898062+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00028131181160332666,
+          "cost_budget": 0.0016,
+          "probability": 0.4573532016631734,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T15:46:32.637126+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00021181328890926038,
+          "cost_budget": 0.0016,
+          "probability": 0.46840832553282924,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T16:01:46.394277+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0002651396876242212,
+          "cost_budget": 0.0016,
+          "probability": 0.45992569999686395,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T16:16:58.922397+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0002615982034473161,
+          "cost_budget": 0.0016,
+          "probability": 0.46048904357224407,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T16:32:14.306002+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00024602176319441405,
+          "cost_budget": 0.0016,
+          "probability": 0.4629667865481941,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T16:47:27.387482+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00024602176319441405,
+          "cost_budget": 0.0016,
+          "probability": 0.4629667865481941,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T17:02:39.053845+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00024389547027407125,
+          "cost_budget": 0.0016,
+          "probability": 0.4633050157753252,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T17:17:51.865680+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00023203148241563668,
+          "cost_budget": 0.0016,
+          "probability": 0.46519221927662036,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T17:33:04.848541+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.0002327613863308685,
+          "cost_budget": 0.0016,
+          "probability": 0.46507611352525996,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T17:48:16.965790+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        },
+        {
+          "action": "NO_TRADE",
+          "reasons": [
+            "WEAK_FORECAST",
+            "INSUFFICIENT_EDGE"
+          ],
+          "expected_edge": 0.00022939542541948162,
+          "cost_budget": 0.0016,
+          "probability": 0.4656115366302892,
+          "model_version": "24c8238525d4",
+          "time": "2026-10-19T18:03:42.419994+00:00",
+          "config_version": "risk-v1:e814a649e3",
+          "replayed": false
+        }
+      ],
+      "curve": [
+        {
+          "time": "2026-10-19T08:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:15:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:30:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:50:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T09:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:30:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:50:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T10:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:15:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:30:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T11:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:15:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:30:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:50:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T12:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:15:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:30:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:50:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T13:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:15:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:50:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T14:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:15:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:30:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:50:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T15:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:15:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:30:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:50:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T16:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:05:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:10:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:15:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:20:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:25:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:30:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:35:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:40:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:45:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:50:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T17:55:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        },
+        {
+          "time": "2026-10-19T18:00:00+00:00",
+          "equity": 10000,
+          "exposure": 0
+        }
+      ],
+      "realized_pnl": 0,
+      "fees": 0,
+      "funding_total": 0
+    },
+    "provenance": {
+      "source": "Transactional simulated USD-M isolated-margin ledger",
+      "observed_at": "2026-10-19T18:03:45.387530+00:00",
+      "served_at": "2026-10-19T18:16:47.079094+00:00",
+      "age_seconds": 781.691564,
+      "freshness": "stale"
+    },
+    "config_version": "risk-v1:e814a649e3",
+    "model_version": "24c8238525d4"
+  },
+  "prediction": {
+    "data": {
+      "action": "NO_TRADE",
+      "reasons": [
+        "STALE_DATA",
+        "WEAK_FORECAST",
+        "INSUFFICIENT_EDGE"
+      ],
+      "expected_edge": 0.00022939542541948162,
+      "cost_budget": 0.0016,
+      "probability": 0.4656115366302892,
+      "model_version": "24c8238525d4",
+      "forecast": {
+        "probability": 0.4656115366302892,
+        "up_magnitude": 0.003130061165644755,
+        "down_magnitude": 0.0031564828399656976,
+        "atr": 111.2071422713091,
+        "observed_at": "2026-10-19T18:00:00+00:00",
+        "model_version": "24c8238525d4",
+        "funding_rate": 0.00007964,
+        "funding_observable": true,
+        "complete": true,
+        "threshold": 0.6,
+        "input_available_at": {
+          "mark_available_at": "2026-10-19 18:00:00+00:00",
+          "index_available_at": "2026-10-19 18:00:00+00:00",
+          "positioning_available_at": "2026-10-19 18:00:00+00:00",
+          "funding_available_at": "2026-10-19 16:00:01.003000+00:00",
+          "sentiment_available_at": "2026-10-19 00:00:00+00:00"
+        }
+      },
+      "regime": "ranging",
+      "explanation": {
+        "method": "SHAP raw model associations before calibration",
+        "contributions": [
+          {
+            "feature": "return_288",
+            "value": -0.06823903322219849
+          },
+          {
+            "feature": "1h_ema_21_distance",
+            "value": 0.03713751211762428
+          },
+          {
+            "feature": "swing_low_distance",
+            "value": 0.014950203709304333
+          },
+          {
+            "feature": "macd",
+            "value": 0.014540360309183598
+          },
+          {
+            "feature": "15min_macd",
+            "value": 0.012094656936824322
+          },
+          {
+            "feature": "1h_rsi_14",
+            "value": -0.011436604894697666
+          },
+          {
+            "feature": "sma_200_distance",
+            "value": -0.010924729518592358
+          },
+          {
+            "feature": "15min_ema_21_distance",
+            "value": 0.008425022475421429
+          },
+          {
+            "feature": "mfi",
+            "value": 0.006814242340624332
+          },
+          {
+            "feature": "ema_200_slope",
+            "value": -0.00484889093786478
+          },
+          {
+            "feature": "rsi_21",
+            "value": 0.00417828094214201
+          },
+          {
+            "feature": "vwap_distance",
+            "value": 0.00409853458404541
+          }
+        ]
+      }
+    },
+    "provenance": {
+      "source": "Frozen calibrated model, completed bars",
+      "observed_at": "2026-10-19T18:00:00+00:00",
+      "served_at": "2026-10-19T18:16:47.735110+00:00",
+      "age_seconds": 1007.73511,
+      "freshness": "stale"
+    },
+    "config_version": "risk-v1:e814a649e3",
+    "model_version": "24c8238525d4"
+  }
+}

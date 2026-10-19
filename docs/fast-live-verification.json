@@ -1,0 +1,43 @@
+{
+  "verified_at": "2026-10-19T13:29:38.885794+00:00",
+  "status": "code_verified_actual_websocket_blocked_activation_pending",
+  "symbol": "BTCUSDT",
+  "source_market": "Binance USD-M perpetual",
+  "python": {
+    "tests": 70,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "browser_cases_passed": 10,
+  "additional_workspace_capture_check": "passed",
+  "postgres_checks_passed": 5,
+  "static_checks_passed": 7,
+  "production_build": "passed",
+  "provider_documented_cadence_ms": 250,
+  "observed_actual_stream_latency_ms": null,
+  "target_postgres_poll_seconds": 5,
+  "running_collector_reloaded": false,
+  "actual_database_advancement_verified": true,
+  "actual_browser_stream_verified": false,
+  "network_blocker": "Exchange WebSocket connections returned net::ERR_NETWORK_ACCESS_DENIED in the agent-controlled browser.",
+  "process_blocker": "Earlier automatic approval review rejected terminating the existing API; process-termination approval remains unavailable. Existing working services were preserved.",
+  "activation_command": "node scripts/start.cjs --restart-services",
+  "runtime_check_command": "node scripts/verify_live.cjs",
+  "runtime_evidence": "docs/fast-live-runtime.json",
+  "screenshot_visually_reviewed": true,
+  "source_sha256": {
+    "frontend/src/liveFeed.ts": "04c0c071367d80a45730f83d0ed0c99c963bde7853919830793a0ba326d290c6",
+    "frontend/src/TradingWorkspace.tsx": "74484fd6d4ce4467a9c38d508a40d6fa5eeaeb087e46a78924aa59ca8abf74d7",
+    "frontend/src/MarketChart.tsx": "f948122c3ae555a90f8e7889862fd870c0c3382c296c4fdd6cab7bfcd0febd04",
+    "frontend/src/api.ts": "3d5ae87b7b7402abe8613ab521fa4eaa9800234c72c6a43f065c978e91d0fe3f",
+    "frontend/src/TradingViewPanel.tsx": "25b548be474c80cdb1689e4d3d21d316eb157ce4a2bb3a4b4bd33bf23ae22c21",
+    "frontend/tests/live-feed.spec.ts": "cf86dfad0990c18505454a774954f4041dfba3ade7b8d5c6f64c947a296c3846",
+    "frontend/tests/workspace.spec.ts": "f23f61a617685a1e4e5593e28aeed47154509f12cabb5c0e239606c649e01828",
+    "src/quantpilot/collector.py": "22b3a43bd879c050f49f91c9e67ca0ea819d8b8f9d2d5c118fbf86b99ad5daaa",
+    "src/quantpilot/config.py": "dde6faeba1b0ac1811a166d450c319b5617a8322951a36fa893e39725b12b9c2",
+    "tests/test_history_collector.py": "2e4d11ff85f7b7dd2c79bf8ec3d769385ef89fa48b835a768523ac4f07e08736",
+    "scripts/verify_live.cjs": "44c7f5f3d45cc2bfe9597a3434d5671a50e3d729d346e6f764efa474bae71742",
+    "docs/screenshots/fast-live-btcusdt.png": "775006ef4fde1a8eb68e66449fe9508d91e82f8389f9673fe141a9347f1f7e5b"
+  }
+}

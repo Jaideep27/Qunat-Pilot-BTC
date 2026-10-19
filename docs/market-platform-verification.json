@@ -1,0 +1,216 @@
+{
+  "verified_at": "2026-10-19T08:30:27.737209+00:00",
+  "status": "local_database_and_chart_verified_provider_sync_blocked",
+  "database": {
+    "engine": "postgresql",
+    "markets": [
+      {
+        "market": "BTCUSDT_PERP",
+        "rows": 227808,
+        "first": "2024-08-01 05:30:00+05:30",
+        "last": "2026-10-01 05:25:00+05:30"
+      }
+    ],
+    "families": [
+      {
+        "market": "BTCUSDT_PERP",
+        "family": "funding",
+        "rows": 2373,
+        "first": "2024-08-01 05:30:00+05:30",
+        "last": "2026-09-30 21:30:00.002000+05:30"
+      },
+      {
+        "market": "BTCUSDT_PERP",
+        "family": "index",
+        "rows": 227808,
+        "first": "2024-08-01 05:30:00+05:30",
+        "last": "2026-10-01 05:25:00+05:30"
+      },
+      {
+        "market": "BTCUSDT_PERP",
+        "family": "mark",
+        "rows": 227808,
+        "first": "2024-08-01 05:30:00+05:30",
+        "last": "2026-10-01 05:25:00+05:30"
+      },
+      {
+        "market": "BTCUSDT_PERP",
+        "family": "positioning",
+        "rows": 221755,
+        "first": "2024-08-22 05:30:00+05:30",
+        "last": "2026-10-01 05:25:00+05:30"
+      },
+      {
+        "market": "BTCUSDT_PERP",
+        "family": "sentiment",
+        "rows": 3178,
+        "first": "2018-02-01 05:30:00+05:30",
+        "last": "2026-10-18 05:30:00+05:30"
+      }
+    ],
+    "feeds": [
+      {
+        "id": "live:collector",
+        "updated_at": "2026-10-19 13:58:45.104636+05:30",
+        "state": {
+          "status": "disconnected",
+          "error": "[WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+          "consecutive_failures": 3,
+          "next_retry_seconds": 80
+        }
+      },
+      {
+        "id": "paper:worker",
+        "updated_at": "2026-10-19 13:57:44.017094+05:30",
+        "state": {
+          "status": "blocked",
+          "error": "[WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions"
+        }
+      },
+      {
+        "id": "history:overall",
+        "updated_at": "2026-10-19 13:57:43.990048+05:30",
+        "state": {
+          "status": "blocked",
+          "error": "[WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions"
+        }
+      },
+      {
+        "id": "historical:parquet",
+        "updated_at": "2026-10-19 13:22:04.876204+05:30",
+        "state": {
+          "status": "imported",
+          "rows": {
+            "candles": 227808,
+            "mark": 227808,
+            "index": 227808,
+            "positioning": 221755,
+            "funding": 2373,
+            "sentiment": 3178
+          },
+          "source": "data"
+        }
+      }
+    ]
+  },
+  "stored_rows": 910730,
+  "earliest_requested_history_complete": false,
+  "real_live_provider_verified": false,
+  "external_blocker": "WinError 10013: outbound provider sockets denied in this session",
+  "resume_command": "node scripts/start.cjs (from the regular network-enabled terminal)",
+  "python": {
+    "passed": 64,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 24.472
+  },
+  "browser": {
+    "passed": 6,
+    "seconds": 42.6,
+    "engine": "Playwright with installed Chrome"
+  },
+  "postgres_integration": [
+    "COPY upsert idempotency",
+    "forming/complete separation",
+    "JSON NULL quality flag",
+    "completed candle query",
+    "continuous ingestion persistence"
+  ],
+  "mcp": {
+    "tools_matched": 9,
+    "shared_api_data_parity": true
+  },
+  "chart": {
+    "native_studies": 86,
+    "timeframes": [
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "4h",
+      "1d",
+      "1w"
+    ],
+    "styles": [
+      "Candles",
+      "Bars",
+      "Line",
+      "Area"
+    ],
+    "drawings": [
+      "trend",
+      "ray",
+      "horizontal",
+      "vertical",
+      "rectangle",
+      "fibonacci",
+      "measure",
+      "text"
+    ],
+    "drawing_storage": "Browser local storage, per market/timeframe",
+    "tradingview_widget": "Official hosted widget supplied; external availability not verified in this session"
+  },
+  "screenshot": {
+    "path": "docs/screenshots/postgres-workspace.png",
+    "sha256": "885b4988725a93862fb91f566e3cdc128c03d32e3caa0c9588c91503b71bfb66"
+  },
+  "source_sha256": {
+    "src/quantpilot/api.py": "f63ce068a589e0c3eab148a51679633dc0338a6a9a5ea9de6726aecefc53f620",
+    "src/quantpilot/benchmarks.py": "4dede54970fa04ad77285a4678bb0ff018a66d00c9a63c2cb710d246a9379832",
+    "src/quantpilot/charting.py": "377bba7b0881e8a28399f0f9fef86fdb1027e4c70c75efbba70c0352fb75b113",
+    "src/quantpilot/cli.py": "ec4a921955104f45ec584dd9815fa2438ffa31acf9d3033d9c86ee4e9f9e5c73",
+    "src/quantpilot/collector.py": "d047a46af76f26c2b6d450e069bee95e6e5b6164a4b3390bc86a882d5d8b0904",
+    "src/quantpilot/config.py": "471da3f163101087af80a288c5d3921a84060c875089b70ad953f970717f729d",
+    "src/quantpilot/data.py": "a07392654d83336963baaff6cefaaaa49b95792716c9f3884a9549ea0f204707",
+    "src/quantpilot/engine.py": "cf6bee89f9739b00e31ddfbbde2c081e72b2a174f7f4438fdf8746e7ff4018d3",
+    "src/quantpilot/features.py": "dfd1423669ef4c86bdbc6190b40c03c02ebb67eb0be3643d2a1cd3f87a8a2bd8",
+    "src/quantpilot/history.py": "6a61a3f34318b8cf268738643f901bbdce409edcb829920721c377110c6aac22",
+    "src/quantpilot/live.py": "cc1fdc8422a8b3f33218d054a1448344ca25a7e3657eb6b6533085df560fe760",
+    "src/quantpilot/market_store.py": "726fed38159d4d469eeab231d3e4e42a6fff206d27816013200129c223ea86c3",
+    "src/quantpilot/mcp_server.py": "41a7cb6d798ca3e3ea54467e2cbf2236ae446caffa9fc85cfc8f02180782e4e3",
+    "src/quantpilot/repair.py": "bf29e1245e13a06ea72d14acd23f0f83d831d9e2a4da8fe4504409d020def4f7",
+    "src/quantpilot/replay.py": "5ab2290cf1d66f041c6ef84986b3683157e90aed31d397757675fe26df9221c9",
+    "src/quantpilot/research.py": "8de9837946785746681cf8ae8489bac3c747414396b4a2c42db4ded8eb00496b",
+    "src/quantpilot/services.py": "f5f5ea9573e20ae40488adc008c687f32721ecc6ab6f69099a95073c41f4a486",
+    "src/quantpilot/snapshots.py": "1c97099aa404ec19de8da6433fa6de4ebe510ba446f0650b9a34db621376ada2",
+    "src/quantpilot/store.py": "ad30276fea74f75e7455ba2c44bbf50f4bbaade742b96767c2a6162d9f489114",
+    "src/quantpilot/worker.py": "6ddfb396c65a12704b99e52f72bf1ed28aebe0863cb7c4fc464a0adc3ed63027",
+    "src/quantpilot/__init__.py": "3cb1d78cf26b74da58a21a601b51f1a662d2e476accf88a6c6ae65e384adf70d",
+    "frontend/src/api.ts": "d547cc6295bbc10f290655cf5aa83d27dced46c75779cd18c288516dc0194b5d",
+    "frontend/src/main.tsx": "b97235ac5bd9fe9e513796f18b11c1d865b234a3aa26f8e4c095cadb747bd531",
+    "frontend/src/MarketChart.tsx": "46c783211f3a941c61e6258bbd556dbbaf4470eb29aaea06c2ed6dfca86d908f",
+    "frontend/src/preview.ts": "cdb455d9d4a2c667ad26904a4cfb3c6dcae1100c6b7c02a84187cb4ab3849a74",
+    "frontend/src/styles.css": "ab8b5fa4e519a6724e4f6ff78b919cfbe95e420550ca88aed03dfa19d242323c",
+    "frontend/src/TradingViewPanel.tsx": "8196cab231eccb1d2afd4809d2d5bd73adb05cf9bff5040e9af227724412589e",
+    "frontend/src/TradingWorkspace.tsx": "48c226632326dc27c287135c6ed8115ced1497981493f567a15a7595157b3890",
+    "frontend/src/workspace.css": "97004816a380a70a65ff3a34225ef4c1064125b9536a6d5c4bcb9fa36b5b81db",
+    "tests/conftest.py": "d18991c922dc02b8ca9c205cbaa868e27a4898984dbc2a55b18c5e1a956f0884",
+    "tests/test_benchmarks.py": "8a26c6fbe4141a48ed67f8031848ef6921c6b38bb995eaf2f051a5805855ed27",
+    "tests/test_data.py": "953e9a49c0aad418fe08962b72a356856212f147b8553c8300d37cb6469bb4b6",
+    "tests/test_engine.py": "2d043a3c3101a1111a7a3cf5acd64e8323cfb435383efb6042a381122dbcb2d7",
+    "tests/test_features.py": "197a73fc03b458d02dac30ee52664dcaaee2d7c597b5f2890c4b0bae4ab7ce82",
+    "tests/test_history_collector.py": "23448ec0c3ca2a6212fbc537021c321552691817b23e861a561a65d1ef381966",
+    "tests/test_market_store.py": "0d784eb94e2b5a41fe45345ed8a17a19fcf50ab919819b6a5450f65db5fc5a88",
+    "tests/test_quarantine.py": "b476d110681cf56960ac65cb5ad502ce13ced1db1b384829c8f5672fc58a4593",
+    "tests/test_repair.py": "c7ed3bd2c26f1bf93e1c9de3738ff1b853b5043a7bb5e8c784b2f2d1b22cd46b",
+    "tests/test_research.py": "b580d886f39b3898f878be6b246070dc35c446085754c7de2087d6d947de73af",
+    "tests/test_services_mcp.py": "5954cf90a39c18caeffbf75484aa8c5242504058efa83fed5e47bead14f1dd0d",
+    "tests/test_snapshots.py": "1dfaccf7854f1a642f1c996f9fd4c2029d4645a8c9b0ff47ff17f1953236cc36",
+    "tests/test_worker.py": "136af2cfdfcf16f85081737ea5842040535187e5bb2b215fbbe1596e29e587f8",
+    "frontend/tests/workspace.spec.ts": "d787c5f90de6697ad08992e84628c7ec5bd03ab9bf4a2bf49b2ca23d695b5f7e",
+    "scripts/start.cjs": "ae76da3bb1587593efb932df2ee9365638c188941d4e9b225f1ab18047be240b",
+    "scripts/serve_api.py": "d2bb870abdacc8e67c81e8af2d33d2b60aa8087e12c9af0e9fcd0968a75172a0",
+    "scripts/data_supervisor.py": "a90f34a61fbd64484d89ac3a42b0590a2617c6b101c997aa2a57c49278cb162a",
+    "scripts/configure_postgres.py": "ed30a642b18c6aa4531fb0e328837349826994d5c4d0fc3eab86522d3e15634d",
+    "scripts/verify_postgres.py": "92470b8f9c60bf264925c0efed8a0e675fdfb3c7e1ceeaebc57ad3e43ae56417",
+    "migrations/versions/0003_market_history.py": "3703310fd354cd67e39a476799c04a3a82bde49425720932a04aa0f9126ac68f",
+    "compose.yaml": "1ae1a91c21440e90a1fe161f2029df1f17c6a72dd4101326170f99dff3b8fa71"
+  },
+  "evidence_sha256": {
+    ".verification/pytest-platform.xml": "e26ab385a31c5d0455eb9c8600d543538e00a699d71018e9c684b54db87d6ff7",
+    ".verification/workspace-browser-final.log": "c024e216e3ea351fea330305200c982fa5b40c2b4887936ff686a79946694aa2",
+    ".verification/postgres-platform.json": "48979b4ab50621ba5dee463a07edfd412f26a3359c1365b3f70af9686169169c",
+    ".verification/workspace-build-final.log": "4acd52e110ae889b23d1f03fdaac5871d96cd75ed90ed996d2885b532a553a28",
+    ".verification/release-smoke.json": "43584ad08bf996ce64b17789ee61f957a7ba1baf4474ee3be1bf2ea360c15ca4"
+  }
+}
