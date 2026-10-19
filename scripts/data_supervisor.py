@@ -13,6 +13,7 @@ from quantpilot.config import settings
 from quantpilot.store import database, initialize
 from quantpilot.market_store import feed_status
 from quantpilot.operations import next_paper_run
+from quantpilot import news
 
 
 def repeating_history():
@@ -21,6 +22,14 @@ def repeating_history():
         try:backfill()
         except Exception as exc:feed_status(engine,'history:overall',dict(status='blocked',error=str(exc)))
         time.sleep(1800)
+
+
+def news_feeds():
+    # Feed collection never waits on reasoning; Codex runs at most once per analysis interval.
+    while True:
+        try:news.run(reasoning=True)
+        except Exception as exc:print(json.dumps(dict(news='blocked',error_type=type(exc).__name__)),flush=True)
+        time.sleep(settings.news_poll_seconds)
 
 
 def paper():
@@ -39,8 +48,9 @@ if __name__=='__main__':
         with FileLock(str(settings.data_dir/'data-supervisor.lock'),timeout=0):
             (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=time.time())),encoding='utf-8')
             initialize(database(settings.market_database_url))
-            with ThreadPoolExecutor(max_workers=3) as pool:
-                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper)]
+            initialize(database())
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds)]
                 for future in futures:future.result()
     except Timeout:
         print('A data supervisor is already running.',flush=True)

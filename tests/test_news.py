@@ -22,9 +22,22 @@ def sample():
 
 def answer(items):
     return {'events': [dict(source_ids=[i['id'] for i in items], topic='macro', relevance='direct',
-        sentiment='uncertain', summary='Reported inflation and BTC movement coincide.',
+        sentiment='uncertain', novelty='new', entities=['BTC', 'CPI'],
+        summary='Reported inflation and BTC movement coincide.',
         transmission=['rates'], evidence=[dict(source_id=i['id'], quote=i['payload']['title']) for i in items],
         uncertainties=['The headline does not establish causation.'])]}
+
+
+# Verbatim stderr shape from codex-cli 0.163.0 when the ChatGPT allowance is exhausted.
+LIMIT_STDERR = ('OpenAI Codex v0.163.0\n--------\nmodel: gpt-6-luna\n'
+                'ERROR: You’ve hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), '
+                'visit https://chatgpt.com/settings/usage to purchase more credits or try again at 4:19 AM.\n')
+
+
+def fake_cli(monkeypatch, returncode, stderr):
+    monkeypatch.setattr(news.shutil, 'which', lambda _: 'codex')
+    monkeypatch.setattr(news.subprocess, 'run', lambda args, **kw:
+                        subprocess.CompletedProcess(args, returncode, stdout='', stderr=stderr))
 
 
 def test_revisions_and_availability_are_immutable(account):
@@ -106,3 +119,81 @@ def test_news_api_shares_service_and_rejects_invalid_bounds(account):
         assert client.get('/api/v1/news').json()['data'] == services.news()['data']
         assert client.get('/api/v1/news?limit=101').status_code == 422
         assert client.post('/api/v1/news').status_code == 405
+
+
+def test_analysis_requires_novelty_classification():
+    data = answer(sample())
+    del data['events'][0]['novelty']
+    with pytest.raises(ValueError):
+        news.validate_batch(data, sample())
+
+
+def test_cli_usage_limit_is_distinguished_from_other_failures(monkeypatch):
+    fake_cli(monkeypatch, 1, LIMIT_STDERR)
+    with pytest.raises(news.UsageLimitReached):
+        news.invoke_codex([dict(id='x', cluster='c', payload={})])
+    fake_cli(monkeypatch, 1, 'ERROR: model not found')
+    with pytest.raises(RuntimeError) as other:
+        news.invoke_codex([dict(id='x', cluster='c', payload={})])
+    assert not isinstance(other.value, news.UsageLimitReached)
+
+
+def test_usage_limit_pauses_analysis_without_spending_daily_budget(account, monkeypatch):
+    clock = {'t': STAMP+timedelta(seconds=10)}
+    monkeypatch.setattr(news, 'now', lambda: clock['t'])
+    monkeypatch.setattr(settings, 'news_daily_batches', 1)
+    news.persist_items(account, sample())
+    def limited(items):
+        raise news.UsageLimitReached('allowance exhausted')
+    assert news.analyze(account, runner=limited, check_login=False)['status'] == 'usage_limited'
+    assert news.snapshot(account)['analysis_status'] == 'delayed_usage_limit'
+    clock['t'] += timedelta(minutes=30)
+    assert news.analyze(account, runner=answer, check_login=False)['status'] == 'usage_limit_backoff'
+    clock['t'] += timedelta(minutes=31)
+    # The refused attempt never reached the model, so the one-batch budget is still available.
+    assert news.analyze(account, runner=answer, check_login=False)['status'] == 'completed'
+    assert news.snapshot(account)['analysis_status'] == 'current'
+
+
+def test_forward_analysis_becomes_an_event_research_feature(account, monkeypatch):
+    import pandas as pd
+    from quantpilot.event_research import news_features
+    monkeypatch.setattr(news, 'now', lambda: STAMP+timedelta(seconds=10))
+    news.persist_items(account, sample())  # published 2h before collection: forward, not retrospective
+    news.analyze(account, runner=answer, check_login=False)
+    with Session(account) as session:
+        runs = [dict(status=r.status, **r.payload) for r in session.scalars(select(news.NewsRun)).all()]
+    assert runs[0]['retrospective'] is False
+    cutoffs = pd.date_range(STAMP, periods=3, freq='5min', tz='UTC')
+    features = news_features(cutoffs, runs)
+    assert features['news_count_1h'].isna().iloc[0]  # analysis finished after the first cutoff
+    assert features['news_count_1h'].iloc[1:].tolist() == [1.0, 1.0]
+
+
+def test_retrospective_items_mark_their_analysis_retrospective(account, monkeypatch):
+    monkeypatch.setattr(news, 'now', lambda: STAMP+timedelta(days=3))
+    # First collected two days after publication, so a model may already know the outcome.
+    news.persist_items(account, news.parse_feed(FEED, 'fixture', STAMP+timedelta(days=2)))
+    news.analyze(account, runner=answer, check_login=False)
+    with Session(account) as session:
+        run = session.scalars(select(news.NewsRun)).one()
+    assert run.payload['retrospective'] is True
+
+
+def test_collection_cycles_space_out_reasoning(account, monkeypatch):
+    clock = {'t': STAMP+timedelta(seconds=10)}
+    monkeypatch.setattr(news, 'now', lambda: clock['t'])
+    calls = []
+    def analyzer(engine):
+        calls.append(clock['t'])
+        return {'status': 'idle'}
+    with httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503))) as client:
+        first, last = news.cycle(account, True, None, client=client, analyzer=analyzer)
+        clock['t'] += timedelta(minutes=5)
+        second, last = news.cycle(account, True, last, client=client, analyzer=analyzer)
+        clock['t'] += timedelta(minutes=11)
+        third, last = news.cycle(account, True, last, client=client, analyzer=analyzer)
+        quiet, _ = news.cycle(account, False, None, client=client, analyzer=analyzer)
+    assert second['analysis'] == {'status': 'waiting_interval'}
+    assert calls == [STAMP+timedelta(seconds=10), STAMP+timedelta(minutes=16, seconds=10)]
+    assert 'analysis' not in quiet and len(first['feeds']) == len(news.FEEDS)

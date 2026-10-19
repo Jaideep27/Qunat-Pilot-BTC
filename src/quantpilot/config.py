@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     worker_max_age_seconds: int = Field(1800,ge=900,le=7200)
     news_poll_seconds: int = Field(300, ge=60, le=3600)
     news_daily_batches: int = Field(48, ge=1, le=200)
+    news_analysis_interval_seconds: int = Field(900, ge=60, le=86400)
+    news_usage_backoff_seconds: int = Field(3600, ge=300, le=86400)
     news_model: str = 'gpt-6-luna'
     news_codex_command: str = 'codex'
     news_timeout_seconds: int = Field(120, ge=10, le=300)

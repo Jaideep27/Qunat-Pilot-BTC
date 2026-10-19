@@ -3,8 +3,13 @@ import {request,type Envelope} from './api';
 
 type News={items:{id:string;title:string;url:string;source:string;available_at:string;published_at:string|null;excerpt:string}[];
   feeds:{source:string;status:string;checked_at:string}[];
-  runs:{id:string;status:string;available_at?:string;result?:{events:{summary:string;sentiment:string;uncertainties:string[];source_ids:string[]}[]}}[];
-  total_items:number;scope:string;model:string;forecasting_status:string};
+  runs:{id:string;status:string;available_at?:string;result?:{events:{summary:string;sentiment:string;novelty?:string;entities?:string[];
+    uncertainties:string[];source_ids:string[]}[]}}[];
+  analysis_status?:string;total_items:number;scope:string;model:string;forecasting_status:string};
+const delays:Record<string,string>={
+  delayed_usage_limit:'Analysis delayed: the ChatGPT usage limit was reached. Collection continues and analysis retries automatically.',
+  delayed_failure:'Analysis delayed: the latest analysis attempt failed. It retries automatically.'};
+const novelty:Record<string,string>={new:'new information',follow_up:'follow-up',duplicate:'duplicate report',correction:'correction'};
 
 export default function NewsPanel(){
   const [value,setValue]=useState<Envelope<News>|null>(null);
@@ -25,9 +30,12 @@ export default function NewsPanel(){
         <p>{i.excerpt}</p><small>{i.source} · Collected {new Date(i.available_at).toLocaleString()} · Publication {i.published_at?new Date(i.published_at).toLocaleString():'unknown'}</small>
       </article>)}
       <h3>Agent analysis</h3>
+      {d.analysis_status&&delays[d.analysis_status]&&<p role="status">{delays[d.analysis_status]}</p>}
       {!d.runs.some(r=>r.status==='completed')&&<p>No completed analysis. Pending news is not classified as neutral.</p>}
       {d.runs.filter(r=>r.status==='completed').slice(0,3).flatMap(r=>(r.result?.events??[]).map((e,n)=><article key={r.id+n}>
-        <strong>{e.sentiment} textual sentiment</strong><p>{e.summary}</p><small>Uncertainty: {e.uncertainties.join(' · ')}</small>
+        <strong>{e.sentiment} textual sentiment{e.novelty?' · '+(novelty[e.novelty]??e.novelty):''}</strong><p>{e.summary}</p>
+        {e.entities?.length?<small>Entities: {e.entities.join(' · ')}</small>:null}<br/>
+        <small>Uncertainty: {e.uncertainties.join(' · ')}</small>
         <p>{e.source_ids.map(id=>{const item=d.items.find(i=>i.id===id);return item?<a key={id} href={item.url} target="_blank" rel="noreferrer">{item.source} source </a>:<span key={id}>Source {id.slice(0,12)} </span>;})}</p>
       </article>))}
       <p className="panel-source">{d.total_items} observations · {d.model} · Statements about market effects are hypotheses.</p>
