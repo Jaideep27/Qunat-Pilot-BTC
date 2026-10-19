@@ -32,7 +32,7 @@ def test_official_sdk_stdio_discovery_calls_and_invalid_inputs(account):
                 discovered=await session.list_tools()
                 assert {t.name for t in discovered.tools} == {"get_market_snapshot","get_indicators",
                     "get_market_positioning","get_sentiment","check_data_coverage","get_prediction",
-                    "explain_decision","compare_backtests","get_paper_portfolio","get_news_events"}
+                    "explain_decision","compare_backtests","get_paper_portfolio","get_news_events","get_macro_calendar"}
                 expected = {
                     "get_market_snapshot": services.candles,
                     "get_indicators": services.indicators,
@@ -44,6 +44,7 @@ def test_official_sdk_stdio_discovery_calls_and_invalid_inputs(account):
                     "compare_backtests": services.research,
                     "get_paper_portfolio": services.paper,
                     "get_news_events": services.news,
+                    "get_macro_calendar": services.macro,
                 }
                 for tool in discovered.tools:
                     assert tool.outputSchema["type"] == "object"

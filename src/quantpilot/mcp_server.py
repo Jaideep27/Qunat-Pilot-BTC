@@ -34,6 +34,11 @@ async def get_news_events(limit: Annotated[int, Field(ge=1, le=100)] = 20) -> di
     return await asyncio.to_thread(services.news, limit)
 
 @mcp.tool(structured_output=True)
+async def get_macro_calendar() -> dict[str, Any]:
+    """Upcoming CPI, jobs and FOMC releases plus recent first-release values; no consensus surprise."""
+    return await asyncio.to_thread(services.macro)
+
+@mcp.tool(structured_output=True)
 async def check_data_coverage() -> dict[str, Any]:
     """Historical coverage, missing intervals and model release eligibility."""
     return await asyncio.to_thread(services.coverage)

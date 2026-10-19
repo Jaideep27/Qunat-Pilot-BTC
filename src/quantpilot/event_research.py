@@ -1,4 +1,9 @@
-"""Causal event features and multi-horizon research. Never publishes a trading model."""
+"""Causal event features and multi-horizon research. Never publishes a trading model.
+
+Components, all fitted inside each walk-forward window and compared on identical timestamps:
+direction (calibrated logistic + XGBoost, regime-weighted), return ranges (multi-quantile
+XGBoost), large-drop risk (touching -5% within 24h), and volatility (EWMA vs GARCH(1,1)).
+"""
 from __future__ import annotations
 
 from hashlib import sha256
@@ -8,6 +13,8 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
+from scipy.signal import lfilter
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression, Ridge
@@ -15,17 +22,15 @@ from sklearn.metrics import brier_score_loss, mean_pinball_loss, roc_auc_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier, XGBRegressor
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from .config import settings
 from .data import load_frames, dataset_hashes
 from .features import build_features, feature_groups
-from .news import NewsRun, snapshot
-from .store import database
 
 HORIZONS = {'1h': 12, '4h': 48, '24h': 288}
 PURGE = pd.Timedelta(hours=24)
+QUANTILES = (.1, .5, .9)
+DROP = .05
 
 
 def news_features(index, runs):
@@ -57,7 +62,7 @@ def news_features(index, runs):
     return out
 
 
-def targets(close):
+def targets(close, low=None):
     if close.index.tz is None or close.index.has_duplicates or not close.index.is_monotonic_increasing:
         raise ValueError('unique ordered timezone-aware cutoffs required')
     if (close.index.to_series().diff().dropna() != pd.Timedelta(minutes=5)).any():
@@ -67,28 +72,13 @@ def targets(close):
         forward = close.shift(-bars)/close-1
         result[f'return_{label}'] = forward
         result[f'up_{label}'] = (forward > 0).astype(float).where(forward.notna())
-    # Endpoint drawdown target is distinct from touching -5% intrahorizon.
-    r = result['return_24h']
-    result['drop5_24h'] = (r <= -.05).astype(float).where(r.notna())
+    # Touching -5% at any point in the next 24h, from bars strictly after the cutoff.
+    bars = HORIZONS['24h']
+    lows = close if low is None else low
+    future_low = lows.iloc[::-1].rolling(bars, min_periods=bars).min().iloc[::-1].shift(-1)
+    drawdown = future_low/close-1
+    result['drop5_24h'] = (drawdown <= -DROP).astype(float).where(drawdown.notna())
     return result
-
-
-def episodes(data, features, threshold=.05):
-    daily = data.close/data.close.shift(288)-1
-    chosen = []
-    last = {'drop': None, 'rally': None}
-    for t, value in daily.dropna().items():
-        kind = 'drop' if value <= -threshold else 'rally' if value >= threshold else None
-        if kind is None or (last[kind] is not None and t-last[kind] < pd.Timedelta(hours=24)):
-            continue
-        last[kind] = t
-        fields = ['rsi_14', 'relative_volume', 'taker_imbalance', 'oi_change', 'funding_rate',
-                  'global_ratio', 'top_account_ratio', 'top_position_ratio', 'atr_fraction']
-        state = features.loc[t, [c for c in fields if c in features]].replace([np.inf, -np.inf], np.nan)
-        chosen.append(dict(time=t.isoformat(), kind=kind, observed_return_24h=float(value),
-                           context={c: None if pd.isna(v) else float(v) for c, v in state.items()},
-                           interpretation='Observed association; no causal attribution'))
-    return chosen
 
 
 def split(index, test_start, test_days=14, rolling_days=None):
@@ -106,44 +96,190 @@ def brier(y, p):
     return float(brier_score_loss(y, p))
 
 
-def train_experiment(output, folds=2):
+def block_bootstrap_skill(y, p, base, index, seed=0, draws=1000):
+    """Brier improvement of `p` over `base`, resampling whole UTC days (overlapping labels stay together)."""
+    y, p, base = (np.asarray(v, dtype=float) for v in (y, p, base))
+    days = pd.DatetimeIndex(index).floor('D')
+    codes, uniques = pd.factorize(days)
+    gain = (base-y)**2-(p-y)**2
+    sums, counts = np.bincount(codes, gain), np.bincount(codes)
+    rng = np.random.default_rng(seed)
+    picks = rng.integers(0, len(uniques), (draws, len(uniques)))
+    samples = sums[picks].sum(axis=1)/counts[picks].sum(axis=1)
+    return dict(brier_improvement=float(gain.mean()), blocks=int(len(uniques)),
+                ci95=[float(np.percentile(samples, 2.5)), float(np.percentile(samples, 97.5))])
+
+
+def garch_filter(returns, omega, alpha, beta, initial=None):
+    """Conditional variances: var_t = omega + alpha*r_{t-1}^2 + beta*var_{t-1}."""
+    r2 = np.asarray(returns, dtype=float)**2
+    start = float(np.mean(r2)) if initial is None else initial
+    drive = omega+alpha*np.r_[start, r2[:-1]]
+    var, _ = lfilter([1.], [1., -beta], drive, zi=[beta*start])
+    return var
+
+
+def garch_fit(returns):
+    """Gaussian GARCH(1,1) maximum likelihood with variance targeting (omega from the sample variance)."""
+    returns = np.asarray(returns, dtype=float)
+    returns = returns[np.isfinite(returns)]
+    sample = float(np.mean(returns**2))
+    def loss(theta):
+        alpha, beta = theta
+        if alpha < 0 or beta < 0 or alpha+beta >= .999:
+            return 1e12
+        var = np.maximum(garch_filter(returns, sample*(1-alpha-beta), alpha, beta, sample), 1e-300)
+        return float(np.sum(np.log(var)+returns**2/var))
+    best = minimize(loss, x0=[.05, .9], method='Nelder-Mead', options=dict(xatol=1e-5, fatol=1e-3, maxiter=600))
+    alpha, beta = (float(v) for v in best.x)
+    return dict(omega=sample*(1-alpha-beta), alpha=alpha, beta=beta, converged=bool(best.success))
+
+
+def garch_forecast(params, variance, shock, steps):
+    """Sum of the next `steps` conditional variances given the latest variance and return shock."""
+    omega, persistence = params['omega'], params['alpha']+params['beta']
+    v = omega+params['alpha']*shock**2+params['beta']*variance
+    total = 0.0
+    for _ in range(steps):
+        total += v
+        v = omega+persistence*v
+    return total
+
+
+def qlike(realized, forecast):
+    ratio = np.asarray(realized, dtype=float)/np.asarray(forecast, dtype=float)
+    ratio = ratio[np.isfinite(ratio) & (ratio > 0)]
+    return float(np.mean(ratio-np.log(ratio)-1))
+
+
+def volatility_comparison(close, windows, horizons):
+    """EWMA (5-minute, span 1 day) vs GARCH(1,1) fitted on hourly returns from the training window only."""
+    log_ret = np.log(close).diff()
+    hourly = np.log(close.iloc[::12]).diff().dropna()
+    rows = []
+    for name, (train, test) in windows.items():
+        fitted = garch_fit(hourly.loc[(hourly.index >= train.min()) & (hourly.index <= train.max())].to_numpy())
+        # Filter the whole history with frozen parameters; each hourly variance uses only prior returns.
+        hourly_var = pd.Series(garch_filter(hourly.to_numpy(), fitted['omega'], fitted['alpha'], fitted['beta']),
+                               index=hourly.index)
+        last_shock = hourly.reindex(test, method='ffill')
+        last_var = hourly_var.reindex(test, method='ffill')
+        ewma = log_ret.pow(2).ewm(span=288, adjust=False).mean().loc[test]
+        for label, bars in horizons.items():
+            realized = log_ret.pow(2).iloc[::-1].rolling(bars, min_periods=bars).sum().iloc[::-1].shift(-1).loc[test]
+            hours = max(1, bars//12)
+            garch = np.array([garch_forecast(fitted, v, s, hours) for v, s in zip(last_var, last_shock)])
+            ewma_h = ewma.to_numpy()*bars
+            ok = np.isfinite(realized.to_numpy()) & np.isfinite(garch) & np.isfinite(ewma_h)
+            realized_ok = realized.to_numpy()[ok]
+            rows.append(dict(window=name, horizon=label, garch=fitted,
+                             qlike_ewma=qlike(realized_ok, ewma_h[ok]), qlike_garch=qlike(realized_ok, garch[ok]),
+                             coverage90_ewma=_coverage(close, test, bars, ewma_h, ok),
+                             coverage90_garch=_coverage(close, test, bars, garch, ok)))
+    return dict(models=['ewma', 'garch'], rows=rows,
+                note='QLIKE on realized variance of future 5-minute log returns; lower is better.')
+
+
+def _coverage(close, test, bars, variance, ok):
+    forward = (close.shift(-bars)/close-1).loc[test].to_numpy()
+    good = ok & np.isfinite(forward)
+    return float((np.abs(forward[good]) <= 1.645*np.sqrt(variance[good])).mean()) if good.any() else None
+
+
+def quantile_ranges(x, y, tr, te, seed):
+    """Multi-quantile XGBoost versus unconditional training quantiles (pinball loss; 80% interval coverage)."""
+    model = XGBRegressor(objective='reg:quantileerror', quantile_alpha=np.array(QUANTILES), n_estimators=80,
+                         max_depth=3, learning_rate=.05, reg_lambda=8, n_jobs=2, random_state=seed)
+    model.fit(x.loc[tr], y.loc[tr])
+    predicted = np.sort(model.predict(x.loc[te]), axis=1)  # prevent crossing quantiles
+    actual = y.loc[te].to_numpy()
+    base = np.quantile(y.loc[tr], QUANTILES)
+    pinball = float(np.mean([mean_pinball_loss(actual, predicted[:, i], alpha=a) for i, a in enumerate(QUANTILES)]))
+    base_pinball = float(np.mean([mean_pinball_loss(actual, np.repeat(base[i], len(actual)), alpha=a)
+                                  for i, a in enumerate(QUANTILES)]))
+    return model, dict(pinball=pinball, constant_pinball=base_pinball,
+                       interval_coverage_80=float(((actual >= predicted[:, 0]) & (actual <= predicted[:, 2])).mean()),
+                       median_interval_width=float(np.median(predicted[:, 2]-predicted[:, 0])))
+
+
+def drop_risk(x, target, windows, seed):
+    """Calibrated large-drop classifier; alerts at the validation 90th percentile of predicted risk."""
+    tr, ca, va, te = (windows[k] for k in ('train', 'calibration', 'validation', 'test'))
+    y = target
+    if y.loc[tr].sum() < 20 or y.loc[ca].nunique() < 2:
+        return None, dict(status='skipped', reason='too few large drops to fit and calibrate',
+                          train_positives=int(y.loc[tr].sum()))
+    model = XGBClassifier(n_estimators=80, max_depth=3, learning_rate=.05, reg_lambda=8, n_jobs=2,
+                          random_state=seed, eval_metric='logloss')
+    model.fit(x.loc[tr], y.loc[tr])
+    model = CalibratedClassifierCV(FrozenEstimator(model), method='sigmoid').fit(x.loc[ca], y.loc[ca])
+    threshold = float(np.quantile(model.predict_proba(x.loc[va])[:, 1], .9))
+    p = model.predict_proba(x.loc[te])[:, 1]
+    actual = y.loc[te].to_numpy()
+    alerts = p >= threshold
+    base = np.repeat(float(y.loc[tr].mean()), len(actual))
+    return model, dict(status='evaluated', base_rate_train=float(base[0]), test_rate=float(actual.mean()),
+                       brier=brier(actual, p), constant_brier=brier(actual, base),
+                       auc=float(roc_auc_score(actual, p)) if len(set(actual)) > 1 else None,
+                       alert_threshold=threshold, alert_share=float(alerts.mean()),
+                       precision=float(actual[alerts].mean()) if alerts.any() else None,
+                       recall=float(actual[alerts].sum()/actual.sum()) if actual.sum() else None,
+                       skill=block_bootstrap_skill(actual, p, base, te, seed))
+
+
+def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None, min_days=90,
+                     groups=('price', 'technical', 'derivatives', 'full', 'macro'), horizons=tuple(HORIZONS),
+                     reserve_months=2, seed=42):
     """New research directory only. Historical tests are explicitly previously observed.
 
-    This implements mathematical/ML benchmarks and a soft validation-weighted
-    regime ensemble. No holdout is relabeled 'untouched' and no release is made.
+    The last `reserve_months` are left unused for later forward-design checks. No holdout is
+    relabeled 'untouched' and no model is released or allowed to trade.
     """
+    from .macro import macro_features
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
-    frames = load_frames(settings.data_dir)
+    frames = frames if frames is not None else load_frames(settings.data_dir)
+    if runs is None:
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session
+        from .news import NewsRun
+        from .store import database
+        with Session(database()) as session:
+            runs = [dict(status=r.status, **r.payload) for r in session.scalars(select(NewsRun)).all()]
+    if macro_events is None:
+        from .macro import events as stored_macro
+        macro_events = stored_macro()
     f, _, d = build_features(frames['candles'], frames)
-    y = targets(d.close)
-    with Session(database()) as session:
-        runs = [dict(status=r.status, **r.payload) for r in session.scalars(select(NewsRun)).all()]
+    y = targets(d.close, d.low)
     nf = news_features(f.index, runs)
-    f = f.join(nf)
-    base_columns = [c for c in f if not c.startswith('news_')]
-    groups = feature_groups(base_columns)
-    common = f[base_columns].dropna().index.intersection(y.dropna().index)
-    if len(common) < 288*90:
-        raise ValueError('At least 90 days of common eligible history required')
-    # Preserve the last two months for forward-design discipline, while declaring all
-    # historical data previously inspected. This is not a new untouched holdout.
-    end = common.max()-pd.DateOffset(months=2)
-    test_starts = [end-pd.Timedelta(days=14*i) for i in reversed(range(folds))]
-    rows, artifacts = [], {}
-    seed = 42
+    mf = macro_features(f.index, macro_events)
+    mf = mf.loc[:, mf.notna().any()]  # kinds absent from the calendar contribute no columns
+    base_columns = list(f.columns)
+    group_columns = feature_groups(base_columns)
+    group_columns['macro'] = group_columns['full']+list(mf.columns)
+    f = f.join(nf).join(mf)
+    used = sorted({c for g in groups for c in group_columns[g]})
+    # Every group is compared on the same eligible timestamps.
+    labels = [f'up_{h}' for h in horizons]+[f'return_{h}' for h in horizons]+['drop5_24h']
+    common = f[used].dropna().index.intersection(y[labels].dropna().index)
+    if len(common) < 288*min_days:
+        raise ValueError(f'At least {min_days} days of common eligible history required')
+    end = common.max()-pd.DateOffset(months=reserve_months) if reserve_months else common.max()
+    test_starts = [end-pd.Timedelta(days=14*(i+1)) for i in reversed(range(folds))]
+    rows, risk, artifacts, vol_windows = [], [], {}, {}
     for fold, test_start in enumerate(test_starts):
         for strategy, lookback in (('expanding', None), ('rolling90d', 90)):
             windows = split(common, test_start, rolling_days=lookback)
             if min(map(len, windows.values())) < 288:
                 continue
-            for group in ('price', 'technical', 'derivatives', 'full'):
-                columns = groups[group]
-                tr, ca, va, te = [windows[k] for k in ('train', 'calibration', 'validation', 'test')]
+            tr, ca, va, te = [windows[k] for k in ('train', 'calibration', 'validation', 'test')]
+            if strategy == 'expanding':
+                vol_windows[f'fold{fold}'] = (tr, te)
+            regime = (f['regime'].fillna(0) > .5).astype(int)
+            for group in groups:
+                columns = group_columns[group]
                 x = f[columns]
-                # Fixed causal condition flag. Weights are fitted on validation only.
-                regime = (f['regime'].fillna(0) > .5).astype(int)
-                for horizon in HORIZONS:
+                for horizon in horizons:
                     target = y['up_'+horizon]
                     if min(target.loc[tr].nunique(), target.loc[ca].nunique()) < 2:
                         continue
@@ -170,36 +306,94 @@ def train_experiment(output, folds=2):
                         weights[str(state)] = w.tolist()
                         test_mask = regime.loc[te].to_numpy() == state
                         combined[test_mask] = np.array(tp)[:, test_mask].T @ w
-                    rtrain, rtest = y.loc[tr, 'return_'+horizon], y.loc[te, 'return_'+horizon]
+                    returns = y['return_'+horizon]
                     ridge = make_pipeline(StandardScaler(), Ridge(alpha=100.))
-                    ridge.fit(x.loc[tr], rtrain)
+                    ridge.fit(x.loc[tr], returns.loc[tr])
                     expected = ridge.predict(x.loc[te])
-                    # EWMA variance is causal; horizon scaling is an explicit approximation.
-                    sigma = d.close.pct_change().ewm(span=288, adjust=False).std().loc[te]
-                    sigma = sigma*np.sqrt(HORIZONS[horizon])
+                    quantile_model, ranges = quantile_ranges(x, returns, tr, te, seed)
+                    constant = np.repeat(target.loc[tr].mean(), len(te))
                     key = f'{fold}-{strategy}-{group}-{horizon}'
                     row = dict(id=key, fold=fold, training=strategy, group=group, horizon=horizon,
                         train_rows=len(tr), test_rows=len(te),
                         windows={k: [v.min().isoformat(), v.max().isoformat()] for k, v in windows.items()},
                         weights=weights, brier=brier(target.loc[te], combined),
-                        constant_brier=brier(target.loc[te], np.repeat(target.loc[tr].mean(), len(te))),
+                        constant_brier=brier(target.loc[te], constant),
                         auc=float(roc_auc_score(target.loc[te], combined)) if target.loc[te].nunique() > 1 else None,
-                        return_mae=float(np.mean(np.abs(expected-rtest))),
-                        zero_return_mae=float(np.mean(np.abs(rtest))),
-                        ewma_normal90_coverage=float((np.abs(rtest) <= 1.645*sigma).mean()))
-                    artifacts[key] = dict(models=calibrated, weights=weights, return_model=ridge, columns=columns)
+                        skill_vs_constant=block_bootstrap_skill(target.loc[te], combined, constant, te, seed),
+                        return_mae=float(np.mean(np.abs(expected-returns.loc[te]))),
+                        zero_return_mae=float(np.mean(np.abs(returns.loc[te]))), **ranges)
+                    artifacts[key] = dict(models=calibrated, weights=weights, return_model=ridge,
+                                          quantile_model=quantile_model, columns=columns)
                     rows.append(row)
-                    print(json.dumps({'completed': key, 'brier': row['brier']}), flush=True)
+                    print(json.dumps({'completed': key, 'brier': row['brier'], 'constant': row['constant_brier']}),
+                          flush=True)
+                model, result = drop_risk(x, y['drop5_24h'], windows, seed)
+                risk.append(dict(fold=fold, training=strategy, group=group, **result))
+                if model is not None:
+                    artifacts[f'{fold}-{strategy}-{group}-drop5'] = dict(model=model, columns=columns)
+    volatility = volatility_comparison(d.close, vol_windows, {h: HORIZONS[h] for h in horizons})
     report = dict(status='research_only', promotion_allowed=False, seed=seed, purge_hours=24,
-        data_hashes=dataset_hashes(settings.data_dir),
+        data_hashes=dataset_hashes(settings.data_dir) if frames is None else 'supplied_frames',
         code_hash=sha256(Path(__file__).read_bytes()).hexdigest(),
-        news_eligible_rows=int(nf.dropna().shape[0]),
+        eligible_rows=len(common), reserved_after=end.isoformat(),
+        news_eligible_rows=int(nf.dropna().shape[0]), macro_columns=list(mf.columns),
         news_experiment_status='blocked_until_forward_news_history_and_agent_validation',
         historical_test_status='Previously inspected data; not an untouched holdout',
-        incomplete=['news and macro ablations', 'quantile and tail models', 'cost-aware shared-engine replay',
-                    'independent uncertainty intervals', 'fresh forward validation'],
-        comparisons=rows, episodes=episodes(d, f),
-        news_coverage=snapshot()['scope'])
-    (output/'evaluation.json').write_text(json.dumps(report, indent=2, allow_nan=False), encoding='utf-8')
+        incomplete=['news ablation (needs forward news history)', 'cost-aware shared-engine replay',
+                    'fresh forward validation'],
+        comparisons=rows, drop_risk=risk, volatility=volatility, summary=summarize(rows, risk, volatility))
+    (output/'evaluation.json').write_text(json.dumps(report, indent=2, allow_nan=False, default=str), encoding='utf-8')
+    (output/'report.md').write_text(render(report), encoding='utf-8')
     joblib.dump(artifacts, output/'candidates.joblib')
     return report
+
+
+def summarize(rows, risk, volatility):
+    frame = pd.DataFrame(rows)
+    direction = []
+    if not frame.empty:
+        grouped = frame.groupby(['group', 'horizon', 'training'])
+        for (group, horizon, training), part in grouped:
+            direction.append(dict(group=group, horizon=horizon, training=training, folds=int(len(part)),
+                                  mean_brier=float(part.brier.mean()), mean_constant_brier=float(part.constant_brier.mean()),
+                                  folds_beating_constant=int((part.brier < part.constant_brier).sum()),
+                                  mean_auc=float(part.auc.dropna().mean()) if part.auc.notna().any() else None,
+                                  mean_pinball=float(part.pinball.mean()), mean_constant_pinball=float(part.constant_pinball.mean()),
+                                  mean_interval_coverage_80=float(part.interval_coverage_80.mean())))
+    evaluated = [r for r in risk if r.get('status') == 'evaluated']
+    vol = pd.DataFrame(volatility['rows'])
+    return dict(direction=direction,
+                drop_risk=dict(evaluated=len(evaluated), skipped=len(risk)-len(evaluated),
+                               beats_constant=sum(r['brier'] < r['constant_brier'] for r in evaluated),
+                               mean_auc=float(np.nanmean([r['auc'] for r in evaluated if r['auc'] is not None]))
+                               if any(r['auc'] is not None for r in evaluated) else None),
+                volatility=[dict(horizon=h, garch_wins=int((p.qlike_garch < p.qlike_ewma).sum()), windows=int(len(p)),
+                                 mean_qlike_ewma=float(p.qlike_ewma.mean()), mean_qlike_garch=float(p.qlike_garch.mean()))
+                            for h, p in vol.groupby('horizon')] if not vol.empty else [])
+
+
+def render(report):
+    s = report['summary']
+    lines = ['# Multi-horizon forecast experiment', '',
+             f"Research only; promotion allowed: **{report['promotion_allowed']}**. Eligible cutoffs: "
+             f"{report['eligible_rows']:,}. Data after {report['reserved_after'][:10]} is reserved and unused. "
+             f"{report['historical_test_status']}.", '',
+             '## Direction (probability price is higher at the horizon)', '',
+             '| Group | Horizon | Training | Folds | Brier | Constant | Folds beating constant | AUC | Pinball / constant | 80% interval coverage |',
+             '|---|---|---|---|---|---|---|---|---|---|']
+    for r in s['direction']:
+        auc = '—' if r['mean_auc'] is None else f"{r['mean_auc']:.3f}"
+        lines.append(f"| {r['group']} | {r['horizon']} | {r['training']} | {r['folds']} | {r['mean_brier']:.4f} | "
+                     f"{r['mean_constant_brier']:.4f} | {r['folds_beating_constant']}/{r['folds']} | {auc} | "
+                     f"{r['mean_pinball']:.5f} / {r['mean_constant_pinball']:.5f} | {r['mean_interval_coverage_80']*100:.0f}% |")
+    d = s['drop_risk']
+    drop_auc = '—' if d['mean_auc'] is None else f"{d['mean_auc']:.3f}"
+    lines += ['', '## Large-drop risk (touch -5% within 24h)', '',
+              f"Evaluated windows: {d['evaluated']} (skipped {d['skipped']}); beat the constant base rate in "
+              f"{d['beats_constant']}; mean AUC {drop_auc}.",
+              '', '## Volatility: EWMA vs GARCH(1,1) (QLIKE, lower is better)', '',
+              '| Horizon | Windows | GARCH better | Mean QLIKE EWMA | Mean QLIKE GARCH |', '|---|---|---|---|---|']
+    for v in s['volatility']:
+        lines.append(f"| {v['horizon']} | {v['windows']} | {v['garch_wins']} | {v['mean_qlike_ewma']:.4f} | {v['mean_qlike_garch']:.4f} |")
+    lines += ['', '## Not yet done', ''] + [f'- {item}' for item in report['incomplete']]
+    return '\n'.join(lines)+'\n'

@@ -9,6 +9,13 @@ function news(status:string){return {items:[item],feeds:[{source:'bls',status:'o
     sentiment:'negative',novelty:'new',entities:['BLS','CPI'],uncertainties:['Consensus is unavailable.'],source_ids:['item-1']}]}}],
   analysis_status:status,total_items:1,scope:'Feed excerpts.',model:'gpt-6-luna',forecasting_status:'shadow_only_no_policy_changes'};}
 
+const cpi={id:'cpi:2026-10-14',kind:'cpi',label:'Consumer Price Index',scheduled_at:'2026-10-14T12:30:00+00:00',status:'released',
+  values:{CPIAUCSL:{period:'2026-09-01',value:336.3,previous:334.1,change:2.2,change_pct:0.47},
+    CPILFESL:{period:'2026-09-01',value:330,previous:329.3,change:0.7,change_pct:0.21}},surprise:null,surprise_status:'unavailable_no_timestamped_consensus'};
+const macro={upcoming:{cpi:{...cpi,id:'cpi:2026-11-12',scheduled_at:'2026-11-12T13:30:00+00:00',status:'scheduled',values:{}},
+  jobs:null,fomc:{id:'fomc:2026-10-28',kind:'fomc',label:'FOMC rate decision',scheduled_at:'2026-10-28T18:00:00+00:00',status:'scheduled',values:{}}},
+  recent:[cpi],total_events:180,surprise_status:'unavailable_no_timestamped_consensus',scope:'Official schedules.'};
+
 async function open(page:Page,status:string){
   const requested:string[]=[];
   const values:Record<string,unknown>={candles:[],indicators:{},positioning:[],sentiment:[],
@@ -17,7 +24,7 @@ async function open(page:Page,status:string){
     portfolio:{equity:10000,position:null,fills:[],decisions:[],paused:false}};
   await page.route('**/api/v1/**',route=>{
     const key=new URL(route.request().url()).pathname.split('/').at(-1)!;requested.push(key);
-    return route.fulfill({json:{data:key==='news'?news(status):values[key],
+    return route.fulfill({json:{data:key==='news'?news(status):key==='macro'?macro:values[key],
       provenance:{source:'News test fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
   });
   await page.goto('/');await page.waitForLoadState('networkidle');
@@ -44,4 +51,15 @@ test('current analysis shows no delay notice',async({page})=>{
   const panel=page.getByRole('region',{name:'News evidence'});
   await expect(panel).toContainText('CPI rose 0.3 percent.');
   await expect(panel.getByText('Analysis delayed')).toHaveCount(0);
+});
+
+test('macro calendar shows upcoming releases and first-release values without inventing a surprise',async({page})=>{
+  await open(page,'current');
+  const calendar=page.getByRole('region',{name:'Macro calendar'});
+  await expect(calendar).toContainText('FOMC rate decision');
+  await expect(calendar).toContainText('Consumer Price Index');
+  await expect(calendar).toContainText('Headline +0.47% m/m');
+  await expect(calendar).toContainText('Core +0.21% m/m');
+  await expect(calendar).toContainText('Consensus surprise unavailable');
+  await expect(calendar.getByText('Employment Situation')).toHaveCount(0);
 });

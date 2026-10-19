@@ -49,6 +49,9 @@ def sentiment(): return services.family("sentiment")
 def news(limit: Annotated[int, Query(ge=1, le=100)] = 20):
     return services.news(limit)
 
+@app.get('/api/v1/macro')
+def macro(): return services.macro()
+
 @app.get("/api/v1/coverage")
 def coverage(): return services.coverage()
 

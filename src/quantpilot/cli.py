@@ -34,6 +34,13 @@ def main():
     news_collect.add_argument('--reasoning', action='store_true', help='Analyze new batches with saved ChatGPT Codex login')
     sub.add_parser('analyze-news', help='Analyze at most one bounded news batch; no trading-policy changes')
     sub.add_parser('news-status', help='News coverage, feed health and local Codex login readiness')
+    sub.add_parser('macro-calendar', help='Refresh official CPI, jobs and FOMC schedules and first-release values')
+    study=sub.add_parser('event-study', help='Hourly 5%% move event study with matched controls (descriptive)')
+    study.add_argument('--output', default=None)
+    study.add_argument('--years', type=int, choices=range(1, 16), default=None)
+    experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
+    experiment.add_argument('--output', required=True, help='New directory; existing directories are refused')
+    experiment.add_argument('--folds', type=int, choices=range(1, 27), default=6)
     backup=sub.add_parser('backup-db',help='Consistent PostgreSQL custom archive with checksummed manifest')
     backup.add_argument('--database',choices=['both','operational','market'],default='both')
     backup.add_argument('--output',help='New backup directory; existing directories are never overwritten')
@@ -96,6 +103,19 @@ def main():
     elif args.command == 'collect-news':
         from .news import run
         run(once=args.once, reasoning=args.reasoning)
+    elif args.command == 'macro-calendar':
+        from .macro import run as macro_run
+        result = macro_run(once=True)
+        print(json.dumps(result, indent=2, default=str))
+    elif args.command == 'event-study':
+        from .event_study import run as study_run
+        report = study_run(args.output, args.years)
+        print(json.dumps(dict(hours=report['hours'], episodes=report['episodes'], controls=report['controls'],
+                              start=report['start'], end=report['end']), indent=2))
+    elif args.command == 'research-events':
+        from .event_research import train_experiment
+        report = train_experiment(args.output, folds=args.folds)
+        print(json.dumps(report['summary'], indent=2, default=str))
     elif args.command in ('analyze-news', 'news-status'):
         from .news import analyze, snapshot, codex_status
         initialize(database())

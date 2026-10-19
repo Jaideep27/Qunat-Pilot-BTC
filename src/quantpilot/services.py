@@ -53,6 +53,14 @@ def news(limit=20):
     observed = max((f['checked_at'] for f in data['feeds']), default=None)
     return envelope(data, observed, 'Publisher RSS excerpts / versioned Codex extraction', max_age=900)
 
+def macro():
+    from .macro import snapshot
+    data = snapshot(database())
+    observed = data['recent'][0]['scheduled_at'] if data['recent'] else None
+    # Schedules are known in advance; freshness concerns the latest observed release.
+    return envelope(data, observed, 'FRED release calendar / Federal Reserve FOMC calendar / ALFRED first releases',
+                    max_age=40*86400)
+
 def market_root():
     live = settings.data_dir / "live"
     return live if (live / "candles.parquet").exists() else settings.data_dir
