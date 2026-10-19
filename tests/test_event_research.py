@@ -92,3 +92,12 @@ def test_experiment_runs_end_to_end_without_leaking_or_promoting(account, tmp_pa
         assert 0 <= row['brier'] <= 1 and row['interval_coverage_80'] is not None
     assert report['drop_risk'] and report['volatility']['models'] == ['ewma', 'garch']
     assert (tmp_path/'run'/'evaluation.json').exists()
+
+
+def test_training_windows_are_thinned_but_evaluation_keeps_every_cutoff():
+    index = pd.date_range('2025-01-01', periods=10, freq='5min', tz='UTC')
+    windows = dict(train=index[:6], calibration=index[6:8], validation=index[8:9], test=index[9:])
+    thinned = er.thin(windows, step=3)
+    assert list(thinned['train']) == [index[0], index[3]]
+    assert list(thinned['calibration']) == [index[6]]
+    assert list(thinned['test']) == [index[9]] and thinned['validation'].equals(windows['validation'])

@@ -37,23 +37,41 @@ def load_market(engine=None, start=None, end=None):
     from .market_store import PERP, MarketCandle, MarketObservation
     engine = engine or database(settings.market_database_url)
     start, end = utc(start), utc(end)
+    candle_columns = ['event_time', 'available_at', 'open', 'high', 'low', 'close', 'volume', 'taker_buy_volume']
+    candles, families = [], {family: [] for family in EXTERNAL}
+    # Month-sized reads keep peak memory small: Python row objects never exist for the full history.
+    bounds = list(pd.date_range(start.normalize().replace(day=1), end, freq='MS'))
+    edges = [start-pd.Timedelta(days=2)]+[b for b in bounds if b > start]+[end]
     with engine.connect() as connection:
-        candles = connection.execute(select(MarketCandle.__table__).where(
-            MarketCandle.market == PERP, MarketCandle.interval == '5m', MarketCandle.complete.is_(True),
-            MarketCandle.event_time >= start.to_pydatetime(), MarketCandle.event_time < end.to_pydatetime())
-            .order_by(MarketCandle.event_time)).mappings().all()
-        observed = connection.execute(select(MarketObservation.__table__).where(
-            MarketObservation.market == PERP, MarketObservation.valid.is_(True),
-            MarketObservation.family.in_(list(EXTERNAL)),
-            MarketObservation.event_time >= (start-pd.Timedelta(days=2)).to_pydatetime(),
-            MarketObservation.event_time < end.to_pydatetime())).mappings().all()
-    frames = {'candles': _times(pd.DataFrame(candles))}
-    if observed:
-        rows = pd.DataFrame(observed)
-        for family, group in rows.groupby('family'):
-            values = pd.DataFrame(list(group['values']), index=group.index)
-            frames[family] = _times(pd.concat([group.drop(columns=['values']), values], axis=1))
+        for lo, hi in zip(edges[:-1], edges[1:]):
+            rows = connection.execute(select(*[MarketCandle.__table__.c[c] for c in candle_columns]).where(
+                MarketCandle.market == PERP, MarketCandle.interval == '5m', MarketCandle.complete.is_(True),
+                MarketCandle.event_time >= max(lo, start).to_pydatetime(), MarketCandle.event_time < hi.to_pydatetime())
+                .order_by(MarketCandle.event_time)).all()
+            if rows:
+                candles.append(_compact(pd.DataFrame(rows, columns=candle_columns)))
+            for family, columns in EXTERNAL.items():
+                rows = connection.execute(select(MarketObservation.event_time, MarketObservation.available_at,
+                                                 MarketObservation.values).where(
+                    MarketObservation.market == PERP, MarketObservation.valid.is_(True),
+                    MarketObservation.family == family, MarketObservation.event_time >= lo.to_pydatetime(),
+                    MarketObservation.event_time < hi.to_pydatetime())).all()
+                if rows:
+                    frame = pd.DataFrame({'event_time': [r[0] for r in rows], 'available_at': [r[1] for r in rows],
+                                          **{c: [r[2].get(c) for r in rows] for c in columns}})
+                    families[family].append(_compact(frame))
+    frames = {'candles': pd.concat(candles, ignore_index=True) if candles else pd.DataFrame(columns=candle_columns)}
+    for family, parts in families.items():
+        if parts:
+            frames[family] = pd.concat(parts, ignore_index=True).sort_values('available_at', ignore_index=True)
     return frames
+
+
+def _compact(frame):
+    frame = _times(frame)
+    for column in frame.columns.difference(['event_time', 'available_at']):
+        frame[column] = pd.to_numeric(frame[column], errors='coerce').astype('float32')
+    return frame
 
 
 def _times(frame):

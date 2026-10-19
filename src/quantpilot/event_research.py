@@ -92,6 +92,12 @@ def split(index, test_start, test_days=14, rolling_days=None):
                 test=index[(index >= start) & (index < start+pd.Timedelta(days=test_days)-PURGE)])
 
 
+def thin(windows, step=3):
+    """Fit on every `step`-th cutoff: adjacent 5-minute cutoffs share almost the same future label window.
+    Validation and test keep every cutoff so evaluation is unchanged."""
+    return {k: (v[::step] if k in ('train', 'calibration') else v) for k, v in windows.items()}
+
+
 def brier(y, p):
     return float(brier_score_loss(y, p))
 
@@ -229,7 +235,7 @@ def drop_risk(x, target, windows, seed):
 
 def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None, min_days=90,
                      groups=('price', 'technical', 'derivatives', 'full', 'macro'), horizons=tuple(HORIZONS),
-                     reserve_months=2, seed=42):
+                     reserve_months=2, seed=42, train_step=3):
     """New research directory only. Historical tests are explicitly previously observed.
 
     The last `reserve_months` are left unused for later forward-design checks. No holdout is
@@ -257,7 +263,7 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
     base_columns = list(f.columns)
     group_columns = feature_groups(base_columns)
     group_columns['macro'] = group_columns['full']+list(mf.columns)
-    f = f.join(nf).join(mf)
+    f = f.join(nf).join(mf).astype('float32')  # halves memory; XGBoost works in float32 anyway
     used = sorted({c for g in groups for c in group_columns[g]})
     # Every group is compared on the same eligible timestamps.
     labels = [f'up_{h}' for h in horizons]+[f'return_{h}' for h in horizons]+['drop5_24h']
@@ -272,6 +278,7 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
             windows = split(common, test_start, rolling_days=lookback)
             if min(map(len, windows.values())) < 288:
                 continue
+            windows = thin(windows, train_step)
             tr, ca, va, te = [windows[k] for k in ('train', 'calibration', 'validation', 'test')]
             if strategy == 'expanding':
                 vol_windows[f'fold{fold}'] = (tr, te)
@@ -332,7 +339,7 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                 if model is not None:
                     artifacts[f'{fold}-{strategy}-{group}-drop5'] = dict(model=model, columns=columns)
     volatility = volatility_comparison(d.close, vol_windows, {h: HORIZONS[h] for h in horizons})
-    report = dict(status='research_only', promotion_allowed=False, seed=seed, purge_hours=24,
+    report = dict(status='research_only', promotion_allowed=False, seed=seed, purge_hours=24, train_step=train_step,
         data_hashes=dataset_hashes(settings.data_dir) if frames is None else 'supplied_frames',
         code_hash=sha256(Path(__file__).read_bytes()).hexdigest(),
         eligible_rows=len(common), reserved_after=end.isoformat(),
