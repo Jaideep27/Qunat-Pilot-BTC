@@ -227,7 +227,7 @@ Scripts (`scripts/`):
 |---|---|
 | Data | `audit`, `repair-data`, `manifest`, `import-market`, `backfill-history`, `market-coverage`, `collect-live`, `research-data` |
 | Original release | `train`, `backtest`, `publish-research` |
-| Research | `event-study`, `research-events`, `research-risk`, `research-strategies [--output DIR] [--holdout]`, `validate-outlook`, `outlook-refresh [--full]`, `shadow-forecast` |
+| Research | `event-study`, `research-events`, `research-risk`, `research-strategies [--output DIR] [--holdout]`, `research-agent --output DIR`, `validate-outlook`, `outlook-refresh [--full]`, `shadow-forecast` |
 | News and macro | `collect-news`, `analyze-news`, `news-status`, `macro-calendar` |
 | Q&A | `ask "<question>" [--no-ai]` |
 | Operations | `init-db`, `status`, `doctor`, `backup-db`, `restore-check`, `worker`, `pause`, `resume` |
@@ -246,7 +246,7 @@ Scripts (`scripts/`):
 | Macro calendar (CPI, jobs, FOMC) | FRED, ALFRED first-release vintages, Federal Reserve | 198 events | no consensus forecasts, so no surprises |
 | News | Fed, BLS, CoinDesk RSS; analysed by Claude and Codex | from 2026-10-19 only | forward only, on purpose |
 | Research history (`data/research/*.parquet`) | Binance spot BTCUSDT daily/hourly; USD-M funding archives; Coinbase BTC-USD daily/hourly; Deribit DVOL hourly | spot daily 2017-08 →; funding 2020-01 →; hourly 2021-09 →; DVOL 2021-03 → | `quantpilot research-data` refreshes them and builds the hourly (44,293 rows) and daily (3,351 rows) panels |
-| Liquidations (forward only) | Binance `btcusdt@forceOrder` websocket, per minute | from 2026-10-20 | a lower bound (Binance pushes at most one per second); rows exist only for minutes with liquidations |
+| Liquidations (forward only) | Binance all-symbol `!forceOrder@arr` websocket on the `/market/ws/` path, BTCUSDT only, per minute | from about 2026-10-20 19:30 UTC; the legacy path delivered nothing before that (amendment A5) | a lower bound (Binance pushes at most one per second per symbol); rows exist only for minutes with liquidations |
 | Order-book depth (forward only) | `/fapi/v1/depth` 1000 levels, every minute | from 2026-10-20 | size and imbalance within 5 and 15 bps of the mid, spread, how far the book reaches (about 16 bps) |
 
 **Not collected:** options chains, on-chain flows, other exchanges' order books.
