@@ -34,6 +34,8 @@ def main():
     news_collect.add_argument('--reasoning', action='store_true', help='Analyze new batches with saved ChatGPT Codex login')
     sub.add_parser('analyze-news', help='Analyze at most one bounded news batch; no trading-policy changes')
     sub.add_parser('news-status', help='News coverage, feed health and local Codex login readiness')
+    sub.add_parser('outlook-refresh', help='Rebuild the cached hourly outlook panel (all history with --full)').add_argument('--full', action='store_true')
+    sub.add_parser('validate-outlook', help='Walk-forward validation of the outlook methods; writes the gate report')
     sub.add_parser('shadow-forecast', help='Refit if due, record research forecasts and score finished ones')
     sub.add_parser('macro-calendar', help='Refresh official CPI, jobs and FOMC schedules and first-release values')
     study=sub.add_parser('event-study', help='Hourly 5%% move event study with matched controls (descriptive)')
@@ -107,6 +109,14 @@ def main():
     elif args.command == 'collect-news':
         from .news import run
         run(once=args.once, reasoning=args.reasoning)
+    elif args.command == 'outlook-refresh':
+        from .outlook import refresh_panel
+        print(json.dumps(refresh_panel(full=args.full), indent=2))
+    elif args.command == 'validate-outlook':
+        from .outlook import validate_outlook
+        report = validate_outlook()
+        touch = {k: v for k, v in report['touch'].items() if not k.startswith('calibration')}
+        print(json.dumps({**{k: v for k, v in report.items() if k != 'touch'}, 'touch': touch}, indent=2, default=str))
     elif args.command == 'shadow-forecast':
         from .forecaster import run_cycle
         initialize(database())
