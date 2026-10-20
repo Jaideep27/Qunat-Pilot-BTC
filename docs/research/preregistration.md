@@ -103,3 +103,18 @@ A pass means the rule is recorded in the shadow forecaster and scored forward. I
 - Open interest is available from **2021-10** (the PostgreSQL store), so S3 with the OI filter only calls from 2021-10 onward. Archive rows with open interest ≤ 0 (28 hours, 2024-07 to 2025-04) are treated as missing.
 - I4 uses the taker buy share from the 5-minute candles (already defined that way above). The Binance metrics taker long/short volume ratio is not downloaded: it carries the same taker flow at coarser resolution.
 - The daily Coinbase premium is computed against Binance spot BTCUSDT, so it includes USDT/USD moves (up to 13% in 2017–2018). The z-score over the trailing window is used exactly as registered.
+
+**A2 — 2026-10-20, after the development run (no family passed) and before any liquidation or order-book data existed.**
+The holdout year 2025-10-20 → 2026-10-19 was **not** evaluated, because section 7 requires a development pass first. It stays untouched for future pre-registered tests.
+
+Two forward-only intraday families are registered now, before their data exists (collection started 2026-10-20):
+
+| ID | Name | Rule | Parameters |
+|---|---|---|---|
+| I6 | Liquidation exhaustion | L = long-liquidation USD in the last hour; p = its percentile within the trailing 30 days. +1 if p ≥ c and the 1h return ≤ −m. Mirror with short liquidations: −1 if their percentile ≥ c and the 1h return ≥ +m | c ∈ {0.99, 0.995}; m ∈ {0.01, 0.02} |
+| I7 | Depth imbalance persistence | b = hourly mean of `imbalance_15bps`; z = (b − 168h mean) / 168h std. +1 if z ≥ z0 for each of the last k hours; −1 if z ≤ −z0 for each | z0 ∈ {1.5, 2.0, 2.5}; k ∈ {1, 3} |
+
+- **Holding periods and scoring:** H ∈ {4, 12, 24} hours, scored exactly as in section 3.
+- **When:** evaluated once at least 6 months of data exist (no earlier than 2027-04-20).
+- **Walk-forward:** 1-month test blocks after a 2-month burn-in (otherwise as in section 5). Pass rule as in section 7. The trial count includes every earlier intraday trial (105 at registration).
+- **Holdout:** the last 2 months of the collected data are held back and evaluated once, only for a family that passes.
