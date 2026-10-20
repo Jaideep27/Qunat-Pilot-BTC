@@ -259,6 +259,11 @@ def _summarized(result):
                                       for fold in row.get("walk_forward_policy", [])]
         if row.get("trading", {}).get("curve"):
             row["trading"]["curve"] = thin(row["trading"]["curve"])
+    for bench in result.get("benchmarks", {}).values():
+        if isinstance(bench.get("fills"), list):
+            bench["fills"] = len(bench["fills"])   # a count; the moving-average fills alone were 1.4 MB
+        if bench.get("curve"):
+            bench["curve"] = thin(bench["curve"])
     return result
 
 

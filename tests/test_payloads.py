@@ -40,3 +40,16 @@ def test_full_detail_on_request(account):
 def services_app():
     from quantpilot.api import app
     return app
+
+
+def test_benchmarks_are_summarized_too(account):
+    write_evaluation()
+    path = settings.artifact_dir/'evaluation.json'
+    result = json.loads(path.read_text(encoding='utf-8'))
+    curve = [dict(time=str(i), equity=10000.0+i) for i in range(1500)]
+    result['benchmarks'] = dict(buy_hold=dict(net_return=.3, max_drawdown=-.09, curve=curve, fills=[dict(price=1.0)]*900))
+    path.write_text(json.dumps(result), encoding='utf-8')
+    bench = services.research()['data']['benchmarks']['buy_hold']
+    assert bench['net_return'] == .3 and bench['fills'] == 900 and len(bench['curve']) <= services.MAX_CURVE_POINTS
+    full = services.research(detail=True)['data']['benchmarks']['buy_hold']
+    assert len(full['fills']) == 900
