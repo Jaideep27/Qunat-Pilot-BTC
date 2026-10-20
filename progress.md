@@ -176,6 +176,9 @@ All Python modules are in `src/quantpilot/`. "Codex" marks modules from the orig
 | `strategy_research.py` | Walk-forward selection over 6-month blocks, meta-labeling, `gate_all`, report, one-shot holdout behind a lock |
 | `research_data.py` | Spot, Coinbase, Deribit DVOL and funding history fetchers; incremental Parquet caches; hourly and daily research panels |
 | `forward_data.py` | Forward-only collectors: per-minute liquidations (websocket) and 1000-level depth snapshots |
+| `context.py` | Trading agent, step A: causal multi-timeframe MarketContext (indicators 5m/15m/1h/4h, confirmed swing support/resistance, prior day/week levels, positioning, funding, 24h volatility, input ages, macro blackout, news and forecasts known by the cutoff) |
+| `tradeplan.py` | Trading agent, step A: deterministic TradePlan (structural stop and target, net reward:risk ≥ 1.5, 0.25% risk sizing, exposure, margin, liquidation and exchange-minimum checks, evidence for and against, revalidation at fill) |
+| `futures.py` | Trading agent, step A: versioned futures simulator `futures-v1`, one pure reducer for history and the forward paper account (next-open fills, stop-first ambiguity, mark liquidation, funding, tighten-only stops, 24h exit, daily and drawdown halts) |
 
 Frontend (`frontend/src/`): `main.tsx` (tabs), `api.ts`, `MarketChart.tsx`, `TradingWorkspace.tsx`, `TradingViewPanel.tsx`, `ShadowForecasts.tsx`, `StrategyResearch.tsx`, `Chat.tsx`, `NewsPanel.tsx`, `MacroCalendar.tsx`, `PaperOperations.tsx`, `ResearchPlots.tsx`, `liveFeed.ts`, `preview.ts`, styles.
 
@@ -260,6 +263,8 @@ Scripts (`scripts/`):
 | | | **Macro calendar** and the **five-year 5% event study** |
 | | | **Multi-horizon research harness** with validation-only champions and PBO; the **shadow forecaster** with a promotion gate |
 | | | **Market outlook Q&A and in-app Chat** (11-task plan), independent review, fix pass (commit `95d6274`) |
+| | | **Fixes to seven verified defects:**<br>- direction "down" intent;<br>- the live price from completed candles only;<br>- scoring against the recorded price over gap-free windows (scoring v2);<br>- stale labels;<br>- the Claude-timeout fallback;<br>- Codex environment stripping;<br>- the smoke check and doc counts.<br>Commit `6dd7430`, branch `trading-agent` |
+| | | **Trading agent, step A:** market context, trade plans, futures simulator (commit `5ef0cae`, branch `trading-agent`). Design: `docs/superpowers/specs/2026-10-20-trading-agent-step-a-design.md` |
 | | | **Selective prediction research**: progress record, pre-registration, trade-style scoring, new data, forward collectors, 10 rule families + 2 meta-labeled primaries, report, dashboard panel, independent review, fixes (commits `5453862` → `c030629`) |
 
 `git log --oneline 821b45c..main` lists the 36 commits since the Codex import.
@@ -391,6 +396,7 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 - **Deployment and fills:** no public deployment. Paper fills are bar-based and margin is approximate.
 - **News:** only days of history, so it can't be evaluated yet.
 - **Leftovers:** 18 `scripts/fix*.cjs` one-off patch scripts could be removed.
+- **Flaky test:** `test_history_collector::test_collector_recovers_paginated_downtime…` reads the wall clock and can fail when a 5-minute boundary passes mid-test. That happened once, on 2026-10-20, under heavy memory pressure, when the full suite took 27 minutes; the test passes alone.
 - **Logs:** services log to `.verification/services/{api,data-supervisor,dashboard}.log`.
 
 ---
@@ -403,6 +409,17 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 - The Prediction tab shows the strategy verdict.
 
 **Open choice for the owner:** add a git remote (for example a private GitHub repository) so the code is backed up off the laptop.
+
+**Trading agent (owner request, 2026-10-20).** The goal is an experimental RL paper-futures account that bridges indicators, structure, forecasts, positioning and news. It runs in this order:
+
+| Step | What | Status |
+|---|---|---|
+| A | Verify and fix the defects; MarketContext; deterministic TradePlans; versioned futures simulator | **done** (branch `trading-agent`, not merged) |
+| B | Pre-register the trade-plan rules plus a baseline entry policy; evaluate walk-forward with the existing strategy harness (same costs and pass rule) | next |
+| C | RL for trade management only (hold, exit, tighten stop, pull in target), compared against fixed exits | after B |
+| D | Experimental forward paper account ($10,000 or $1,000, 2× isolated), worker, persistence, dashboard and API/MCP inspection | after C |
+
+Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
 
 **Next steps:**
 1. Keep the supervisor running as continuously as possible to build forward data.
