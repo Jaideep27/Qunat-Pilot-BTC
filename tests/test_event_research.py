@@ -164,3 +164,39 @@ def test_probability_of_backtest_overfitting_counts_folds_where_the_pick_fails_o
     result = er.backtest_overfitting(rows)['1h']
     assert result['folds'] == 3
     assert result['pbo'] == pytest.approx(2/3)
+
+
+
+def range_row(fold, group, val_gain, test_gain, horizon='1h'):
+    return dict(fold=fold, group=group, training='expanding', horizon=horizon,
+                validation_pinball=.001-val_gain, validation_constant_pinball=.001,
+                pinball=.001-test_gain, constant_pinball=.001)
+
+
+def test_range_champions_use_pinball_loss_on_validation():
+    rows = [range_row(f, 'price', .00004, .00002) for f in range(3)]+[range_row(f, 'full', .00001, .00009) for f in range(3)]
+    best = er.champions(rows, metric='pinball')['1h']
+    assert best['group'] == 'price' and best['test_skill'] == pytest.approx(.00002)
+
+
+def test_volatility_champion_is_the_lower_validation_qlike():
+    rows = [dict(fold=f, horizon='24h', validation_qlike_ewma=.30, validation_qlike_garch=.25,
+                 qlike_ewma=.28, qlike_garch=.31) for f in range(3)]
+    best = er.volatility_champions(rows)['24h']
+    assert best['model'] == 'garch' and best['test_qlike'] == pytest.approx(.31)
+    assert best['test_qlike_alternative'] == pytest.approx(.28) and best['test_windows_better'] == 0
+
+
+def test_risk_experiment_selects_range_drop_and_volatility_champions(account, tmp_path):
+    frames, macro_events = synthetic_inputs()
+    report = er.risk_experiment(tmp_path/'risk', frames=frames, macro_events=macro_events, **{
+        k: v for k, v in SMALL.items() if k != 'runs'})
+    s = report['summary']
+    assert set(s['range_champions']) == {'1h', '24h'}
+    assert set(s['volatility_champions']) == {'1h', '24h'}
+    assert all(v['model'] in ('ewma', 'garch') for v in s['volatility_champions'].values())
+    assert 'drop_champion' in s and report['promotion_allowed'] is False
+    for row in report['ranges']:
+        assert row['windows']['validation'][1] < row['windows']['test'][0]
+        assert {'validation_pinball', 'pinball', 'validation_constant_pinball'} <= set(row)
+    assert (tmp_path/'risk'/'report.md').exists()

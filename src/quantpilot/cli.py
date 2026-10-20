@@ -39,6 +39,9 @@ def main():
     study=sub.add_parser('event-study', help='Hourly 5%% move event study with matched controls (descriptive)')
     study.add_argument('--output', default=None)
     study.add_argument('--years', type=int, choices=range(1, 16), default=None)
+    risk=sub.add_parser('research-risk', help='Ranges, large-drop risk and volatility scored on validation and test')
+    risk.add_argument('--output', required=True, help='New directory, or an interrupted run to resume')
+    risk.add_argument('--folds', type=int, choices=range(1, 27), default=4)
     experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
     experiment.add_argument('--output', required=True, help='New directory; existing directories are refused')
     experiment.add_argument('--folds', type=int, choices=range(1, 27), default=6)
@@ -117,6 +120,10 @@ def main():
         report = study_run(args.output, args.years)
         print(json.dumps(dict(hours=report['hours'], episodes=report['episodes'], controls=report['controls'],
                               start=report['start'], end=report['end']), indent=2))
+    elif args.command == 'research-risk':
+        from .event_research import risk_experiment
+        report = risk_experiment(args.output, folds=args.folds)
+        print(json.dumps(report['summary'], indent=2, default=str))
     elif args.command == 'research-events':
         from .event_research import train_experiment
         report = train_experiment(args.output, folds=args.folds)

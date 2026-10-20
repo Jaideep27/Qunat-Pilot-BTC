@@ -161,6 +161,23 @@ def qlike(realized, forecast):
     return float(np.mean(ratio-np.log(ratio)-1))
 
 
+def volatility_scores(close, train, idx, bars, fitted=None):
+    """QLIKE of EWMA and GARCH(1,1) (fitted on hourly returns inside `train` only) on cutoffs `idx`."""
+    log_ret = np.log(close).diff()
+    hourly = np.log(close.iloc[::12]).diff().dropna()
+    fitted = fitted or garch_fit(hourly.loc[(hourly.index >= train.min()) & (hourly.index <= train.max())].to_numpy())
+    hourly_var = pd.Series(garch_filter(hourly.to_numpy(), fitted['omega'], fitted['alpha'], fitted['beta']),
+                           index=hourly.index)
+    last_shock, last_var = hourly.reindex(idx, method='ffill'), hourly_var.reindex(idx, method='ffill')
+    ewma = log_ret.pow(2).ewm(span=288, adjust=False).mean().loc[idx].to_numpy()*bars
+    realized = log_ret.pow(2).iloc[::-1].rolling(bars, min_periods=bars).sum().iloc[::-1].shift(-1).loc[idx].to_numpy()
+    garch = np.array([garch_forecast(fitted, v, s, max(1, bars//12)) for v, s in zip(last_var, last_shock)])
+    ok = np.isfinite(realized) & np.isfinite(garch) & np.isfinite(ewma)
+    return dict(qlike_ewma=qlike(realized[ok], ewma[ok]), qlike_garch=qlike(realized[ok], garch[ok]),
+                coverage90_ewma=_coverage(close, idx, bars, ewma, ok),
+                coverage90_garch=_coverage(close, idx, bars, garch, ok), garch=fitted)
+
+
 def volatility_comparison(close, windows, horizons):
     """EWMA (5-minute, span 1 day) vs GARCH(1,1) fitted on hourly returns from the training window only."""
     log_ret = np.log(close).diff()
@@ -195,20 +212,28 @@ def _coverage(close, test, bars, variance, ok):
     return float((np.abs(forward[good]) <= 1.645*np.sqrt(variance[good])).mean()) if good.any() else None
 
 
+def quantile_model(seed):
+    return XGBRegressor(objective='reg:quantileerror', quantile_alpha=np.array(QUANTILES), n_estimators=80,
+                        max_depth=3, learning_rate=.05, reg_lambda=8, min_child_weight=50, subsample=.8,
+                        colsample_bytree=.8, n_jobs=2, random_state=seed)
+
+
+def range_scores(model, x, y, idx, base):
+    """Pinball loss of fitted quantiles vs fixed training quantiles `base`, and 80% interval coverage."""
+    predicted = np.sort(model.predict(x.loc[idx]), axis=1)  # prevent crossing quantiles
+    actual = y.loc[idx].to_numpy()
+    pinball = float(np.mean([mean_pinball_loss(actual, predicted[:, i], alpha=a) for i, a in enumerate(QUANTILES)]))
+    constant = float(np.mean([mean_pinball_loss(actual, np.repeat(base[i], len(actual)), alpha=a)
+                              for i, a in enumerate(QUANTILES)]))
+    return dict(pinball=pinball, constant_pinball=constant,
+                interval_coverage_80=float(((actual >= predicted[:, 0]) & (actual <= predicted[:, 2])).mean()),
+                median_interval_width=float(np.median(predicted[:, 2]-predicted[:, 0])))
+
+
 def quantile_ranges(x, y, tr, te, seed):
     """Multi-quantile XGBoost versus unconditional training quantiles (pinball loss; 80% interval coverage)."""
-    model = XGBRegressor(objective='reg:quantileerror', quantile_alpha=np.array(QUANTILES), n_estimators=80,
-                         max_depth=3, learning_rate=.05, reg_lambda=8, min_child_weight=50, subsample=.8, colsample_bytree=.8, n_jobs=2, random_state=seed)
-    model.fit(x.loc[tr], y.loc[tr])
-    predicted = np.sort(model.predict(x.loc[te]), axis=1)  # prevent crossing quantiles
-    actual = y.loc[te].to_numpy()
-    base = np.quantile(y.loc[tr], QUANTILES)
-    pinball = float(np.mean([mean_pinball_loss(actual, predicted[:, i], alpha=a) for i, a in enumerate(QUANTILES)]))
-    base_pinball = float(np.mean([mean_pinball_loss(actual, np.repeat(base[i], len(actual)), alpha=a)
-                                  for i, a in enumerate(QUANTILES)]))
-    return model, dict(pinball=pinball, constant_pinball=base_pinball,
-                       interval_coverage_80=float(((actual >= predicted[:, 0]) & (actual <= predicted[:, 2])).mean()),
-                       median_interval_width=float(np.median(predicted[:, 2]-predicted[:, 0])))
+    model = quantile_model(seed).fit(x.loc[tr], y.loc[tr])
+    return model, range_scores(model, x, y, te, np.quantile(y.loc[tr], QUANTILES))
 
 
 def drop_risk(x, target, windows, seed):
@@ -236,20 +261,8 @@ def drop_risk(x, target, windows, seed):
                        skill=block_bootstrap_skill(actual, p, base, te, seed))
 
 
-def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None, min_days=90,
-                     groups=('price', 'technical', 'derivatives', 'full', 'macro'), horizons=tuple(HORIZONS),
-                     reserve_months=2, seed=42, train_step=3):
-    """New research directory, or resume of an interrupted run with the identical configuration.
-
-    The last `reserve_months` are left unused for later forward-design checks. No holdout is
-    relabeled 'untouched' and no model is released or allowed to trade. Every finished result
-    is appended to progress.jsonl, so a terminated run resumes instead of refitting.
-    """
-    from .macro import macro_features
-    output = Path(output)
-    config = dict(folds=folds, min_days=min_days, groups=list(groups), horizons=list(horizons),
-                  reserve_months=reserve_months, seed=seed, train_step=train_step,
-                  code=sha256(Path(__file__).read_bytes()).hexdigest())
+def _progress(output, config):
+    """Resumable progress: refuse a different configuration; return finished results and an appender."""
     progress, done = output/'progress.jsonl', {}
     if output.exists():
         if not progress.exists():
@@ -264,6 +277,12 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
     def record(row):
         with progress.open('a', encoding='utf-8') as stream:
             stream.write(json.dumps(row, default=str)+'\n')
+    return done, record
+
+
+def _prepare(frames, runs, macro_events, groups, horizons, min_days, reserve_months, folds):
+    """Features, labels and the common eligible timestamps every configuration is compared on."""
+    from .macro import macro_features
     frames = frames if frames is not None else load_frames(settings.data_dir)
     if runs is None:
         from sqlalchemy import select
@@ -280,18 +299,38 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
     nf = news_features(f.index, runs, provider=settings.news_reasoners[0])
     mf = macro_features(f.index, macro_events)
     mf = mf.loc[:, mf.notna().any()]  # kinds absent from the calendar contribute no columns
-    base_columns = list(f.columns)
-    group_columns = feature_groups(base_columns)
+    group_columns = feature_groups(list(f.columns))
     group_columns['macro'] = group_columns['full']+list(mf.columns)
     f = f.join(nf).join(mf).astype('float32')  # halves memory; XGBoost works in float32 anyway
     used = sorted({c for g in groups for c in group_columns[g]})
-    # Every group is compared on the same eligible timestamps.
     labels = [f'up_{h}' for h in horizons]+[f'return_{h}' for h in horizons]+['drop5_24h']
     common = f[used].dropna().index.intersection(y[labels].dropna().index)
     if len(common) < 288*min_days:
         raise ValueError(f'At least {min_days} days of common eligible history required')
     end = common.max()-pd.DateOffset(months=reserve_months) if reserve_months else common.max()
     test_starts = [end-pd.Timedelta(days=14*(i+1)) for i in reversed(range(folds))]
+    return dict(f=f, y=y, d=d, nf=nf, mf=mf, group_columns=group_columns, common=common, end=end,
+                test_starts=test_starts)
+
+
+def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None, min_days=90,
+                     groups=('price', 'technical', 'derivatives', 'full', 'macro'), horizons=tuple(HORIZONS),
+                     reserve_months=2, seed=42, train_step=3):
+    """New research directory, or resume of an interrupted run with the identical configuration.
+
+    The last `reserve_months` are left unused for later forward-design checks. No holdout is
+    relabeled 'untouched' and no model is released or allowed to trade. Every finished result
+    is appended to progress.jsonl, so a terminated run resumes instead of refitting.
+    """
+    output = Path(output)
+    config = dict(folds=folds, min_days=min_days, groups=list(groups), horizons=list(horizons),
+                  reserve_months=reserve_months, seed=seed, train_step=train_step,
+                  code=sha256(Path(__file__).read_bytes()).hexdigest())
+    done, record = _progress(output, config)
+    supplied = frames is not None
+    data = _prepare(frames, runs, macro_events, groups, horizons, min_days, reserve_months, folds)
+    f, y, d, nf, mf = (data[k] for k in ('f', 'y', 'd', 'nf', 'mf'))
+    group_columns, common, end, test_starts = (data[k] for k in ('group_columns', 'common', 'end', 'test_starts'))
     rows, risk, artifacts, vol_windows = [], [], {}, {}
     for fold, test_start in enumerate(test_starts):
         for strategy, lookback in (('expanding', None), ('rolling90d', 90)):
@@ -373,7 +412,7 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                     artifacts[key] = dict(model=model, columns=columns)
     volatility = volatility_comparison(d.close, vol_windows, {h: HORIZONS[h] for h in horizons})
     report = dict(status='research_only', promotion_allowed=False, seed=seed, purge_hours=24, train_step=train_step,
-        data_hashes=dataset_hashes(settings.data_dir) if frames is None else 'supplied_frames',
+        data_hashes='supplied_frames' if supplied else dataset_hashes(settings.data_dir),
         code_hash=sha256(Path(__file__).read_bytes()).hexdigest(),
         eligible_rows=len(common), reserved_after=end.isoformat(),
         news_eligible_rows=int(nf.dropna().shape[0]), macro_columns=list(mf.columns),
@@ -389,24 +428,24 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
     return report
 
 
-def _skills(rows, horizon, kind):
-    """Per (group, training): fold -> skill, where skill = constant Brier minus model Brier."""
+def _skills(rows, horizon, kind, metric='brier'):
+    """Per (group, training): fold -> skill, where skill = constant loss minus model loss (lower loss is better)."""
     out = {}
     for r in rows:
-        if r['horizon'] != horizon or r.get(f'{kind}brier') is None:
+        if r['horizon'] != horizon or r.get(f'{kind}{metric}') is None:
             continue
-        out.setdefault((r['group'], r['training']), {})[r['fold']] = r[f'{kind}constant_brier']-r[f'{kind}brier']
+        out.setdefault((r['group'], r['training']), {})[r['fold']] = r[f'{kind}constant_{metric}']-r[f'{kind}{metric}']
     return out
 
 
-def champions(rows):
+def champions(rows, metric='brier'):
     """Per horizon, the configuration with the best mean VALIDATION skill; test results are only reported.
 
     If nothing beats the constant base rate on validation, the champion is the constant forecast.
     """
     result = {}
     for horizon in dict.fromkeys(r['horizon'] for r in rows):
-        validation, test = _skills(rows, horizon, 'validation_'), _skills(rows, horizon, '')
+        validation, test = _skills(rows, horizon, 'validation_', metric), _skills(rows, horizon, '', metric)
         if not validation:
             continue
         mean = {k: float(np.mean(list(v.values()))) for k, v in validation.items()}
@@ -424,12 +463,12 @@ def champions(rows):
     return result
 
 
-def backtest_overfitting(rows):
+def backtest_overfitting(rows, metric='brier'):
     """Probability of backtest overfitting: share of folds whose validation pick ranks at or below the
     median of that fold's test results (rank logit <= 0), after Bailey et al.'s CSCV idea."""
     result = {}
     for horizon in dict.fromkeys(r['horizon'] for r in rows):
-        validation, test = _skills(rows, horizon, 'validation_'), _skills(rows, horizon, '')
+        validation, test = _skills(rows, horizon, 'validation_', metric), _skills(rows, horizon, '', metric)
         folds = sorted({f for v in validation.values() for f in v})
         logits = []
         for fold in folds:
@@ -443,6 +482,22 @@ def backtest_overfitting(rows):
         result[horizon] = dict(folds=len(logits), pbo=float(np.mean([l <= 0 for l in logits])) if logits else None,
                                rank_logits=logits)
     return result
+
+
+def volatility_champions(rows):
+    """Per horizon, EWMA or GARCH by lower mean VALIDATION QLIKE; test QLIKE is only reported."""
+    out = {}
+    for horizon in dict.fromkeys(r['horizon'] for r in rows):
+        mine = [r for r in rows if r['horizon'] == horizon]
+        val = {m: float(np.mean([r[f'validation_qlike_{m}'] for r in mine])) for m in ('ewma', 'garch')}
+        best = min(val, key=val.get)
+        other = 'ewma' if best == 'garch' else 'garch'
+        out[horizon] = dict(model=best, validation_qlike=val[best], validation_qlike_alternative=val[other],
+                            test_qlike=float(np.mean([r[f'qlike_{best}'] for r in mine])),
+                            test_qlike_alternative=float(np.mean([r[f'qlike_{other}'] for r in mine])),
+                            test_windows_better=int(sum(r[f'qlike_{best}'] < r[f'qlike_{other}'] for r in mine)),
+                            windows=len(mine))
+    return out
 
 
 def summarize(rows, risk, volatility):
@@ -506,4 +561,130 @@ def render(report):
     for v in s['volatility']:
         lines.append(f"| {v['horizon']} | {v['windows']} | {v['garch_wins']} | {v['mean_qlike_ewma']:.4f} | {v['mean_qlike_garch']:.4f} |")
     lines += ['', '## Not yet done', ''] + [f'- {item}' for item in report['incomplete']]
+    return '\n'.join(lines)+'\n'
+
+
+def drop_scores(x, target, windows, seed):
+    """Calibrated large-drop classifier scored on validation and test against the training base rate."""
+    tr, ca, va, te = (windows[k] for k in ('train', 'calibration', 'validation', 'test'))
+    if target.loc[tr].sum() < 20 or target.loc[ca].nunique() < 2:
+        return dict(status='skipped', reason='too few large drops to fit and calibrate',
+                    train_positives=int(target.loc[tr].sum()))
+    model = XGBClassifier(n_estimators=80, max_depth=3, learning_rate=.05, reg_lambda=8, min_child_weight=50,
+                          subsample=.8, colsample_bytree=.8, n_jobs=2, random_state=seed, eval_metric='logloss')
+    model.fit(x.loc[tr], target.loc[tr])
+    model = CalibratedClassifierCV(FrozenEstimator(model), method='sigmoid').fit(x.loc[ca], target.loc[ca])
+    rate = float(target.loc[tr].mean())
+    out = dict(status='evaluated', base_rate_train=rate)
+    for name, idx in (('validation_', va), ('', te)):
+        actual, p = target.loc[idx].to_numpy(), model.predict_proba(x.loc[idx])[:, 1]
+        out[f'{name}brier'] = brier(actual, p)
+        out[f'{name}constant_brier'] = brier(actual, np.repeat(rate, len(actual)))
+        out[f'{name}auc'] = float(roc_auc_score(actual, p)) if len(set(actual)) > 1 else None
+    return out
+
+
+def risk_experiment(output, folds=4, frames=None, runs=None, macro_events=None, min_days=90,
+                    groups=('price', 'technical', 'derivatives', 'full', 'macro'), horizons=tuple(HORIZONS),
+                    reserve_months=2, seed=42, train_step=3):
+    """Return ranges, large-drop risk and volatility, each scored on validation AND test on the same folds,
+    so their champions can be chosen on validation only. Research only; resumable like train_experiment."""
+    output = Path(output)
+    config = dict(kind='risk', folds=folds, min_days=min_days, groups=list(groups), horizons=list(horizons),
+                  reserve_months=reserve_months, seed=seed, train_step=train_step,
+                  code=sha256(Path(__file__).read_bytes()).hexdigest())
+    done, record = _progress(output, config)
+    supplied = frames is not None
+    data = _prepare(frames, [] if runs is None else runs, macro_events, groups, horizons, min_days,
+                    reserve_months, folds)
+    f, y, d = data['f'], data['y'], data['d']
+    ranges, drops, vols = [], [], []
+    def keep(rows, row):
+        rows.append(row)
+        record(row)
+    for fold, test_start in enumerate(data['test_starts']):
+        for training, lookback in (('expanding', None), ('rolling90d', 90)):
+            windows = split(data['common'], test_start, rolling_days=lookback)
+            if min(map(len, windows.values())) < 288:
+                continue
+            windows = thin(windows, train_step)
+            tr, va, te = windows['train'], windows['validation'], windows['test']
+            span = {k: [v.min().isoformat(), v.max().isoformat()] for k, v in windows.items()}
+            if training == 'expanding':
+                for horizon in horizons:
+                    key = f'{fold}-vol-{horizon}'
+                    if key in done:
+                        vols.append(done[key])
+                        continue
+                    val = volatility_scores(d.close, tr, va, HORIZONS[horizon])
+                    test = volatility_scores(d.close, tr, te, HORIZONS[horizon], fitted=val['garch'])
+                    keep(vols, dict(id=key, fold=fold, horizon=horizon, windows=span, garch=val['garch'],
+                                    **{f'validation_{k}': v for k, v in val.items() if k != 'garch'},
+                                    **{k: v for k, v in test.items() if k != 'garch'}))
+            for group in groups:
+                x = f[data['group_columns'][group]]
+                for horizon in horizons:
+                    key = f'{fold}-{training}-{group}-{horizon}-range'
+                    if key in done:
+                        ranges.append(done[key])
+                        continue
+                    returns = y['return_'+horizon]
+                    model = quantile_model(seed).fit(x.loc[tr], returns.loc[tr])
+                    base = np.quantile(returns.loc[tr], QUANTILES)
+                    val, test = range_scores(model, x, returns, va, base), range_scores(model, x, returns, te, base)
+                    keep(ranges, dict(id=key, fold=fold, training=training, group=group, horizon=horizon, windows=span,
+                                      **{f'validation_{k}': v for k, v in val.items()}, **test))
+                    print(json.dumps({'completed': key, 'pinball': test['pinball'], 'constant': test['constant_pinball']}),
+                          flush=True)
+                key = f'{fold}-{training}-{group}-drop'
+                if key in done:
+                    drops.append(done[key])
+                    continue
+                keep(drops, dict(id=key, fold=fold, training=training, group=group, horizon='24h', windows=span,
+                                 **drop_scores(x, y['drop5_24h'], windows, seed)))
+    evaluated = [r for r in drops if r.get('status') == 'evaluated']
+    summary = dict(range_champions=champions(ranges, metric='pinball'),
+                   range_overfitting=backtest_overfitting(ranges, metric='pinball'),
+                   drop_champion=champions(evaluated).get('24h', dict(group='constant', training=None,
+                       note='No drop-risk configuration could be evaluated')),
+                   drop_overfitting=backtest_overfitting(evaluated).get('24h'),
+                   volatility_champions=volatility_champions(vols))
+    report = dict(status='research_only', promotion_allowed=False, seed=seed, purge_hours=24, train_step=train_step,
+                  data_hashes='supplied_frames' if supplied else dataset_hashes(settings.data_dir),
+                  code_hash=config['code'], eligible_rows=len(data['common']), reserved_after=data['end'].isoformat(),
+                  historical_test_status='Previously inspected data; not an untouched holdout',
+                  resumed_results=len(done), ranges=ranges, drops=drops, volatility=vols, summary=summary)
+    (output/'evaluation.json').write_text(json.dumps(report, indent=2, allow_nan=False, default=str), encoding='utf-8')
+    (output/'report.md').write_text(render_risk(report), encoding='utf-8')
+    return report
+
+
+def render_risk(report):
+    s = report['summary']
+    lines = ['# Risk forecast experiment: ranges, large-drop risk and volatility', '',
+             f"Research only. Eligible cutoffs: {report['eligible_rows']:,}; data after {report['reserved_after'][:10]} "
+             f"reserved. {report['historical_test_status']}. Every champion below is chosen on validation only.", '',
+             '## Return ranges (10/50/90% quantiles; skill = constant pinball minus model pinball)', '',
+             '| Horizon | Champion | Validation skill | Test skill | Test folds better | Configurations | PBO |',
+             '|---|---|---|---|---|---|---|']
+    for horizon, c in s['range_champions'].items():
+        pbo = s['range_overfitting'].get(horizon, {}).get('pbo')
+        name = c['group'] if c['training'] is None else f"{c['group']} / {c['training']}"
+        test = '—' if c['test_skill'] is None else f"{c['test_skill']:+.6f}"
+        beat = '—' if c['folds_beating_constant'] is None else f"{c['folds_beating_constant']}/{c.get('folds', 0)}"
+        lines.append(f"| {horizon} | {name} | {c['validation_skill']:+.6f} | {test} | {beat} | "
+                     f"{c['configurations_tried']} | {'—' if pbo is None else f'{pbo:.2f}'} |")
+    c = s['drop_champion']
+    pbo = (s.get('drop_overfitting') or {}).get('pbo')
+    lines += ['', '## Large-drop risk (touch -5% within 24h; skill = constant Brier minus model Brier)', '',
+              f"Champion: **{c['group'] if c.get('training') is None else c['group']+' / '+c['training']}** · "
+              f"validation skill {c.get('validation_skill', 0):+.6f} · test skill "
+              f"{'—' if c.get('test_skill') is None else format(c['test_skill'], '+.6f')} · PBO "
+              f"{'—' if pbo is None else f'{pbo:.2f}'}", '',
+              '## Volatility (QLIKE, lower is better)', '',
+              '| Horizon | Champion | Validation QLIKE | Test QLIKE | Alternative test QLIKE | Test windows better |',
+              '|---|---|---|---|---|---|']
+    for horizon, v in s['volatility_champions'].items():
+        lines.append(f"| {horizon} | {v['model']} | {v['validation_qlike']:.4f} | {v['test_qlike']:.4f} | "
+                     f"{v['test_qlike_alternative']:.4f} | {v['test_windows_better']}/{v['windows']} |")
     return '\n'.join(lines)+'\n'
