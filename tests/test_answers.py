@@ -59,3 +59,18 @@ def test_ai_view_can_only_be_set_for_answers_from_the_same_run(account):
     assert answers.set_ai_view(account, answer_id, .55, ['x'], run_id='run-b') is False
     assert answers.set_ai_view(account, answer_id, .55, ['x'], run_id='run-a') is True
     assert answers.history(account)[0]['ai']['probability'] == .55
+
+
+def test_scheduled_questions_run_hourly_with_a_daily_ai_cap(account, monkeypatch):
+    from quantpilot.config import settings
+    monkeypatch.setattr(settings, 'ask_scheduled_ai_per_day', 2)
+    calls = []
+    def ask_fn(text, ai, source):
+        calls.append((text, ai))
+        rid = answers.record(account, result(), source, ai=dict(status='ok' if ai else 'off'))
+        return dict(id=rid)
+    first = answers.scheduled_cycle(account, ask_fn, now=T0)
+    again = answers.scheduled_cycle(account, ask_fn, now=T0+pd.Timedelta(minutes=20))   # same hour: skipped
+    later = answers.scheduled_cycle(account, ask_fn, now=T0+pd.Timedelta(hours=1))
+    assert first['asked'] == len(answers.SCHEDULED) and again['asked'] == 0
+    assert sum(ai for _, ai in calls) == 2   # cap holds across cycles in one UTC day

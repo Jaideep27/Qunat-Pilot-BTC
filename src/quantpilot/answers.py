@@ -129,3 +129,23 @@ def ai_calls_today(engine, now, sources):
     day = pd.Timestamp(now).strftime('%Y-%m-%d')
     return sum(1 for r in history(engine, 100000) if r['asked_at'][:10] == day and r['source'] in sources
                and (r.get('ai') or {}).get('status') in ('ok', 'failed', 'usage_limited'))
+
+
+SCHEDULED = ['up or down next 1h', 'up or down next 4h', 'up or down next 24h', 'chance of a 3% drop in 24h',
+             'chance of a 3% rally in 24h']
+
+
+def scheduled_cycle(engine, ask_fn, now=None):
+    from .config import settings
+    now = pd.Timestamp(now or datetime.now(timezone.utc))
+    hour, day = now.strftime('%Y-%m-%dT%H'), now.strftime('%Y-%m-%d')
+    mine = [r for r in history(engine, 2000) if r['source'] == 'scheduled']
+    if any(r['asked_at'][:13] == hour for r in mine):
+        return dict(asked=0, ai=0)
+    ai_used = sum(1 for r in mine if r['asked_at'][:10] == day and (r.get('ai') or {}).get('status') != 'off')
+    asked = ai = 0
+    for text in SCHEDULED:
+        use_ai = ai_used+ai < settings.ask_scheduled_ai_per_day
+        ask_fn(text, ai=use_ai, source='scheduled')
+        asked, ai = asked+1, ai+int(use_ai)
+    return dict(asked=asked, ai=ai)

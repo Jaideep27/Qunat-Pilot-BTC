@@ -50,6 +50,27 @@ def shadow_forecasts():
         time.sleep(max(1,((target if target>now else target+pd.Timedelta(minutes=15))-now).total_seconds()))
 
 
+def outlook_cycle():
+    # Hourly panel refresh + scheduled questions; scoring every 15 minutes.
+    from quantpilot import answers, services
+    from quantpilot.event_study import load_market
+    from quantpilot.outlook import refresh_panel
+    engine, last_refresh = database(), None
+    while True:
+        try:
+            now = pd.Timestamp.now(tz='UTC')
+            if last_refresh is None or now-last_refresh >= pd.Timedelta(hours=1):
+                refresh_panel(now)
+                last_refresh = now
+                answers.scheduled_cycle(engine, lambda text, ai, source: services.ask(text, ai=ai, source=source), now)
+            recent = load_market(database(settings.market_database_url), now-pd.Timedelta(days=8), now)['candles']
+            bars = recent.set_index('available_at')[['high', 'low', 'close']].astype(float)
+            print(json.dumps(dict(outlook=dict(scored=answers.evaluate(engine, bars, now)))), flush=True)
+        except Exception as exc:
+            print(json.dumps(dict(outlook='blocked', error_type=type(exc).__name__)), flush=True)
+        time.sleep(900)
+
+
 def paper():
     engine=database(settings.market_database_url)
     while True:
@@ -67,8 +88,8 @@ if __name__=='__main__':
             (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=time.time())),encoding='utf-8')
             initialize(database(settings.market_database_url))
             initialize(database())
-            with ThreadPoolExecutor(max_workers=6) as pool:
-                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts)]
+            with ThreadPoolExecutor(max_workers=7) as pool:
+                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts),pool.submit(outlook_cycle)]
                 for future in futures:future.result()
     except Timeout:
         print('A data supervisor is already running.',flush=True)
