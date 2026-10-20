@@ -161,3 +161,8 @@ Two forward-only intraday families are registered now, before their data exists 
   - N = every intraday trial: the 105 earlier ones plus these 8.
   - V[SR] = the variance of per-call Sharpe across intraday trials with ≥ 30 calls (amendment A3).
 - **Holdout.** Evaluated once, only for a family that passes: ≥ 10 trades, mean net > 0, hit rate ≥ the development break-even.
+
+**A5 — 2026-10-21, data correction (no evaluation affected).** Liquidation collection recorded **nothing** from 2026-10-20 14:00 UTC until about 19:30 UTC.
+- **Cause:** Binance's legacy futures websocket path (`fstream.binance.com/ws/…`) accepted the connection but delivered no messages, as a test on the trade stream confirmed. The collector now uses the all-symbol stream on the market path, `wss://fstream.binance.com/market/ws/!forceOrder@arr`, keeps BTCUSDT, and reconnects after 15 silent minutes.
+- **Effect on I6:** its data start is about 2026-10-20 19:30 UTC; the earliest evaluation date (2027-04-20) still gives about 6 months.
+- **Unaffected:** order-book depth (REST) was recorded throughout.

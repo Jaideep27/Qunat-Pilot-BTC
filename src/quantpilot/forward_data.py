@@ -1,6 +1,6 @@
 """Forward-only research data: liquidations and order-book depth cannot be downloaded later.
 
-Liquidations come from Binance's public `btcusdt@forceOrder` stream and are stored per minute
+Liquidations come from Binance's public all-symbol `!forceOrder@arr` stream (BTCUSDT kept) and are stored per minute
 (long liquidations are forced SELLs, short liquidations forced BUYs). Binance pushes at most one
 liquidation per symbol per second on this stream, so totals are a lower bound. Depth is a
 1000-level REST snapshot (about 17 bps each side) once a minute. Both are stored as
@@ -17,7 +17,10 @@ import pandas as pd
 from .config import settings
 from .market_store import FORWARD_VALUES, save_frame
 
-STREAM = 'wss://fstream.binance.com/ws/btcusdt@forceOrder'
+# All-symbol liquidation stream on Binance's market path, filtered to BTCUSDT. The legacy /ws/ path accepts
+# connections but delivered no data at all on 2026-10-20, which recorded nothing silently.
+STREAM = 'wss://fstream.binance.com/market/ws/!forceOrder@arr'
+SILENCE_LIMIT = 900   # seconds without any message (any symbol) before the stream is treated as dead
 DEPTH = 'https://fapi.binance.com/fapi/v1/depth'
 
 
@@ -87,6 +90,10 @@ def depth_features(book, received_at):
     return row
 
 
+def stream_stale(last_message, now, limit=SILENCE_LIMIT):
+    return now-last_message > limit
+
+
 def save(engine, family, frame):
     if family not in FORWARD_VALUES:
         raise ValueError('unsupported forward family')
@@ -100,13 +107,17 @@ async def _liquidations(engine, flush_seconds=60):
         try:
             async with websockets.connect(STREAM, ping_interval=60, close_timeout=5) as socket:
                 backoff, last = 1, asyncio.get_running_loop().time()
+                heard = last
                 while True:
                     try:
-                        item = parse_liquidation(await asyncio.wait_for(socket.recv(), timeout=flush_seconds))
+                        message = await asyncio.wait_for(socket.recv(), timeout=flush_seconds)
+                        heard = asyncio.get_running_loop().time()
+                        item = parse_liquidation(message)
                         if item:
                             pending.append(item)
                     except asyncio.TimeoutError:
-                        pass
+                        if stream_stale(heard, asyncio.get_running_loop().time()):
+                            raise ConnectionError('liquidation stream silent')   # reconnect; logged below
                     if asyncio.get_running_loop().time()-last >= flush_seconds:
                         pending = await asyncio.to_thread(flush, pending, pd.Timestamp.now(tz='UTC'),
                                                           lambda frame: save(engine, 'liquidations', frame))

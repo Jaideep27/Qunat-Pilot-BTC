@@ -79,3 +79,18 @@ def test_depth_records_how_far_the_snapshot_reaches():
     row = fd.depth_features(book, received_at=pd.Timestamp('2026-10-20 12:00:01', tz='UTC'))
     assert row['bid_reach_bps'] == pytest.approx((10000.1-9990.0)/10000.1*1e4)
     assert row['ask_reach_bps'] == pytest.approx((10010.0-10000.1)/10000.1*1e4)
+
+
+def test_liquidations_use_binances_market_stream_path():
+    # The legacy fstream.binance.com/ws/ path accepts connections but no longer delivers data (2026-10-20).
+    assert fd.STREAM == 'wss://fstream.binance.com/market/ws/!forceOrder@arr'
+
+
+def test_other_symbols_on_the_all_market_stream_are_ignored():
+    other = '{"e":"forceOrder","E":1,"o":{"s":"JASMYUSDT","S":"BUY","q":"1","ap":"0.005","z":"1","T":1}}'
+    assert fd.parse_liquidation(other) is None
+
+
+def test_a_silent_stream_is_detected():
+    assert fd.stream_stale(last_message=0.0, now=fd.SILENCE_LIMIT+1) is True
+    assert fd.stream_stale(last_message=0.0, now=fd.SILENCE_LIMIT-1) is False
