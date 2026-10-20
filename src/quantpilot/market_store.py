@@ -60,7 +60,7 @@ class MarketFeed(Base):
 # Forward-only research families (liquidations, order book); never part of the release audit.
 FORWARD_VALUES = {'liquidations': ['long_liq_qty', 'long_liq_usd', 'short_liq_qty', 'short_liq_usd', 'liq_count'],
                   'depth': ['mid', 'spread_bps', 'bid_qty_5bps', 'ask_qty_5bps', 'imbalance_5bps',
-                            'bid_qty_15bps', 'ask_qty_15bps', 'imbalance_15bps']}
+                            'bid_qty_15bps', 'ask_qty_15bps', 'imbalance_15bps', 'bid_reach_bps', 'ask_reach_bps']}
 
 
 def _finite(value):

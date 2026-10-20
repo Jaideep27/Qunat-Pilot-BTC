@@ -53,3 +53,29 @@ def test_forward_rows_are_stored_as_market_observations(account):
     with account.connect() as connection:
         stored = connection.execute(select(MarketObservation.family, MarketObservation.values)).all()
     assert stored[0][0] == 'liquidations' and stored[0][1]['long_liq_usd'] == 100000
+
+
+def test_flush_waits_a_grace_period_so_late_events_join_their_minute():
+    now = pd.Timestamp('2026-10-20 12:05:30', tz='UTC')
+    events = [dict(time=pd.Timestamp('2026-10-20 12:02:10', tz='UTC'), side='SELL', qty=1, usd=1),
+              dict(time=pd.Timestamp('2026-10-20 12:04:50', tz='UTC'), side='SELL', qty=1, usd=1)]
+    done, remaining = fd.split_flush(events, now, grace=pd.Timedelta(minutes=2))
+    assert [e['time'].minute for e in done] == [2] and [e['time'].minute for e in remaining] == [4]
+
+
+def test_a_failed_save_keeps_the_batch_for_the_next_flush():
+    events = [dict(time=pd.Timestamp('2026-10-20 12:00:10', tz='UTC'), side='SELL', qty=1, usd=1)]
+    def failing(*args):
+        raise RuntimeError('database down')
+    remaining = fd.flush(events, pd.Timestamp('2026-10-20 12:05', tz='UTC'), failing)
+    assert remaining == events
+    saved = []
+    assert fd.flush(remaining, pd.Timestamp('2026-10-20 12:06', tz='UTC'), lambda frame: saved.append(len(frame))) == []
+    assert saved == [1]
+
+
+def test_depth_records_how_far_the_snapshot_reaches():
+    book = dict(bids=[['10000.0', '1'], ['9990.0', '1']], asks=[['10000.2', '1'], ['10010.0', '1']], T=T0)
+    row = fd.depth_features(book, received_at=pd.Timestamp('2026-10-20 12:00:01', tz='UTC'))
+    assert row['bid_reach_bps'] == pytest.approx((10000.1-9990.0)/10000.1*1e4)
+    assert row['ask_reach_bps'] == pytest.approx((10010.0-10000.1)/10000.1*1e4)

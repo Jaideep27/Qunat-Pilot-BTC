@@ -64,13 +64,13 @@ Passing on development: none.
 - +0.79% net per call;
 - positive in 5 of 5 years.
 
-It failed the deflated Sharpe (0.01) and overfitting (PBO 0.42) criteria. Two checks confirm that verdict:
+It failed the deflated Sharpe (0.01) and overfitting (PBO 0.42) criteria. These checks confirm that verdict:
 
 | Check | Result |
 |---|---|
 | Drift baseline: always long, same scoring and span | 7-day hold: 52.9% hit rate, +0.25% per call. 14-day hold: 55.2%, +0.91%. BTC's rise alone makes long-biased swing calls profitable. |
 | M1 by side | Longs (59% of calls) +1.15% per call; shorts +0.28%. Most of the result is the market's drift. |
-| Deflated Sharpe with variance from trials with ≥ 30 calls only (removes noisy tiny trials) | 0.10, still far below 0.95 |
+| Deflated Sharpe: how much the cross-trial variance choice matters (amendment A3) | 0.01 as registered; 0.10 with variance from trials with ≥ 30 calls only; about 0.97 with no deflation at all. M1 still fails, because its PBO is 0.42: the configuration picked on earlier data landed in the bottom half out of sample in 42% of blocks. |
 
 The swing families with positive means behave the same way: S1 breakout, S2 momentum agreement and S5 Coinbase premium all make money on longs and little or nothing on shorts. Their Sharpe ratios are well inside what 81 swing trials would produce by luck.
 
@@ -78,6 +78,8 @@ The swing families with positive means behave the same way: S1 breakout, S2 mome
 - Session momentum (I3, 411 calls), flush-out rebounds (I1), crowding fades (I2) and the meta-filtered 24h momentum (M2, 402 calls) all lost money after costs.
 - Taker-flow persistence (I4) lost on 71% of calls. This is not a reversal: gross returns were near zero (80 of 105 calls hit the time limit with small moves), so costs turned most calls into losers.
 - The hourly Coinbase premium (I5) had a 57.6% hit rate but only 92 calls (fewer than the 100 required) and a PBO of 0.33.
+
+An independent review of the code and run found no bug that could change any verdict. It noted that the deflated-Sharpe variance was not specified in advance; amendment A3 now records the choice and fixes it for future tests.
 
 ## What this means
 

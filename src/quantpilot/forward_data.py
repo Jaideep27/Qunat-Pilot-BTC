@@ -50,6 +50,25 @@ def aggregate_liquidations(events, received_at):
     return frame
 
 
+def split_flush(events, now, grace=pd.Timedelta(minutes=2)):
+    """Minutes older than `grace` are complete; later events may still arrive for the rest."""
+    cutoff = (now-grace).floor('min')
+    return [e for e in events if e['time'] < cutoff], [e for e in events if e['time'] >= cutoff]
+
+
+def flush(events, now, saver, grace=pd.Timedelta(minutes=2)):
+    """Save complete minutes once; on failure keep every event for the next attempt."""
+    done, remaining = split_flush(events, now, grace)
+    if not done:
+        return remaining
+    try:
+        saver(aggregate_liquidations(done, now))
+    except Exception as exc:
+        print(json.dumps(dict(liquidations='save_failed', error_type=type(exc).__name__)), flush=True)
+        return events
+    return remaining
+
+
 def depth_features(book, received_at):
     """Size resting within 5 and 15 bps of the mid on each side, their imbalance, and the spread."""
     bids = [(float(p), float(q)) for p, q in book['bids']]
@@ -58,7 +77,8 @@ def depth_features(book, received_at):
     mid = (best_bid+best_ask)/2
     row = dict(event_time=pd.Timestamp(int(book['T']), unit='ms', tz='UTC').floor('min'),
                available_at=pd.Timestamp(received_at), received_at=pd.Timestamp(received_at), source=DEPTH,
-               mid=mid, spread_bps=(best_ask-best_bid)/mid*1e4)
+               mid=mid, spread_bps=(best_ask-best_bid)/mid*1e4,
+               bid_reach_bps=(mid-bids[-1][0])/mid*1e4, ask_reach_bps=(asks[-1][0]-mid)/mid*1e4)
     for bps in (5, 15):
         bid = sum(q for p, q in bids if p >= mid*(1-bps/1e4))
         ask = sum(q for p, q in asks if p <= mid*(1+bps/1e4))
@@ -82,14 +102,14 @@ async def _liquidations(engine, flush_seconds=60):
                 backoff, last = 1, asyncio.get_running_loop().time()
                 while True:
                     try:
-                        pending.append(parse_liquidation(await asyncio.wait_for(socket.recv(), timeout=flush_seconds)))
+                        item = parse_liquidation(await asyncio.wait_for(socket.recv(), timeout=flush_seconds))
+                        if item:
+                            pending.append(item)
                     except asyncio.TimeoutError:
                         pass
                     if asyncio.get_running_loop().time()-last >= flush_seconds:
-                        now = pd.Timestamp.now(tz='UTC')
-                        done = [e for e in pending if e and e['time'] < now.floor('min')]
-                        pending = [e for e in pending if e and e['time'] >= now.floor('min')]
-                        await asyncio.to_thread(save, engine, 'liquidations', aggregate_liquidations(done, now))
+                        pending = await asyncio.to_thread(flush, pending, pd.Timestamp.now(tz='UTC'),
+                                                          lambda frame: save(engine, 'liquidations', frame))
                         last = asyncio.get_running_loop().time()
         except Exception as exc:  # reconnect: the stream drops every 24 hours by design
             print(json.dumps(dict(liquidations='reconnecting', error_type=type(exc).__name__)), flush=True)

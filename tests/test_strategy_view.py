@@ -38,7 +38,8 @@ def test_strategy_view_reports_forward_collection(account):
                               available_at=pd.Timestamp('2026-10-20 12:01', tz='UTC'),
                               received_at=pd.Timestamp('2026-10-20 12:01', tz='UTC'), source='x',
                               mid=1.0, spread_bps=.1, bid_qty_5bps=1.0, ask_qty_5bps=1.0, imbalance_5bps=0.0,
-                              bid_qty_15bps=1.0, ask_qty_15bps=1.0, imbalance_15bps=0.0)])
+                              bid_qty_15bps=1.0, ask_qty_15bps=1.0, imbalance_15bps=0.0,
+                              bid_reach_bps=17.0, ask_reach_bps=17.0)])
     forward_data.save(account, 'depth', rows)
     status = services.strategy_research()['data']['forward']
     assert status['depth']['rows'] == 1 and status['liquidations']['rows'] == 0

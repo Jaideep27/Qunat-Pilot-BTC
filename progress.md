@@ -33,7 +33,7 @@ Requires Python 3.11 (`.venv`), Node 22 and the PostgreSQL 18 Windows binaries. 
 | Market database | PostgreSQL: 5m candles (`market_candles`) and every other family as JSON rows (`market_observations`), plus news, macro events, shadow forecasts, outlook answers and chat | `src/quantpilot/market_store.py`, `migrations/versions/0001`–`0008` |
 | Ledger database | SQLite paper-trading ledger, snapshots, worker runs | `data/quantpilot.db`, `store.py` |
 | API | FastAPI on 127.0.0.1:8000; write endpoints accept loopback clients only | `api.py`, `services.py` |
-| Data supervisor | One process with seven threads: collector (5 s), history backfill, paper worker, news, macro calendar, shadow forecasts (every 15 min), outlook cycle (hourly) | `scripts/data_supervisor.py` |
+| Data supervisor | One process with eight threads: collector (5 s), history backfill, paper worker, news, macro calendar, shadow forecasts (every 15 min), outlook cycle (hourly), forward research data (liquidations stream, depth every minute) | `scripts/data_supervisor.py` |
 | MCP tools | Read-only tools for Claude Code (plus logging outlook answers); a fast proxy forwards to the API | `mcp_server.py`, `mcp_proxy.py`, `docs/mcp-setup.md` |
 | Dashboard | React + Vite. Tabs include Chart (86 studies, 7 timeframes), Prediction, Chat and operations views | `frontend/src/` |
 | CLI | `quantpilot <command>` (argparse) | `cli.py` |
@@ -49,8 +49,11 @@ Requires Python 3.11 (`.venv`), Node 22 and the PostgreSQL 18 Windows binaries. 
 | Fear & Greed | Alternative.me | daily | |
 | Macro calendar (CPI, jobs, FOMC) | FRED, ALFRED first-release vintages, Federal Reserve | 198 events, 2021 → scheduled future dates | no consensus forecasts, so no surprises are computed |
 | News | Fed, BLS, CoinDesk RSS; analysed by Claude Sonnet 5.5 (`claude -p`) and Codex | from 2026-10-19 only | forward-collected on purpose: old headlines could leak hindsight |
+| Research history (Parquet, `data/research/`) | Binance spot BTCUSDT daily and hourly, USD-M funding archives, Coinbase BTC-USD daily and hourly, Deribit DVOL hourly | spot daily 2017-08 →; funding 2020-01 →; hourly 2021-09 →; DVOL 2021-03 → | `quantpilot research-data` refreshes them and builds the hourly (44,293 rows) and daily (3,351 rows) research panels |
+| Liquidations (forward only) | Binance `btcusdt@forceOrder` websocket, aggregated per minute | from 2026-10-20 | a lower bound: Binance pushes at most one liquidation per second |
+| Order-book depth (forward only) | `/fapi/v1/depth` 1000 levels, every minute | from 2026-10-20 | size and imbalance within 5 and 15 bps of the mid, spread |
 
-**Not collected (yet):** liquidations, order book, options, on-chain, other exchanges. Phase 2 of the prediction plan adds some of these (section 11).
+**Not collected:** options chains, on-chain flows, other exchanges' order books.
 
 ## 4. Timeline of work
 
@@ -64,7 +67,7 @@ Requires Python 3.11 (`.venv`), Node 22 and the PostgreSQL 18 Windows binaries. 
 | | | Shadow forecaster: refits the gated champions daily, records every 15 minutes, scores itself forward |
 | | | Market outlook Q&A (questions parser, similar-situations estimator, touch probabilities, ranges, scoreboard), API/MCP/CLI, in-app Chat tab with a Claude agent restricted to QuantPilot tools |
 | | | Independent final review; one fix pass covering the critical and important findings (commit `95d6274`) |
-| | | Prediction plan approved (section 11); execution started |
+| | | Prediction plan approved (section 11) and executed: progress record, pre-registration, selective trade scoring, new data and forward collectors, 10 rule families + 2 meta-labeled primaries, report, dashboard panel |
 
 Full commit list: `git log --oneline main..news-pipeline` (29 commits at the time of writing).
 
@@ -97,7 +100,17 @@ Full commit list: `git log --oneline main..news-pipeline` (29 commits at the tim
 - Touch probability: promoted but weak (Brier 0.09320 calibrated vs 0.09351 historical frequency).
 - 80% ranges: coverage 82.5% / 83.6% / 74.5% / 79.9% / 82.3% / 83.2% at 1h / 4h / 12h / 24h / 72h / 7d.
 
-**Bottom line so far:** this data predicts **how much** BTC moves (ranges, volatility), not **which way**.
+### Selective strategy research (pre-registered, 2026-10-20)
+- **Setup:**
+  - 186 configurations across 10 rule families and 2 meta-labeled primaries, intraday and swing.
+  - Each call scored as a trade (take-profit, stop or time limit) after 16 bps round trip and funding, with walk-forward selection over 6-month blocks.
+  - Pass rule: enough calls, the hit rate's lower bound above break-even, deflated Sharpe ≥ 0.95, PBO < 0.3, most years positive.
+- **Result: no strategy passed.** The holdout year (2025-10-20 → 2026-10-19) was therefore not used and stays untouched.
+- **Closest: trend side + meta-label (swing, 7-day hold).** 295 calls (11.5% of days), 58.3% hit rate (95% CI 52.6–63.8%) vs 51.6% break-even, +0.79% per call. Most of it is BTC's uptrend: always long scores 52.9% and +0.25% per call, and its longs earned +1.15% vs +0.28% for shorts. Deflated Sharpe 0.01 as registered (about 0.97 without any multiple-testing deflation, see amendment A3), but PBO 0.42 fails regardless.
+- **Intraday:** every family lost money after costs or had too few calls.
+- Full tables: [docs/strategy-research.md](docs/strategy-research.md).
+
+**Bottom line so far:** this data predicts **how much** BTC moves (ranges, volatility), not **which way**, even when a rule may stay silent 90–99% of the time.
 
 ## 6. Overfitting controls in place
 - Purged walk-forward splits; identical timestamps across configurations.
@@ -114,10 +127,11 @@ Full commit list: `git log --oneline main..news-pipeline` (29 commits at the tim
 - **Claude Code:** `claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.mcp_proxy`.
 - **Scoreboard:** every answer is stored with a timestamp and scored once its horizon passes. QuantPilot's probability, Claude's probability and the base rate are compared by Brier score. A verdict appears only after 30 independent scored answers per question type and horizon. Shown below the chat and at `GET /api/v1/answers`.
 - **Limits:** 100 asks and 100 chats per day; one Claude call at a time; a numbers-only answer when the limit is reached.
+- **Strategy research panel** (Prediction tab), `GET /api/v1/strategy-research` and MCP `get_strategy_research`: each family's hit rate with its call rate and confidence interval, the verdict, and how much liquidation and depth data has been recorded.
 
 ## 8. Tests
-- Python: 211 tests (`.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider`, about 9.5 minutes on this laptop).
-- Browser: Playwright, 21 passed and 2 skipped (`cd frontend && npm run build && npx playwright test --reporter=line`).
+- Python: 254 tests (`.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider`, about 5–10 minutes on this laptop). They include leakage canaries: a signal that peeks at the future must pass the gate (it shows a 92% hit rate), and random or lagged signals must fail.
+- Browser: Playwright, 22 passed and 2 skipped (`cd frontend && npm run build && npx playwright test --reporter=line`).
 - Everything: `node scripts/verify.cjs`.
 
 ## 9. Decisions and deferred issues from the outlook work
@@ -150,18 +164,27 @@ Full commit list: `git log --oneline main..news-pipeline` (29 commits at the tim
 - No public deployment. Fills in the paper engine are bar-based and margin is approximate.
 - 18 leftover `scripts/fix*.cjs` one-off patch scripts from the Codex era could be removed.
 - News has only days of history, so it can't be evaluated yet.
+- Liquidation and order-book data only exist while the supervisor runs. Gaps while the laptop sleeps or is off are permanent.
 
-## 11. Current work: selective prediction research
+## 11. Selective prediction research (done 2026-10-20) and what's next
 
-Plan: [docs/prediction-plan.md](docs/prediction-plan.md). Pre-registered hypotheses: [docs/research/preregistration.md](docs/research/preregistration.md).
-
-The aim is better accuracy by **calling rarely**: predict only in unusual, pre-defined situations, score each call as a real trade would exit (take-profit, stop or time limit), net of fees and funding, and test intraday (hours) and swing (days–weeks) side by side. Every configuration tried is logged, the last 12 months are evaluated **once**, and anything that passes must then build a forward record before it is trusted.
+Plan: [docs/prediction-plan.md](docs/prediction-plan.md). Pre-registration: [docs/research/preregistration.md](docs/research/preregistration.md). Results: [docs/strategy-research.md](docs/strategy-research.md).
 
 | Phase | Status |
 |---|---|
-| 0. progress.md, plan, preregistration | in progress |
-| 1. Selective evaluation (triple barrier, costs, Wilson bound, deflated Sharpe, trial registry) | pending |
-| 2. Data: spot history 2017+, Deribit DVOL, Coinbase premium; forward liquidations and order book | pending |
-| 3–4. Strategy families and meta-labeling | pending |
-| 5. One-shot holdout and report | pending |
-| 6. Shadow signals and Signals panel | pending |
+| 0. progress.md, plan, pre-registration | done |
+| 1. Selective evaluation (triple barrier, costs, funding, Wilson bound, deflated Sharpe, trial registry, leakage canaries) | done (`selective.py`) |
+| 2. Data: spot 2017+, funding archives, Coinbase premium, Deribit DVOL; forward liquidations and order book | done (`research_data.py`, `forward_data.py`, supervisor thread) |
+| 3–4. Strategy families and meta-labeling | done (`signals.py`, `strategy_research.py`): no family passed |
+| 5. One-shot holdout | not run: nothing passed development, so the holdout stays untouched |
+| 6. Shadow signals and panel | no signal to shadow; the Prediction tab shows the verdict and forward data collection |
+
+**Next:**
+- **Liquidation and order-book tests:** liquidation exhaustion (I6) and depth imbalance (I7) are pre-registered (amendment A2). They run once at least 6 months of forward data exist, no earlier than **2027-04-20**. Until then, keep the supervisor running as continuously as possible; an always-on machine helps.
+- **News:** a news-augmented test becomes possible after a few months of forward news.
+- **Holdout:** the untouched holdout year is available for any future pre-registered idea that passes development.
+
+**Deferred minor issues from the independent review of the strategy research:**
+- PBO is a per-fold rank statistic with only 5–6 folds intraday, so it is coarse. Its pick can differ from the walk-forward pick when that pick had no calls in a block.
+- Funding at the exit bar is charged even when a barrier is hit inside that bar (conservative, about 0.03% per swing call at most).
+- Latent, not triggered: meta-labeling a *passing rule family* would start from a first-block pick chosen on the same history, and its holdout path raises `NotImplementedError`. Both need work only if a rule family ever passes.

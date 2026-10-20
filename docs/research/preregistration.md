@@ -118,3 +118,13 @@ Two forward-only intraday families are registered now, before their data exists 
 - **When:** evaluated once at least 6 months of data exist (no earlier than 2027-04-20).
 - **Walk-forward:** 1-month test blocks after a 2-month burn-in (otherwise as in section 5). Pass rule as in section 7. The trial count includes every earlier intraday trial (105 at registration).
 - **Holdout:** the last 2 months of the collected data are held back and evaluated once, only for a family that passes.
+
+**A3 — 2026-10-20, after an independent review of the development run (verdict unchanged).** This records choices the original text left open or did not describe exactly.
+- **Deflated Sharpe variance.** Section 7 did not say how V[SR], the cross-trial variance of Sharpe ratios, is estimated.
+  - **Used in the 2026-10-20 run:** the variance of the per-call Sharpe of every registered configuration in the track, mixing all-call rule Sharpes and walk-forward meta Sharpes, at any call count.
+  - **How much it matters:** this choice decides the deflated-Sharpe criterion. M1's value is 0.01 with it, 0.10 using only trials with ≥ 30 calls, and about 0.97 with no deflation at all.
+  - **Effect on the verdict:** none. Every family also fails at least one other criterion; M1 fails PBO at 0.42.
+  - **For every later test (including I6/I7):** V[SR] is the variance of per-call Sharpe across that track's trials with at least 30 calls.
+- **Intraday meta-labeling features.** These were `event_study.STATE` **plus** the 168-hour taker-share z-score, the Coinbase premium and the DVOL-minus-realised-volatility gap. Section 6 listed only STATE and DVOL. M2 lost money in every year regardless.
+- **Development cutoff.** The development span was implemented as bars closing before 2025-10-20 00:00 UTC, so the daily bar of 2025-10-19 (which closes at 2025-10-20 00:00) was excluded. That bar is not used in the holdout either.
+- **Forward depth.** Each snapshot also records how far it reaches on each side (`bid_reach_bps`, `ask_reach_bps`), so an `imbalance_15bps` computed from a book thinner than 15 bps can be detected and excluded in I7.
