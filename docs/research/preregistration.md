@@ -97,4 +97,9 @@ Deribit DVOL is not a direction signal. It is used only as a meta-labeling featu
 A pass means the rule is recorded in the shadow forecaster and scored forward. It does **not** mean trading. Paper trading would need ≥ 3 months and ≥ 20 forward calls consistent with the backtest, and a separate decision by the owner.
 
 ## Amendments
-(none yet)
+
+**A1 — 2026-10-20, before any strategy was evaluated (data facts found while building the panels).**
+- Binance's USD-M funding archives start in **January 2020**, not September 2019. The flat default funding (0.01% per settlement) is therefore charged before 2020-01-01, and S3 (funding crowding) can only call from 2020 onward.
+- Open interest is available from **2021-10** (the PostgreSQL store), so S3 with the OI filter only calls from 2021-10 onward. Archive rows with open interest ≤ 0 (28 hours, 2024-07 to 2025-04) are treated as missing.
+- I4 uses the taker buy share from the 5-minute candles (already defined that way above). The Binance metrics taker long/short volume ratio is not downloaded: it carries the same taker flow at coarser resolution.
+- The daily Coinbase premium is computed against Binance spot BTCUSDT, so it includes USDT/USD moves (up to 13% in 2017–2018). The z-score over the trailing window is used exactly as registered.

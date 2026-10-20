@@ -57,6 +57,12 @@ class MarketFeed(Base):
     state = Column(JSON, nullable=False)
 
 
+# Forward-only research families (liquidations, order book); never part of the release audit.
+FORWARD_VALUES = {'liquidations': ['long_liq_qty', 'long_liq_usd', 'short_liq_qty', 'short_liq_usd', 'liq_count'],
+                  'depth': ['mid', 'spread_bps', 'bid_qty_5bps', 'ask_qty_5bps', 'imbalance_5bps',
+                            'bid_qty_15bps', 'ask_qty_15bps', 'imbalance_15bps']}
+
+
 def _finite(value):
     return float(value) if pd.notna(value) and math.isfinite(float(value)) else None
 
@@ -113,7 +119,7 @@ def _upsert(engine, table, rows, keys, condition=None):
 def save_frame(engine, family, frame, market=PERP):
     """Replay-safe upsert. Invalid external values are retained as NULL plus valid=false."""
     if frame.empty: return 0
-    if family not in VALUES and family != 'reference': raise ValueError('unsupported family')
+    if family not in VALUES and family not in FORWARD_VALUES and family != 'reference': raise ValueError('unsupported family')
     rows=[]
     for record in frame.to_dict('records'):
         row={key:utc(record[key]).to_pydatetime() for key in ('event_time','available_at','received_at')}
@@ -127,7 +133,8 @@ def save_frame(engine, family, frame, market=PERP):
             row.update(prices,interval='5m',trade_count=_finite(record.get('trade_count')),
                        taker_buy_volume=_finite(record.get('taker_buy_volume')),complete=True)
         else:
-            values={key:_finite(record[key]) for key in (VALUES[family] if family in VALUES else ['price_usd'])}
+            fields=VALUES.get(family) or FORWARD_VALUES.get(family) or ['price_usd']
+            values={key:_finite(record[key]) for key in fields}
             row.update(family=family,values=values,valid=all(v is not None for v in values.values()))
         rows.append(row)
     table=MarketCandle.__table__ if family=='candles' else MarketObservation.__table__

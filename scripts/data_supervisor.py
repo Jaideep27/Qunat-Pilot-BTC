@@ -71,6 +71,15 @@ def outlook_cycle():
         time.sleep(900)
 
 
+def forward_research():
+    # Liquidations (stream) and order-book depth (1/min) exist only if recorded as they happen.
+    from quantpilot import forward_data
+    while True:
+        try:forward_data.run()
+        except Exception as exc:print(json.dumps(dict(forward_research='blocked',error_type=type(exc).__name__)),flush=True)
+        time.sleep(60)
+
+
 def paper():
     engine=database(settings.market_database_url)
     while True:
@@ -88,8 +97,8 @@ if __name__=='__main__':
             (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=time.time())),encoding='utf-8')
             initialize(database(settings.market_database_url))
             initialize(database())
-            with ThreadPoolExecutor(max_workers=7) as pool:
-                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts),pool.submit(outlook_cycle)]
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts),pool.submit(outlook_cycle),pool.submit(forward_research)]
                 for future in futures:future.result()
     except Timeout:
         print('A data supervisor is already running.',flush=True)

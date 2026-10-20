@@ -47,6 +47,7 @@ def main():
     risk=sub.add_parser('research-risk', help='Ranges, large-drop risk and volatility scored on validation and test')
     risk.add_argument('--output', required=True, help='New directory, or an interrupted run to resume')
     risk.add_argument('--folds', type=int, choices=range(1, 27), default=4)
+    sub.add_parser('research-data', help='Fetch spot, Coinbase, DVOL and funding history; build research panels')
     experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
     experiment.add_argument('--output', required=True, help='New directory; existing directories are refused')
     experiment.add_argument('--folds', type=int, choices=range(1, 27), default=6)
@@ -144,6 +145,12 @@ def main():
         from .event_research import risk_experiment
         report = risk_experiment(args.output, folds=args.folds)
         print(json.dumps(report['summary'], indent=2, default=str))
+    elif args.command == 'research-data':
+        from .research_data import build_panels, refresh
+        fetched = refresh()
+        hourly, daily = build_panels()
+        print(json.dumps(dict(fetched=fetched, hourly=dict(rows=len(hourly), first=str(hourly.index.min())),
+                              daily=dict(rows=len(daily), first=str(daily.index.min()))), indent=2))
     elif args.command == 'research-events':
         from .event_research import train_experiment
         report = train_experiment(args.output, folds=args.folds)
