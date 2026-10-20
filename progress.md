@@ -1,81 +1,276 @@
-# QuantPilot BTC: project progress
+# QuantPilot BTC: complete project status
 
-Last updated: 2026-10-20. This file is the single place that describes what the project is, what has been built, what the research found, and what comes next. It is updated whenever a body of work is finished.
+Last updated: 2026-10-20 (after the selective prediction research). This is the single document a person or AI agent should read first: what the project is, how it is built, what has been done, what was found, the rules for working on it, and what comes next. Update it whenever a body of work is finished.
+
+## Contents
+1. [What QuantPilot is](#1-what-quantpilot-is)
+2. [Rules for anyone working on this project (read before changing anything)](#2-rules-for-anyone-working-on-this-project)
+3. [Tech stack](#3-tech-stack)
+4. [How to run, test and use it](#4-how-to-run-test-and-use-it)
+5. [Architecture](#5-architecture)
+6. [Code map](#6-code-map)
+7. [Interfaces: dashboard, API, MCP tools, CLI](#7-interfaces)
+8. [Data](#8-data)
+9. [Timeline of work](#9-timeline-of-work)
+10. [Research results](#10-research-results)
+11. [Overfitting controls](#11-overfitting-controls)
+12. [Decisions, rulings and deferred issues](#12-decisions-rulings-and-deferred-issues)
+13. [Known limitations and operations](#13-known-limitations-and-operations)
+14. [Current state and next steps](#14-current-state-and-next-steps)
+15. [Glossary](#15-glossary)
+16. [Where to find everything](#16-where-to-find-everything)
+
+---
 
 ## 1. What QuantPilot is
 
-QuantPilot is a local research workstation for **BTCUSDT perpetual futures** on Binance USD-M. It:
+QuantPilot BTC is a **local research workstation for Bitcoin perpetual futures** (BTCUSDT on Binance USD-M). It runs on the owner's Windows laptop and does five things:
 
-- collects market data continuously into PostgreSQL;
-- researches what (if anything) predicts BTC, with strict overfitting controls;
-- records forecasts and answers and scores them later against what actually happened;
-- runs a **paper** (simulated) trading account.
+1. **Collects market data continuously** into PostgreSQL: 5-minute candles, mark and index prices, funding, open interest, long/short ratios, sentiment, a macro calendar, news, and, since 2026-10-20, liquidations and order-book depth.
+2. **Researches what, if anything, predicts BTC**, with strict overfitting controls. Every experiment reports failures as well as successes.
+3. **Forecasts and answers questions** ("Will BTC go up in 4 hours?", "Chance it touches $120k this week?"). Numbers come only from methods that passed walk-forward validation; otherwise the answer is the honest base rate.
+4. **Scores itself forward:** every forecast and answer is stored with a timestamp and scored once its horizon passes, against a base rate. Claude's own opinions are scored separately.
+5. **Runs a paper (simulated) trading account** with chronological accounting of fees, slippage and funding.
 
-It **never places real orders**. There is no order API. Nothing in research, forecasting or chat sizes or places trades.
+**It never places real orders.** There is no order API. Research, forecasts, chat and signals never place or size trades.
 
-### How to run it
+**The honest headline so far:** the data predicts **how much** BTC moves (return ranges, volatility) but **not which way**. No direction strategy beat costs out of sample, including rules allowed to stay silent 90–99% of the time (section 10).
+
+**Owner context:** the owner wants honest results with heavy overfitting control rather than impressive backtests. They chose to research both intraday (hours) and swing (days–weeks) trading, and preferred rare but accurate calls over frequent ones.
+
+---
+
+## 2. Rules for anyone working on this project
+
+These are standing instructions from the owner and decisions already made. Follow them unless the owner says otherwise.
+
+**Safety and money**
+- Nothing may place real orders or size trades. Paper trading only.
+- Claude and Codex reasoning must use **subscription logins only, never billed API keys**. Strip `ANTHROPIC_*`, `CLAUDE_CODE_*`, `QUANTPILOT_*` and `OPENAI*` keys from the environment of any `claude`/`codex` subprocess. `~/.claude/settings.json` has been checked: no `apiKeyHelper`, no env keys.
+- Calls to `claude -p` must use:
+  - the native executable `C:\Users\jaide\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe` (the `.cmd` shim mangles JSON);
+  - the flags `--tools ""`, `--strict-mcp-config`, `--settings` with `{"disableAllHooks":true}`, `--disable-slash-commands`, `--no-session-persistence`;
+  - an empty working directory, with untrusted text passed only through stdin.
+- **Never use `--bare`**: it disables the subscription login. Model: `claude-sonnet-5-5`, effort low. Codex model: `gpt-6-luna`.
+- API write endpoints accept loopback (127.0.0.1) clients only.
+
+**Research integrity**
+- Every new strategy or hypothesis must be **pre-registered** before it is evaluated: a new dated amendment in `docs/research/preregistration.md` giving its rule, parameter grid and pass rule. Earlier entries are never edited.
+- Log every configuration tried in the trial registry. The overfitting corrections depend on the true count.
+- The **holdout year 2025-10-20 → 2026-10-19 is untouched**. Evaluate it only once, and only for something that already passed development (`quantpilot research-strategies --holdout` refuses to run twice).
+- Treat a backtest hit rate of 75–80% or more as a leakage red flag until proven otherwise.
+- Historical news is not backfilled on purpose: a language model reading old headlines may already know what happened next.
+
+**Engineering**
+- Test-driven: write the failing test first, watch it fail, then implement. Run the full suite before claiming done.
+- Match the surrounding code style. The code is compact, with few comments that explain *why*.
+- Commits end with two attribution lines:
+  - `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
+  - `Claude-Session: https://claude.ai/code/session_01FSBKv59fXns6hpnLLK8Aq8`
+- Do **not** merge to `main`, push, or publish without asking the owner.
+
+**The laptop**
+- The machine is a Samsung Galaxy Book4 Pro (Core Ultra 7 155H, 16 GB RAM). It runs near its memory limit, usually with about 0.7–1.5 GB free.
+- Long background jobs get killed by Claude Code's memory-pressure reaper. Make long jobs **resumable** (checkpoint results as they finish), stream database reads in chunks, and ask before restarting a reaped research job.
+- **Never close VS Code or Chrome** (possible unsaved work). The owner approved closing Steam, Spotify and the Codex desktop app.
+- When restarting services from an agent, launch them detached, e.g. PowerShell `Start-Process node scripts/start.cjs`. A restart from the Bash tool was reaped within minutes on 2026-10-20. The owner can also restart from their own terminal.
+
+---
+
+## 3. Tech stack
+
+| Layer | Technology |
+|---|---|
+| Language (backend) | Python 3.11.11, managed with **uv** (`pyproject.toml`, `uv.lock`); virtual environment in `.venv` |
+| API | **FastAPI** + **uvicorn** on 127.0.0.1:8000 |
+| Settings | **pydantic-settings** (`QUANTPILOT_` environment prefix; risk settings `QUANTPILOT_RISK_`) |
+| Databases | **PostgreSQL 18** (market data, port 55432, private instance configured by the launcher) and **SQLite** (`data/quantpilot.db`: paper ledger, forecasts, answers, chat). **SQLAlchemy 2** + **psycopg 3**; migrations with **Alembic** (`migrations/versions/0001`–`0008`) |
+| Data | **pandas**, **numpy**, **pyarrow**/Parquet, **numba** |
+| Machine learning | **scikit-learn** (logistic regression, isotonic calibration, pipelines), **XGBoost** (shallow, regularised), **SHAP** (explanations), **SciPy** (statistics), own EWMA and GARCH(1,1) |
+| Networking | **httpx** (REST), **websockets** (Binance liquidation stream) |
+| AI integration | **MCP** Python SDK (Model Context Protocol server and proxy); Claude Code CLI (`claude -p`, Sonnet 5.5) and Codex CLI (`codex exec`), both subscription logins |
+| Other | **joblib** (model files), **filelock** (single supervisor, single chat) |
+| Frontend | **React 19** + **TypeScript 5.9**, built with **Vite 6**; **Tailwind CSS 4**; **lightweight-charts 5** (trading chart), **Recharts 3** (research plots), **lucide-react** (icons) |
+| Tests | **pytest** (36 test files, 257 tests), **Playwright** (10 browser specs), Node test for startup readiness |
+| Runtime and tooling | Node 22 (`scripts/start.cjs` launcher, verify scripts), Windows 11, PowerShell and Git Bash |
+| Version control | git; `main` = Codex snapshot, all later work on branch `news-pipeline` (no remote) |
+
+---
+
+## 4. How to run, test and use it
 
 | Action | Command |
 |---|---|
+| Install | `uv sync --locked --extra dev` then `npm --prefix frontend ci` |
 | Start everything (PostgreSQL, API, dashboard, data supervisor) | `node scripts/start.cjs` |
 | Restart services after code changes | `node scripts/start.cjs --restart-services` |
 | Check services without restarting | `node scripts/start.cjs --check` |
 | Dashboard | http://localhost:5173 |
 | API docs | http://127.0.0.1:8000/docs |
 | Readiness report | `uv run quantpilot doctor` |
+| Python tests | `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider` (about 3–10 minutes) |
+| Browser tests | `cd frontend && npm run build && npx playwright test --reporter=line` |
+| Everything | `node scripts/verify.cjs` |
+| Ask a question | `.venv\Scripts\quantpilot ask "Will BTC go up in the next 4 hours?"` (add `--no-ai` for numbers only) |
+| Connect Claude Code | `claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.mcp_proxy` (needs the API running; `-m quantpilot.mcp_server` works without it) |
 
-Requires Python 3.11 (`.venv`), Node 22 and the PostgreSQL 18 Windows binaries. The market database runs on port 55432.
+Latest results (2026-10-20): **257 Python tests pass; 22 browser tests pass, 2 skipped.** The Python tests include leakage canaries: a signal that peeks at the future must pass the strategy gate (it shows a 92% hit rate), and random or lagged signals must fail.
 
-## 2. Architecture
+---
+
+## 5. Architecture
+
+```
+ Binance REST/archives/websocket, Coinbase, Deribit, Alternative.me, FRED/ALFRED, Fed/BLS/CoinDesk RSS
+                                   │
+              scripts/data_supervisor.py  (one process, eight threads)
+   collector · history backfill · paper worker · news · macro · shadow forecasts · outlook · forward data
+                                   │
+          PostgreSQL :55432 (market data)        SQLite data/quantpilot.db (ledger, forecasts, answers, chat)
+                                   │
+                    FastAPI 127.0.0.1:8000  (services.py → api.py)
+             │                         │                              │
+   React dashboard :5173      MCP proxy / MCP server            CLI: quantpilot <command>
+   (Chart, Market, Prediction,   (Claude Code, in-app Chat agent)
+    Research, Chat, News, Paper)
+```
 
 | Part | What it does | Where |
 |---|---|---|
-| Market database | PostgreSQL: 5m candles (`market_candles`) and every other family as JSON rows (`market_observations`), plus news, macro events, shadow forecasts, outlook answers and chat | `src/quantpilot/market_store.py`, `migrations/versions/0001`–`0008` |
-| Ledger database | SQLite paper-trading ledger, snapshots, worker runs | `data/quantpilot.db`, `store.py` |
-| API | FastAPI on 127.0.0.1:8000; write endpoints accept loopback clients only | `api.py`, `services.py` |
-| Data supervisor | One process with eight threads: collector (5 s), history backfill, paper worker, news, macro calendar, shadow forecasts (every 15 min), outlook cycle (hourly), forward research data (liquidations stream, depth every minute) | `scripts/data_supervisor.py` |
-| MCP tools | Read-only tools for Claude Code (plus logging outlook answers); a fast proxy forwards to the API | `mcp_server.py`, `mcp_proxy.py`, `docs/mcp-setup.md` |
-| Dashboard | React + Vite. Tabs include Chart (86 studies, 7 timeframes), Prediction, Chat and operations views | `frontend/src/` |
-| CLI | `quantpilot <command>` (argparse) | `cli.py` |
+| Market database | 5m candles (`market_candles`) and every other family as JSON rows (`market_observations`, keyed by market, family and time) | `market_store.py`, migrations 0001–0008 |
+| Ledger database | Paper ledger, snapshots, worker runs, news, macro events, shadow forecasts, outlook answers, chat threads | `store.py`, `data/quantpilot.db` |
+| Data supervisor | **Eight threads:** collector (every 5 s), history backfill (every 30 min), paper worker, news (every 5 min), macro calendar (hourly), shadow forecasts (every 15 min), outlook cycle (hourly panel refresh + scheduled questions, scoring every 15 min), forward research data (liquidation stream + depth every minute) | `scripts/data_supervisor.py` |
+| API | Read endpoints plus loopback-only write endpoints (ask, outlook, chat, AI view) | `api.py`, `services.py` |
+| MCP | 16 tools; read-only except logging outlook answers and AI views | `mcp_server.py` (full), `mcp_proxy.py` (fast, forwards to the API) |
+| Chat agent | Claude Sonnet via `claude -p` (stream-json, max 8 turns), allowed only `mcp__quantpilot__*` tools | `chat.py` |
+| Dashboard | React tabs; polls the API; live chart through the exchange websocket with PostgreSQL fallback | `frontend/src/` |
 
-## 3. Data
+---
 
-| Family | Source | Range in the store | Notes |
+## 6. Code map
+
+All Python modules are in `src/quantpilot/`. "Codex" marks modules from the original build; the rest were added or extended by Claude on 2026-10-20.
+
+| Module | Purpose |
+|---|---|
+| `config.py` | `Settings` (paths, database URLs, limits, news reasoners) and `RiskConfig` (fees 5 bps, slippage 3 bps, buffer 5 bps, risk per trade 0.25%, 2% daily loss limit) |
+| `data.py` *(Codex)* | Public archive download with SHA256 checks; coverage audit (fails closed); family definitions |
+| `history.py`, `collector.py`, `live.py` *(Codex)* | Resumable 5-year backfill; continuous REST collector; live ingestion into Parquet and PostgreSQL |
+| `market_store.py` | Market tables, replay-safe upserts, coverage; `FORWARD_VALUES` for liquidations and depth |
+| `store.py`, `snapshots.py`, `operations.py`, `diagnostics.py`, `recovery.py`, `repair.py` *(Codex)* | Ledger and locks, read projections, worker evidence, `doctor`, backups and restore drills, gap repair |
+| `features.py` *(Codex)* | 106 causal 5-minute features (technical, derivatives, sentiment, regime) |
+| `research.py`, `replay.py`, `benchmarks.py` *(Codex)* | Original walk-forward training and the frozen release `24c8238525d4`; holdout replay; buy-and-hold comparator |
+| `engine.py`, `worker.py` *(Codex)* | One event reducer for backtests and forward paper trading; scheduled paper worker |
+| `charting.py` *(Codex)* | 86 chart studies on completed bars |
+| `news.py` | RSS ingestion; Claude and Codex reasoners with per-provider budgets and usage-limit backoff; quote-checked claims; shared `claude_json()` |
+| `macro.py` | CPI, jobs and FOMC calendar with first-release (ALFRED) values; macro features |
+| `event_study.py` | Market loader (`load_market`, monthly chunks), hourly panel builder, five-year 5% move study |
+| `event_research.py` | Multi-horizon research harness: direction, ranges, drop risk, volatility; purged splits; validation-only champions; PBO |
+| `forecaster.py` | Shadow forecaster: promotion gate, daily refit, forecasts every 15 minutes, forward scoring |
+| `questions.py`, `analogs.py`, `outlook.py`, `answers.py`, `ask_ai.py` | Outlook Q&A: question parsing, similar-situations estimator, validated answer engine, answer storage and scoreboard, Claude explanation layer |
+| `chat.py` | In-app chat agent restricted to QuantPilot tools |
+| `services.py`, `api.py`, `cli.py` | Shared read services and envelopes; FastAPI routes; command line |
+| `mcp_server.py`, `mcp_proxy.py` | MCP tools (full server and fast proxy) |
+| `selective.py` | Selective-call scoring: triple barrier, costs, funding, Wilson interval, break-even, deflated Sharpe, pass rule (`gate`), trial registry |
+| `signals.py` | The 10 pre-registered rule families and 2 meta-labeling primaries |
+| `strategy_research.py` | Walk-forward selection over 6-month blocks, meta-labeling, `gate_all`, report, one-shot holdout behind a lock |
+| `research_data.py` | Spot, Coinbase, Deribit DVOL and funding history fetchers; incremental Parquet caches; hourly and daily research panels |
+| `forward_data.py` | Forward-only collectors: per-minute liquidations (websocket) and 1000-level depth snapshots |
+
+Frontend (`frontend/src/`): `main.tsx` (tabs), `api.ts`, `MarketChart.tsx`, `TradingWorkspace.tsx`, `TradingViewPanel.tsx`, `ShadowForecasts.tsx`, `StrategyResearch.tsx`, `Chat.tsx`, `NewsPanel.tsx`, `MacroCalendar.tsx`, `PaperOperations.tsx`, `ResearchPlots.tsx`, `liveFeed.ts`, `preview.ts`, styles.
+
+Scripts (`scripts/`):
+- `start.cjs`: launcher.
+- `data_supervisor.py`, `serve_api.py`, `stop_data_supervisor.py`, `configure_postgres.py`.
+- `verify*.cjs|py`, `smoke_release.py`, `package_*.py`, `report_release.py`, `export_release.py`.
+- 18 leftover one-off `fix*.cjs` patch scripts from the Codex era.
+
+---
+
+## 7. Interfaces
+
+**Dashboard tabs:**
+- **Chart workspace:** 86 studies, 7 timeframes, saved drawings.
+- **Market:** price, positioning, sentiment.
+- **Prediction:** research forecasts, the **Strategy research** panel and the frozen model's decision gates.
+- **Research:** coverage audit and holdout comparisons.
+- **Chat:** Claude agent, quick quant-only questions and the answer scoreboard.
+- **News & events:** source-linked news and the macro calendar.
+- **Paper portfolio:** virtual account and worker monitoring.
+
+**API** (`/api/v1/…`). The ones marked POST are loopback-only.
+
+| Kind | Routes |
+|---|---|
+| Health and operations | `health`, `ready`, `operations` |
+| Market | `candles`, `indicators`, `positioning`, `sentiment`, `coverage`, `market/storage`, `market/candles`, `market/studies` |
+| Frozen model and paper account | `predictions`, `backtests`, `portfolio`, `decisions` |
+| Context | `news` (`?compact=`), `macro` |
+| Research | `forecasts`, `strategy-research` |
+| Outlook Q&A | POST `ask`, POST `outlook`, POST `answers/{id}/ai-view`, GET `answers` |
+| Chat | POST `chat`, GET `chat/threads`, GET `chat/threads/{id}` |
+
+**MCP tools (16):**
+- **Market:** `get_market_snapshot`, `get_indicators`, `get_market_positioning`, `get_sentiment`, `check_data_coverage`.
+- **Frozen model:** `get_prediction`, `explain_decision`, `compare_backtests`.
+- **Paper account:** `get_paper_portfolio`.
+- **Context:** `get_news_events`, `get_macro_calendar`.
+- **Research:** `get_shadow_forecasts`, `get_strategy_research`.
+- **Outlook:** `ask_outlook`, `record_ai_view`, `get_answer_scoreboard`.
+
+**CLI** (`quantpilot <command>`):
+
+| Area | Commands |
+|---|---|
+| Data | `audit`, `repair-data`, `manifest`, `import-market`, `backfill-history`, `market-coverage`, `collect-live`, `research-data` |
+| Original release | `train`, `backtest`, `publish-research` |
+| Research | `event-study`, `research-events`, `research-risk`, `research-strategies [--output DIR] [--holdout]`, `validate-outlook`, `outlook-refresh [--full]`, `shadow-forecast` |
+| News and macro | `collect-news`, `analyze-news`, `news-status`, `macro-calendar` |
+| Q&A | `ask "<question>" [--no-ai]` |
+| Operations | `init-db`, `status`, `doctor`, `backup-db`, `restore-check`, `worker`, `pause`, `resume` |
+
+---
+
+## 8. Data
+
+| Family | Source | Range | Notes |
 |---|---|---|---|
-| 5m perpetual candles (OHLCV, trades, taker buy volume) | data.binance.vision archives + `fapi.binance.com` REST | 2021-10-19 → now; 525,888 of 525,888 bars present | 15m–1w built from 5m |
+| 5m perpetual candles (OHLCV, trades, taker buy volume) | data.binance.vision archives + `fapi.binance.com` REST | 2021-10-19 → now; 525,888 of 525,888 bars | 15m–1w built from 5m |
 | Mark and index price (5m) | Binance | same | premium = mark/index − 1 |
-| Funding rate | Binance | same | actual settlement times |
-| Open interest + three long/short ratios (global accounts, top-trader accounts, top-trader positions) | Binance `metrics` archives + `/futures/data/*` | same, about 81% of hours present | Live calls fetch 500 rows (~41 h), so a longer outage leaves a gap. 62 rows quarantined in the release audit. |
+| Funding rate | Binance | same | actual settlement times (00/08/16 UTC) |
+| Open interest + 3 long/short ratios | Binance `metrics` archives + `/futures/data/*` | same, about 81% of hours | Live calls fetch about 41 h, so a longer outage leaves a gap. 62 rows quarantined in the release audit; archive rows with OI ≤ 0 treated as missing in research |
 | Fear & Greed | Alternative.me | daily | |
-| Macro calendar (CPI, jobs, FOMC) | FRED, ALFRED first-release vintages, Federal Reserve | 198 events, 2021 → scheduled future dates | no consensus forecasts, so no surprises are computed |
-| News | Fed, BLS, CoinDesk RSS; analysed by Claude Sonnet 5.5 (`claude -p`) and Codex | from 2026-10-19 only | forward-collected on purpose: old headlines could leak hindsight |
-| Research history (Parquet, `data/research/`) | Binance spot BTCUSDT daily and hourly, USD-M funding archives, Coinbase BTC-USD daily and hourly, Deribit DVOL hourly | spot daily 2017-08 →; funding 2020-01 →; hourly 2021-09 →; DVOL 2021-03 → | `quantpilot research-data` refreshes them and builds the hourly (44,293 rows) and daily (3,351 rows) research panels |
-| Liquidations (forward only) | Binance `btcusdt@forceOrder` websocket, aggregated per minute | from 2026-10-20 | a lower bound: Binance pushes at most one liquidation per second |
-| Order-book depth (forward only) | `/fapi/v1/depth` 1000 levels, every minute | from 2026-10-20 | size and imbalance within 5 and 15 bps of the mid, spread |
+| Macro calendar (CPI, jobs, FOMC) | FRED, ALFRED first-release vintages, Federal Reserve | 198 events | no consensus forecasts, so no surprises |
+| News | Fed, BLS, CoinDesk RSS; analysed by Claude and Codex | from 2026-10-19 only | forward only, on purpose |
+| Research history (`data/research/*.parquet`) | Binance spot BTCUSDT daily/hourly; USD-M funding archives; Coinbase BTC-USD daily/hourly; Deribit DVOL hourly | spot daily 2017-08 →; funding 2020-01 →; hourly 2021-09 →; DVOL 2021-03 → | `quantpilot research-data` refreshes them and builds the hourly (44,293 rows) and daily (3,351 rows) panels |
+| Liquidations (forward only) | Binance `btcusdt@forceOrder` websocket, per minute | from 2026-10-20 | a lower bound (Binance pushes at most one per second); rows exist only for minutes with liquidations |
+| Order-book depth (forward only) | `/fapi/v1/depth` 1000 levels, every minute | from 2026-10-20 | size and imbalance within 5 and 15 bps of the mid, spread, how far the book reaches (about 16 bps) |
 
 **Not collected:** options chains, on-chain flows, other exchanges' order books.
 
-## 4. Timeline of work
+---
+
+## 9. Timeline of work
 
 | When | Who | What |
 |---|---|---|
-| Before 2026-10-20 | Codex | Built the platform: data acquisition and audit, 106 causal features, walk-forward training, released model `24c8238525d4`, paper engine and worker, PostgreSQL market store, chart workspace, MCP tools, recovery drills, operations monitoring. Imported as commit `821b45c` on `main`. |
-| 2026-10-20 | Claude | Took over. All later work is on branch `news-pipeline` (not merged; no git remote). |
-| | | News pipeline: continuous RSS, Claude and Codex reasoners with per-provider budgets and usage-limit backoff, claims checked against verbatim quotes |
-| | | Macro calendar with first-release values; five-year 5% event study |
-| | | Multi-horizon research harness (direction, ranges, drop risk, volatility) with validation-only champions and PBO |
-| | | Shadow forecaster: refits the gated champions daily, records every 15 minutes, scores itself forward |
-| | | Market outlook Q&A (questions parser, similar-situations estimator, touch probabilities, ranges, scoreboard), API/MCP/CLI, in-app Chat tab with a Claude agent restricted to QuantPilot tools |
-| | | Independent final review; one fix pass covering the critical and important findings (commit `95d6274`) |
-| | | Prediction plan approved (section 11) and executed: progress record, pre-registration, selective trade scoring, new data and forward collectors, 10 rule families + 2 meta-labeled primaries, report, dashboard panel |
+| Before 2026-10-20 | Codex | Built the platform: data acquisition and audit, 106 features, walk-forward training, released model `24c8238525d4`, paper engine and worker, PostgreSQL market store, chart workspace, the first nine MCP tools, recovery drills, operations monitoring. Imported as commit `821b45c` on `main`. |
+| 2026-10-20 | Claude | Took over; repository initialised; all later work on branch `news-pipeline` |
+| | | **News pipeline:** continuous RSS, Claude and Codex reasoners, budgets and usage-limit handling |
+| | | **Macro calendar** and the **five-year 5% event study** |
+| | | **Multi-horizon research harness** with validation-only champions and PBO; the **shadow forecaster** with a promotion gate |
+| | | **Market outlook Q&A and in-app Chat** (11-task plan), independent review, fix pass (commit `95d6274`) |
+| | | **Selective prediction research**: progress record, pre-registration, trade-style scoring, new data, forward collectors, 10 rule families + 2 meta-labeled primaries, report, dashboard panel, independent review, fixes (commits `5453862` → `c030629`) |
 
-Full commit list: `git log --oneline main..news-pipeline` (29 commits at the time of writing).
+`git log --oneline main..news-pipeline` lists all 36 commits.
 
-## 5. Research results (honest summary)
+---
+
+## 10. Research results
 
 ### Released paper-trading model (Codex era)
-- Calibrated XGBoost, sign of the 60-minute return, entry threshold 0.60, costs 5 bps fee + 3 bps slippage per side plus funding.
-- Holdout (Aug–Sep 2026): ROC-AUC 0.539, Brier 0.2511, balanced accuracy 50.65%. **Zero trades**, 0% return. Buy-and-hold made +31.44% over the same research span.
+- Calibrated XGBoost on the sign of the 60-minute return; entry threshold 0.60; costs 5 bps fee + 3 bps slippage per side plus funding.
+- Holdout (Aug–Sep 2026): ROC-AUC 0.539, Brier 0.2511, balanced accuracy 50.65%. **Zero trades**, 0% return. Buy-and-hold made +31.44% over the research span.
 - Forward: 36 decisions in about 8.9 hours, zero fills.
 
 ### Multi-horizon research (221,213 five-minute cutoffs, 24 months)
@@ -83,66 +278,71 @@ Full commit list: `git log --oneline main..news-pipeline` (29 commits at the tim
 | Question | Result |
 |---|---|
 | Direction, 1h / 4h / 24h | **No edge.** The base rate wins at every horizon (PBO 0.25 / 0.25 / 0.75) |
-| 80% return range, 1h | Real skill: +3.8% vs unconditional, 4/4 folds, PBO 0.00; macro calendar helps. Deployed. |
-| 80% return range, 4h | +1.4%, passes the gate at exactly half the folds. Deployed. |
+| 80% return range, 1h | Real skill: +3.8% vs unconditional, 4/4 folds, PBO 0.00; the macro calendar helps. Deployed. |
+| 80% return range, 4h | +1.4%, passes at exactly half the folds. Deployed. |
 | 80% return range, 24h | No skill; the unconditional range is used |
-| Chance of a −5% touch in 24h | No skill (3 of 30 configuration-folds beat the base rate) |
+| Chance of a −5% touch in 24h | No skill |
 | Volatility | EWMA at 1h and 4h; GARCH(1,1) at 24h |
 
-### Five-year 5% move event study
-- 143 drops and 175 rallies (Oct 2021 – Oct 2026).
-- After a 5% drop, the median next-24h return was +0.44% vs −0.32% for matched ordinary hours; 43% kept falling.
-- High volatility, crowded long positioning and high funding raise the chance of a 5% drop (12.7–15.1% vs 3.2–3.6% in the calmest fifth; base rate 7.4%).
+### Five-year 5% move event study (Oct 2021 – Oct 2026)
+- 143 drops and 175 rallies.
+- After a 5% drop, the median next-24h return was +0.44% vs −0.32% for matched ordinary hours.
+- High volatility, crowded longs and high funding raise the chance of a 5% drop (12.7–15.1% vs 3.2–3.6%; base rate 7.4%).
 - Only 19 of 143 drops followed a CPI, jobs or FOMC release, about what chance would give.
 
 ### Outlook validation (44,064 hours)
 - Similar-situations direction estimate: not promoted at any horizon.
-- Touch probability: promoted but weak (Brier 0.09320 calibrated vs 0.09351 historical frequency).
-- 80% ranges: coverage 82.5% / 83.6% / 74.5% / 79.9% / 82.3% / 83.2% at 1h / 4h / 12h / 24h / 72h / 7d.
+- Touch probability: promoted but weak (Brier 0.09320 vs 0.09351).
+- 80% ranges well calibrated: 82.5% / 83.6% / 74.5% / 79.9% / 82.3% / 83.2% at 1h / 4h / 12h / 24h / 72h / 7d.
 
 ### Selective strategy research (pre-registered, 2026-10-20)
 - **Setup:**
   - 186 configurations across 10 rule families and 2 meta-labeled primaries, intraday and swing.
-  - Each call scored as a trade (take-profit, stop or time limit) after 16 bps round trip and funding, with walk-forward selection over 6-month blocks.
-  - Pass rule: enough calls, the hit rate's lower bound above break-even, deflated Sharpe ≥ 0.95, PBO < 0.3, most years positive.
-- **Result: no strategy passed.** The holdout year (2025-10-20 → 2026-10-19) was therefore not used and stays untouched.
-- **Closest: trend side + meta-label (swing, 7-day hold).** 295 calls (11.5% of days), 58.3% hit rate (95% CI 52.6–63.8%) vs 51.6% break-even, +0.79% per call. Most of it is BTC's uptrend: always long scores 52.9% and +0.25% per call, and its longs earned +1.15% vs +0.28% for shorts. Deflated Sharpe 0.01 as registered (about 0.97 without any multiple-testing deflation, see amendment A3), but PBO 0.42 fails regardless.
+  - Every call is scored as a trade (take-profit, stop or time limit) after 16 bps round trip and funding, one position at a time.
+  - Configurations are chosen walk-forward over 6-month blocks.
+  - Pass rule: enough calls, the hit rate's 95% lower bound above break-even, positive mean, deflated Sharpe ≥ 0.95, PBO < 0.3, most years positive.
+- **Result: no strategy passed.** The holdout year was therefore not used.
+- **Closest: M1, trend side + meta-label (swing, 7-day hold).**
+  - 295 calls (11.5% of days), 58.3% hit rate (95% CI 52.6–63.8%) vs 51.6% break-even, +0.79% per call.
+  - Mostly BTC's uptrend: always long scores 52.9% and +0.25% per call, and M1's longs earned +1.15% vs +0.28% for shorts.
+  - Fails PBO (0.42). Its deflated Sharpe is 0.01 as registered; it depends on the variance choice (amendment A3), but PBO fails regardless.
 - **Intraday:** every family lost money after costs or had too few calls.
+- **Independent review:** found no bug that could change the verdict.
 - Full tables: [docs/strategy-research.md](docs/strategy-research.md).
 
-**Bottom line so far:** this data predicts **how much** BTC moves (ranges, volatility), not **which way**, even when a rule may stay silent 90–99% of the time.
+**Bottom line:** this data predicts **how much** BTC moves, not **which way**, even when a rule may stay silent most of the time.
 
-## 6. Overfitting controls in place
-- Purged walk-forward splits; identical timestamps across configurations.
+---
+
+## 11. Overfitting controls
+- Purged walk-forward splits, with identical timestamps across configurations.
 - Scaling, calibration and feature selection fitted inside training windows only.
 - Regularised models (strong L2; shallow XGBoost with large leaves and subsampling).
-- Champions chosen on validation only; a constant base rate wins when nothing beats it.
-- PBO (probability of backtest overfitting) reported; promotion gate needs confirming test results.
-- Historical news deliberately not backfilled.
-- The historical months have been inspected; the true out-of-sample test is the **forward** record.
+- Selection on validation only; the constant base rate wins when nothing beats it.
+- PBO (probability of backtest overfitting) and promotion gates that need confirming results.
+- **For strategies:**
+  - pre-registration;
+  - a trial registry of every configuration;
+  - a deflated Sharpe ratio for the number of trials;
+  - Wilson intervals;
+  - per-year consistency;
+  - drift baselines;
+  - leakage canaries;
+  - a holdout behind a lock.
+- No historical news backfill. The historical months have been inspected; the true out-of-sample test is the **forward** record.
 
-## 7. Outlook Q&A and Chat
-- **Chat tab** (dashboard): ask about up/down, price levels, ranges, big moves or "why is BTC moving". Quick buttons give instant quant-only answers. Typed questions go to Claude Sonnet (subscription login only), which can use only QuantPilot's read-only tools.
-- **CLI:** `.venv\Scripts\quantpilot ask "Chance BTC touches 120k this week?"` (add `--no-ai` for numbers only).
-- **Claude Code:** `claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.mcp_proxy`.
-- **Scoreboard:** every answer is stored with a timestamp and scored once its horizon passes. QuantPilot's probability, Claude's probability and the base rate are compared by Brier score. A verdict appears only after 30 independent scored answers per question type and horizon. Shown below the chat and at `GET /api/v1/answers`.
-- **Limits:** 100 asks and 100 chats per day; one Claude call at a time; a numbers-only answer when the limit is reached.
-- **Strategy research panel** (Prediction tab), `GET /api/v1/strategy-research` and MCP `get_strategy_research`: each family's hit rate with its call rate and confidence interval, the verdict, and how much liquidation and depth data has been recorded.
+---
 
-## 8. Tests
-- Python: 254 tests (`.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider`, about 5–10 minutes on this laptop). They include leakage canaries: a signal that peeks at the future must pass the gate (it shows a 92% hit rate), and random or lagged signals must fail.
-- Browser: Playwright, 22 passed and 2 skipped (`cd frontend && npm run build && npx playwright test --reporter=line`).
-- Everything: `node scripts/verify.cjs`.
+## 12. Decisions, rulings and deferred issues
 
-## 9. Decisions and deferred issues from the outlook work
-
+### Outlook Q&A work
 **Rulings:**
-- EWMA(48) volatility at every horizon for touch and range answers, because that is what was validated.
+- EWMA(48) volatility at every horizon for touch and range answers (that is what was validated).
 - The news module is imported as `news_cli` because `services.news()` already existed.
-- `~/.claude/settings.json` has no API key helper, so chat can't be billed.
-- The single-chat lock relies on the API running as one process (it does).
-- Forged "ASSISTANT:" lines in the chat transcript aren't guarded against: only the owner can send messages.
-- `hours_to_next_macro = 168` is correct: all releases are more than 7 days away.
+- No API key helper in Claude settings.
+- The single-chat lock relies on one API process.
+- Forged chat transcript lines aren't guarded against (only the owner can send messages).
+- `hours_to_next_macro = 168` is correct.
 - The daily limit gives a numbers-only answer instead of an error.
 - The 3-second quick-answer target was not measured end to end.
 
@@ -150,41 +350,98 @@ Full commit list: `git log --oneline main..news-pipeline` (29 commits at the tim
 - The scoreboard scans every answer each time.
 - A chat timeout drops its partial reply, and the usage-limit message has no reset time.
 - The proxy reports timeouts as "services not running".
-- Similar-situations neighbours are spaced one per day rather than ≥ 24 h apart.
-- The touch-probability gate is pooled across horizons.
+- Similar-situations neighbours are spaced per day rather than ≥ 24 h apart.
+- The touch gate is pooled across horizons.
 - 1h/4h ranges show the wrong method label.
 - The stale flag can flap at the 2-hour boundary.
 - No TrustedHost middleware.
 - Quick-button answers aren't saved to threads, and `testclient` is in the loopback set.
 - The base rate has no Wilson interval.
 
-## 10. Known limitations and operational notes
-- The laptop (Core Ultra 7 155H, 16 GB) is near its RAM limit; long jobs get killed. Long runs go detached with checkpoints. An always-on machine (for example a Mac mini with 24 GB) would also stop gaps in forward-only data.
-- Branch `news-pipeline` is not merged into `main`, and there is no git remote.
-- No public deployment. Fills in the paper engine are bar-based and margin is approximate.
-- 18 leftover `scripts/fix*.cjs` one-off patch scripts from the Codex era could be removed.
-- News has only days of history, so it can't be evaluated yet.
-- Liquidation and order-book data only exist while the supervisor runs. Gaps while the laptop sleeps or is off are permanent.
+### Selective strategy research
+Pre-registration amendments (`docs/research/preregistration.md`):
+- **A1, data facts found before evaluation:**
+  - funding history starts 2020-01; the default rate is charged before that;
+  - OI from 2021-10; OI ≤ 0 is treated as missing;
+  - the taker share comes from candles instead of the metrics ratio;
+  - the Coinbase premium includes USDT/USD moves.
+- **A2, after the run:**
+  - the holdout is not used;
+  - liquidation exhaustion (I6) and depth imbalance (I7) are registered for evaluation no earlier than 2027-04-20.
+- **A3, after the independent review:**
+  - records the deflated-Sharpe variance choice, fixed for future tests as trials with ≥ 30 calls;
+  - records the extra intraday meta features;
+  - records the development cutoff;
+  - adds depth reach fields.
+- **Other rulings:**
+  - Research caches are kept as Parquet under `data/research/` rather than in PostgreSQL.
+  - Nothing passed, so Phase 6 became a verdict panel instead of shadow signals.
 
-## 11. Selective prediction research (done 2026-10-20) and what's next
+**Deferred minor issues:**
+- PBO is coarse with 5–6 intraday folds.
+- Funding at the exit bar is charged even when a barrier is hit inside it (conservative).
+- Latent: meta-labeling a *passing rule family* would start from an in-sample first pick, and its holdout path raises `NotImplementedError`.
 
-Plan: [docs/prediction-plan.md](docs/prediction-plan.md). Pre-registration: [docs/research/preregistration.md](docs/research/preregistration.md). Results: [docs/strategy-research.md](docs/strategy-research.md).
+---
 
-| Phase | Status |
+## 13. Known limitations and operations
+- **Memory:** the laptop runs near its RAM limit; long jobs get killed (section 2). An always-on machine (for example a Mac mini M6 with 24 GB) would free memory and stop gaps in forward-only data.
+- **Forward-only data:** liquidation and order-book data exist only while the supervisor runs. Gaps while the laptop sleeps or is off are permanent. About 25 minutes were lost on 2026-10-20 when a restarted supervisor was reaped.
+- **Branch:** `news-pipeline` is not merged into `main`, and there is no git remote.
+- **Deployment and fills:** no public deployment. Paper fills are bar-based and margin is approximate.
+- **News:** only days of history, so it can't be evaluated yet.
+- **Leftovers:** 18 `scripts/fix*.cjs` one-off patch scripts could be removed.
+- **Logs:** services log to `.verification/services/{api,data-supervisor,dashboard}.log`.
+
+---
+
+## 14. Current state and next steps
+
+**State on 2026-10-20:**
+- All planned work is complete and committed on `news-pipeline`. The tests are green.
+- The services are running and recording depth every minute and liquidations as they happen.
+- The Prediction tab shows the strategy verdict.
+
+**Waiting for a decision from the owner:** merge `news-pipeline` into `main`, push it to a remote (one must be added first), or leave it as is.
+
+**Next steps:**
+1. Keep the supervisor running as continuously as possible to build forward data.
+2. **From 2027-04-20** (6 months of data): run the pre-registered I6 (liquidation exhaustion) and I7 (depth imbalance) tests exactly as in amendment A2, with the variance rule from A3. Implement the signals in `signals.py`, add the families with their own block settings, and run `research-strategies` into a new output directory.
+3. After a few months of forward news: pre-register and test a news-augmented model against the deployed champions.
+4. Watch the forward scoreboards (`/api/v1/answers`, `/api/v1/forecasts`) as they reach 30+ independent scored answers.
+5. Any new idea: pre-register first; the holdout year is still available for one final test.
+6. Optional cleanup: the deferred minor issues in section 12, and removing the `fix*.cjs` scripts.
+
+---
+
+## 15. Glossary
+- **Base rate:** how often something happened historically (for example, BTC up over 4 hours about 50.6% of the time). The honest answer when nothing beats it.
+- **Brier score:** penalty for a probability forecast (lower is better). Used to compare QuantPilot, Claude and the base rate.
+- **Walk-forward:** train on the past, test on the next block, roll forward. Nothing from the future is used.
+- **Purge:** a gap between training and test so overlapping outcomes can't leak.
+- **PBO (probability of backtest overfitting):** how often the configuration that looked best in training ranks in the bottom half when tested. Below 0.3 is required.
+- **Deflated Sharpe ratio:** the chance a result's Sharpe ratio is real after accounting for how many configurations were tried. At least 0.95 is required.
+- **Triple barrier:** a call ends at a take-profit, a stop or a time limit, whichever comes first, like a real trade.
+- **Hit rate / call rate:** the share of calls that made money after costs / how often the rule makes a call.
+- **Break-even hit rate:** the hit rate needed to make zero, given the average win and loss.
+- **Wilson interval:** a confidence interval for a hit rate.
+- **Meta-labeling:** a simple rule picks the direction; a second model decides whether to act on it.
+- **Pre-registration:** writing down the hypothesis, parameters and pass rule before seeing results.
+- **Holdout:** data kept unseen until the final, one-time test.
+- **Shadow forecast:** a recorded, scored forecast that never trades.
+
+---
+
+## 16. Where to find everything
+
+| What | Where |
 |---|---|
-| 0. progress.md, plan, pre-registration | done |
-| 1. Selective evaluation (triple barrier, costs, funding, Wilson bound, deflated Sharpe, trial registry, leakage canaries) | done (`selective.py`) |
-| 2. Data: spot 2017+, funding archives, Coinbase premium, Deribit DVOL; forward liquidations and order book | done (`research_data.py`, `forward_data.py`, supervisor thread) |
-| 3–4. Strategy families and meta-labeling | done (`signals.py`, `strategy_research.py`): no family passed |
-| 5. One-shot holdout | not run: nothing passed development, so the holdout stays untouched |
-| 6. Shadow signals and panel | no signal to shadow; the Prediction tab shows the verdict and forward data collection |
-
-**Next:**
-- **Liquidation and order-book tests:** liquidation exhaustion (I6) and depth imbalance (I7) are pre-registered (amendment A2). They run once at least 6 months of forward data exist, no earlier than **2027-04-20**. Until then, keep the supervisor running as continuously as possible; an always-on machine helps.
-- **News:** a news-augmented test becomes possible after a few months of forward news.
-- **Holdout:** the untouched holdout year is available for any future pre-registered idea that passes development.
-
-**Deferred minor issues from the independent review of the strategy research:**
-- PBO is a per-fold rank statistic with only 5–6 folds intraday, so it is coarse. Its pick can differ from the walk-forward pick when that pick had no calls in a block.
-- Funding at the exit bar is charged even when a barrier is hit inside that bar (conservative, about 0.03% per swing call at most).
-- Latent, not triggered: meta-labeling a *passing rule family* would start from a first-block pick chosen on the same history, and its holdout path raises `NotImplementedError`. Both need work only if a rule family ever passes.
+| This status | `progress.md` |
+| Overview and commands | `README.md` |
+| Selective research plan, pre-registration, results | `docs/prediction-plan.md`, `docs/research/preregistration.md`, `docs/strategy-research.md` |
+| Earlier research | `docs/forecast-research.md`, `docs/event-study.md`, `docs/evaluation-report.md`, `docs/model-card.md` |
+| Outlook Q&A design and plan | `docs/superpowers/specs/2026-10-20-market-outlook-qa-design.md`, `docs/superpowers/plans/2026-10-20-market-outlook-qa.md` |
+| MCP setup | `docs/mcp-setup.md` |
+| Operations, data platform, recovery | `docs/operations.md`, `docs/market-platform.md`, `docs/live-data.md`, `docs/recovery.md`, `docs/coverage-report.md`, `docs/data-dictionary.md`, `docs/architecture.md` |
+| Research artifacts | `artifacts/strategy-research/run-20261020/` (report, trial registry, per-family calls); `artifacts/research-champion-20261020/`, `artifacts/research-risk-20261020/`, `artifacts/event-study/`, `artifacts/outlook/`, `artifacts/shadow/`; frozen release files `artifacts/released.joblib`, `holdout.lock` |
+| Data caches | `data/` (Parquet, SQLite, backups), `data/research/` (research panels and caches) |
