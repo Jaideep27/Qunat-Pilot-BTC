@@ -47,8 +47,8 @@ def positioning(): return services.family("positioning")
 def sentiment(): return services.family("sentiment")
 
 @app.get('/api/v1/news')
-def news(limit: Annotated[int, Query(ge=1, le=100)] = 20):
-    return services.news(limit)
+def news(limit: Annotated[int, Query(ge=1, le=100)] = 20, compact: bool = False):
+    return services.news(limit, compact)
 
 @app.get('/api/v1/forecasts')
 def forecasts(): return services.shadow_forecasts()
@@ -140,7 +140,7 @@ def ask_route(body: AskBody, request: Request):
         result = services.ask(body.question, ai=body.ai)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
-    return services.envelope(result, result.get('data_time'), 'Outlook engine + Claude explanation')
+    return services.envelope(result, result.get('data_time'), 'Outlook engine + Claude explanation', max_age=7200)
 
 
 @app.post('/api/v1/outlook')
@@ -152,7 +152,7 @@ def outlook_route(body: OutlookBody, request: Request):
                                            thread_id=body.thread_id, run_id=body.run_id)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
-    return services.envelope(result, result.get('data_time'), 'Outlook engine')
+    return services.envelope(result, result.get('data_time'), 'Outlook engine', max_age=7200)
 
 
 @app.post('/api/v1/answers/{answer_id}/ai-view')

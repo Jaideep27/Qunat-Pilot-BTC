@@ -139,6 +139,13 @@ def answer(question, ctx):
     if ctx.now-t > pd.Timedelta(hours=2):
         base['stale'] = True
         warnings.append(f'Market data is stale: last completed hour {t.isoformat()}.')
+    if ctx.price_time is not None and ctx.now-pd.Timestamp(ctx.price_time) > pd.Timedelta(minutes=10):
+        base['stale'] = True
+        age = int((ctx.now-pd.Timestamp(ctx.price_time)).total_seconds()//60)
+        warnings.append(f'Latest price is {age} minutes old; the live collector may be stopped.')
+    if q.type == 'touch' and not .2 <= q.level/ctx.price <= 5:
+        raise ValueError(f'Touch level ${q.level:,.0f} is implausible against the current price ${ctx.price:,.0f}; '
+                         'use a level within 0.2x-5x of the price (for example 120k for $120,000).')
     if not ctx.report:
         warnings.append('No validation report yet; every method is treated as unvalidated.')
     h = q.horizon_hours
@@ -146,9 +153,12 @@ def answer(question, ctx):
     if q.type == 'direction':
         outcome = analogs.forward_up(ctx.panel, h)
         estimate = analogs.estimate(ctx.ranks, outcome, t, h)
+        if estimate.get('missing'):
+            warnings.append('Similar-situations estimate skipped: missing ' + ', '.join(estimate['missing']) + '.')
         gate = (ctx.report.get('analogs') or {}).get(f'{_nearest(h)}h')
         confidence = _confidence(gate)
-        use = confidence != 'no_edge' and estimate['probability'] is not None
+        # Stale or incomplete state never feeds a promoted method: the base rate needs no current state.
+        use = confidence != 'no_edge' and estimate['probability'] is not None and not base['stale']
         base['headline'] = dict(kind='probability', probability=estimate['probability'] if use else estimate['base_rate'],
                                 base_rate=estimate['base_rate'], method='analogs' if use else 'base_rate',
                                 confidence=confidence, ci=estimate['ci'] if use else None)
@@ -158,6 +168,7 @@ def answer(question, ctx):
         sigma = horizon_sigma(ctx.panel, t, h)
         if q.type == 'touch':
             side = 'up' if q.level >= ctx.price else 'down'
+            base['question']['side'] = q.side or ('above' if side == 'up' else 'below')
             threshold = abs(q.level/ctx.price-1)
             raw = touch_probability(ctx.price, q.level, sigma)
         else:

@@ -12,6 +12,7 @@ from .features import build_features
 from .engine import gate
 from .store import database, portfolio
 from . import ask_ai, news as news_cli  # alias: services.news() is the news envelope service
+import threading
 
 def clean(value):
     if isinstance(value, dict): return {str(k):clean(v) for k,v in value.items()}
@@ -48,10 +49,12 @@ def model_version():
     return json.loads(p.read_text(encoding="utf-8-sig")).get("metadata",{}).get("version") if p.exists() else None
 
 
-def news(limit=20):
+def news(limit=20, compact=False):
     from .news import snapshot
     data = snapshot(database(), limit)
     observed = max((f['checked_at'] for f in data['feeds']), default=None)
+    if compact:
+        data = _compact_news(data)
     return envelope(data, observed, 'Publisher RSS excerpts / versioned Codex extraction', max_age=900)
 
 def macro():
@@ -230,15 +233,56 @@ def operations(limit=20):
         model_version=model_version(),coverage_ready=coverage()['data'].get('release_ready',False))
     return envelope(result,result['checked_at'],'Persistent worker runs and immutable paper ledger')
 
+def _compact_news(data):
+    """Small enough for an agent's tool output: excerpts trimmed, analyses flattened, raw runs dropped."""
+    analyses = []
+    for run in data['runs']:
+        if run.get('status') != 'completed':
+            continue
+        for event in (run.get('result') or {}).get('events', []):
+            analyses.append(dict(provider=run.get('provider'), model=run.get('model'), available_at=run.get('available_at'),
+                                 summary=event['summary'], sentiment=event['sentiment'], relevance=event['relevance'],
+                                 novelty=event.get('novelty'), entities=event.get('entities', []),
+                                 source_ids=event['source_ids']))
+    items = [dict(id=i['id'], title=i['title'], url=i['url'], source=i['source'], available_at=i['available_at'],
+                  excerpt=(i.get('excerpt') or '')[:300]) for i in data['items']]
+    return dict(items=items, analyses=analyses[:12], providers=data.get('providers'),
+                analysis_status=data.get('analysis_status'), scope=data['scope'],
+                forecasting_status=data['forecasting_status'])
+
+
+ASK_SOURCES = ('ask', 'cli', 'scheduled')
+_ai_lock = threading.Lock()
+
+
+def _budget_file():
+    return settings.data_dir/'ask-ai-budget.json'
+
+
+def _parse_calls_today(day):
+    try:
+        state = json.loads(_budget_file().read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return 0
+    return state.get('parse_calls', 0) if state.get('day') == day else 0
+
+
+def _spend_parse(day):
+    calls = _parse_calls_today(day)+1
+    _budget_file().write_text(json.dumps(dict(day=day, parse_calls=calls)), encoding='utf-8')
+
+
 def _context():
     from .outlook import load_context
     return load_context()
 
 
-def _ai_allowed(source):
+def _ai_allowed():
+    """Ask-path Claude calls today (explanations recorded on answers plus parse attempts) under the daily limit."""
     from .answers import ai_calls_today
-    limit = settings.chat_daily_limit if source == 'chat' else settings.ask_daily_limit
-    return ai_calls_today(database(), pd.Timestamp.now(tz='UTC'), ('ask', 'chat', 'cli', 'scheduled')) < limit
+    now = pd.Timestamp.now(tz='UTC')
+    used = ai_calls_today(database(), now, ASK_SOURCES)+_parse_calls_today(now.strftime('%Y-%m-%d'))
+    return used < settings.ask_daily_limit
 
 
 def ask(text, ai=True, source='ask', ctx=None):
@@ -247,18 +291,25 @@ def ask(text, ai=True, source='ask', ctx=None):
     from .questions import rule_parse
     ctx = ctx or _context()
     question = rule_parse(text, ctx.now.to_pydatetime(), ctx.price or 0)
-    if question is None and ai:
+    if question is None and ai and _ai_allowed() and _ai_lock.acquire(blocking=False):
         try:
+            _spend_parse(pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%d'))
             question = ask_ai.parse(text, ctx.now.to_pydatetime(), ctx.price or 0)
         except (news_cli.UsageLimitReached, RuntimeError, ValueError, FileNotFoundError, OSError):
             question = None
+        finally:
+            _ai_lock.release()
     if question is None:
         raise ValueError('Supported questions: up/down over 1h-7d, "will BTC touch $X by T", expected range, '
                          'chance of a big move, or "why is BTC moving".')
     result = answer(question, ctx)
     result['track_record']['forward'] = _forward(question)
     status, view = 'off', None
-    if ai and _ai_allowed(source):
+    if ai and not _ai_allowed():
+        status = 'daily_limit'
+    elif ai and not _ai_lock.acquire(blocking=False):
+        status = 'busy'   # one Claude call at a time; the quant answer is returned now
+    elif ai:
         try:
             view = ask_ai.explain(result)
             status = 'ok'
@@ -266,8 +317,8 @@ def ask(text, ai=True, source='ask', ctx=None):
             status = 'usage_limited'
         except (RuntimeError, ValueError, FileNotFoundError, OSError):
             status = 'failed'
-    elif ai:
-        status = 'daily_limit'
+        finally:
+            _ai_lock.release()
     ai_record = dict(status=status, probability=(view or {}).get('ai_probability'), reasons=(view or {}).get('reasons', []),
                      answer=(view or {}).get('answer'))
     result['id'] = record(database(), result, source, ai=ai_record)

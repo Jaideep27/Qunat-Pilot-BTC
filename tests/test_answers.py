@@ -56,8 +56,8 @@ def test_scoreboard_withholds_verdicts_until_thirty_independent_answers(account)
 
 def test_ai_view_can_only_be_set_for_answers_from_the_same_run(account):
     answer_id = answers.record(account, result(), 'chat', thread_id='t1', run_id='run-a')
-    assert answers.set_ai_view(account, answer_id, .55, ['x'], run_id='run-b') is False
-    assert answers.set_ai_view(account, answer_id, .55, ['x'], run_id='run-a') is True
+    assert answers.set_ai_view(account, answer_id, .55, ['x'], run_id='run-b', now=T0) is False
+    assert answers.set_ai_view(account, answer_id, .55, ['x'], run_id='run-a', now=T0) is True
     assert answers.history(account)[0]['ai']['probability'] == .55
 
 

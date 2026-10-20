@@ -42,12 +42,14 @@ def estimate(ranks, outcome, t, h, k=200, m=100):
     """Nearest past states (one per UTC day) whose h-hour outcome was known by t; shrunk to the base rate."""
     t = pd.Timestamp(t)
     now = ranks.loc[t]
-    known = outcome.notna() & (outcome.index+pd.Timedelta(hours=h) <= t) & ranks.notna().all(axis=1)
-    if now.isna().any() or not known.any():
-        return dict(probability=None, base_rate=None, hits=0, k_eff=0, ci=[None, None])
+    finished = outcome.notna() & (outcome.index+pd.Timedelta(hours=h) <= t)
+    base = float(outcome[finished].mean()) if finished.any() else None
+    missing = [c for c in now.index if pd.isna(now[c])]
+    known = finished & ranks.notna().all(axis=1)
+    if missing or not known.any():
+        return dict(probability=None, base_rate=base, hits=0, k_eff=0, ci=[None, None], missing=missing)
     past = ranks[known]
     results = outcome[known]
-    base = float(results.mean())
     distance = np.sqrt(((past.to_numpy()-now.to_numpy())**2).sum(axis=1))
     order = np.argsort(distance, kind='stable')
     # At most one neighbour per UTC day: keep each day's nearest hour, then the k nearest of those.
@@ -57,7 +59,7 @@ def estimate(ranks, outcome, t, h, k=200, m=100):
     hits = float(results.iloc[picked].sum())
     k_eff = len(picked)
     probability = (hits+m*base)/(k_eff+m) if k_eff+m else None
-    return dict(probability=probability, base_rate=base, hits=hits, k_eff=k_eff, ci=wilson(hits, k_eff))
+    return dict(probability=probability, base_rate=base, hits=hits, k_eff=k_eff, ci=wilson(hits, k_eff), missing=[])
 
 
 def promote(result):

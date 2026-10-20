@@ -25,6 +25,8 @@ class Question(BaseModel):
     def _complete(self):
         if self.type == 'touch' and self.level is None:
             raise ValueError('touch questions need a price level')
+        if self.type == 'touch' and self.side in ('up', 'down'):
+            self.side = 'above' if self.side == 'up' else 'below'
         if self.type == 'big_move':
             self.threshold_pct = self.threshold_pct or 5.0
             self.side = self.side if self.side in ('up', 'down', 'either') else 'either'
@@ -66,6 +68,8 @@ def extract_level(text):
     t = text.lower().replace(',', '')
     for found in re.finditer(r'\$?\s*(\d+(?:\.\d+)?)\s*(k\b)?', t):
         value = float(found.group(1))*(1000 if found.group(2) else 1)
+        if not found.group(2) and '$' not in found.group(0) and value.is_integer() and 2000 <= value <= 2100:
+            continue  # a year such as 2027, not a price
         tail = t[found.end():found.end()+6]
         if re.match(r'\s*(h|hr|hour|d\b|day|%)', tail):
             continue  # a duration or percentage, not a price

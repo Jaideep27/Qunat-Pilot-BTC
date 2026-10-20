@@ -35,10 +35,20 @@ def record(engine, result, source, thread_id=None, run_id=None, ai=None):
     return answer_id
 
 
-def set_ai_view(engine, answer_id, probability, reasons, run_id=None):
+def set_ai_view(engine, answer_id, probability, reasons, run_id=None, now=None):
+    """A view counts only before the outcome is knowable; without a run it may only fill an empty MCP answer."""
+    now = pd.Timestamp(now or datetime.now(timezone.utc))
     with serialized(engine) as session:
         row = session.get(OutlookAnswer, answer_id)
-        if row is None or (run_id is not None and row.payload.get('run_id') != run_id):
+        if row is None or 'outcome' in row.payload:
+            return False
+        end = pd.Timestamp(row.payload['asked_at'])+pd.Timedelta(hours=row.payload['question']['horizon_hours'])
+        if now >= end:
+            return False
+        if run_id is None:
+            if row.source != 'mcp' or (row.payload.get('ai') or {}).get('probability') is not None:
+                return False
+        elif row.payload.get('run_id') != run_id:
             return False
         row.payload = {**row.payload, 'ai': dict(probability=float(probability), reasons=list(reasons)[:5], status='ok')}
     return True
@@ -56,7 +66,8 @@ def _outcome(payload, bars):
     if q['type'] == 'direction':
         hit = float(close > s)
     elif q['type'] == 'touch':
-        hit = float(window.high.max() >= q['level']) if q.get('side') == 'above' else float(window.low.min() <= q['level'])
+        side = q.get('side') or ('above' if q['level'] >= s else 'below')
+        hit = float(window.high.max() >= q['level']) if side in ('above', 'up') else float(window.low.min() <= q['level'])
     elif q['type'] == 'big_move':
         threshold = q.get('threshold_pct', 5)/100
         up, down = window.high.max() >= s*(1+threshold), window.low.min() <= s*(1-threshold)

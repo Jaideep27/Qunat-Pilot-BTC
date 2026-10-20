@@ -76,7 +76,8 @@ async def ask_outlook(type: Literal['direction', 'touch', 'range', 'big_move', '
     """Validated outlook for a BTCUSDT question: probability or range, confidence label, evidence, track record."""
     question = {k: v for k, v in dict(type=type, horizon_hours=horizon_hours, level=level, side=side,
                                       threshold_pct=threshold_pct, coverage=coverage).items() if v is not None}
-    return services.envelope(await asyncio.to_thread(services.outlook_question, question))
+    result = await asyncio.to_thread(services.outlook_question, question)
+    return services.envelope(result, result.get('data_time'), 'Outlook engine', max_age=7200)
 
 
 @mcp.tool(structured_output=True)
