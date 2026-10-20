@@ -159,3 +159,12 @@ def test_trade_records_carry_costs_excursions_and_protection_changes():
     assert trade['max_adverse'] == pytest.approx(99_400/trade['entry']-1)
     assert trade['protection_changes'][0]['stop'] == 99_600.0
     assert trade['net'] == pytest.approx(trade['pnl']-trade['fees']+trade['funding'])
+
+
+def test_fill_revalidation_uses_the_plans_own_minimum_reward_risk():
+    strict = enter(0)
+    strict['plan']['min_reward_risk'] = 2.0
+    # At a 100,400 fill: (103,000-100,430)/100,430-0.0016 vs (100,430-99,000)/100,430+0.0016 -> about 1.5-1.6
+    state = run(FLAT+[strict, bar(1, 100_400, 100_500, 100_300, 100_450)])
+    assert state['position'] is None and state['rejections'][-1]['reason'] == 'INVALIDATED_AT_FILL'
+    assert run(FLAT+[enter(0), bar(1, 100_400, 100_500, 100_300, 100_450)])['position'] is not None

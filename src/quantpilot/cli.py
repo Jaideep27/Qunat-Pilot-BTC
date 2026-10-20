@@ -51,6 +51,8 @@ def main():
     strategies=sub.add_parser('research-strategies', help='Pre-registered selective strategy research (never trades)')
     strategies.add_argument('--output', default=None, help='Run directory (resumes an interrupted run)')
     strategies.add_argument('--holdout', action='store_true', help='Evaluate the frozen passing rules ONCE on the holdout')
+    agent=sub.add_parser('research-agent', help='Trading-agent step B: pre-registered trade-plan entry rules (never trades)')
+    agent.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
     experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
     experiment.add_argument('--output', required=True, help='New directory; existing directories are refused')
     experiment.add_argument('--folds', type=int, choices=range(1, 27), default=6)
@@ -162,6 +164,10 @@ def main():
         else:
             report = run(args.output)
             print(json.dumps(dict(passing=report['passing'], trials=report['trials']), indent=2))
+    elif args.command == 'research-agent':
+        from .agent_research import research
+        report = research(args.output)
+        print(json.dumps({k: report['families'][k]['gate'] for k in report['families']}, indent=2, default=str))
     elif args.command == 'research-events':
         from .event_research import train_experiment
         report = train_experiment(args.output, folds=args.folds)

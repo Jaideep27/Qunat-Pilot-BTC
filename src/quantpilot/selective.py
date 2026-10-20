@@ -149,20 +149,25 @@ def register(path, track, family, config, result):
         handle.write(json.dumps(record, default=str)+'\n')
 
 
-def _trials(path, track):
-    path, seen = Path(path), {}
-    if not path.exists():
-        return seen
-    for line in path.read_text(encoding='utf-8').splitlines():
-        record = json.loads(line)
-        if record['track'] == track:
-            seen.setdefault((record['family'], record['key']), record)
+def _trials(paths, track):
+    """Distinct (family, configuration) records of a track across one or more registry files."""
+    seen = {}
+    for path in ([paths] if isinstance(paths, (str, Path)) else paths):
+        path = Path(path)
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding='utf-8').splitlines():
+            record = json.loads(line)
+            if record['track'] == track:
+                seen.setdefault((record['family'], record['key']), record)
     return seen
 
 
-def trial_count(path, track):
-    return len(_trials(path, track))
+def trial_count(paths, track):
+    return len(_trials(paths, track))
 
 
-def trial_sharpes(path, track):
-    return [r['sharpe'] for r in _trials(path, track).values() if r.get('sharpe') is not None]
+def trial_sharpes(paths, track, min_calls=None):
+    """Per-trial Sharpe ratios; `min_calls` drops trials too small to estimate one (amendment A3)."""
+    return [r['sharpe'] for r in _trials(paths, track).values() if r.get('sharpe') is not None
+            and (min_calls is None or (r.get('calls') or 0) >= min_calls)]

@@ -69,7 +69,7 @@ def _open(s, plan, open_price, time):
     side = 1 if plan['side'] == 'long' else -1
     fill = open_price*(1+side*SLIPPAGE)
     ratio = reward_risk(plan['side'], fill, plan['stop'], plan['target'], plan['cost_fraction'])
-    if ratio is None or ratio < PLAN_RULES['min_reward_risk']:
+    if ratio is None or ratio < plan.get('min_reward_risk', PLAN_RULES['min_reward_risk']):
         return _reject(s, time, 'enter', 'INVALIDATED_AT_FILL')
     quantity, leverage = float(plan['quantity']), float(plan.get('leverage', PLAN_RULES['leverage']))
     margin = quantity*fill/leverage

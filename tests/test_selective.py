@@ -144,3 +144,11 @@ def test_overlap_mode_labels_every_signal_bar():
     calls = selective.simulate(frame, side(frame, [0, 1, 2]), horizon=3, width=pd.Series(.05, index=frame.index),
                                overlap=True)
     assert list(calls.entry_time) == list(frame.index[:3])
+
+
+def test_trial_sharpes_can_ignore_small_trials(tmp_path):
+    path = tmp_path/'trials.jsonl'
+    selective.register(path, 'intraday', 'A', dict(k=1), dict(sharpe=.9, calls=5))
+    selective.register(path, 'intraday', 'A', dict(k=2), dict(sharpe=.1, calls=40))
+    assert selective.trial_sharpes(path, 'intraday', min_calls=30) == [.1]
+    assert selective.trial_sharpes([path, tmp_path/'missing.jsonl'], 'intraday') == [.9, .1]
