@@ -11,6 +11,7 @@ from .data import load_frames, utc
 from .features import build_features
 from .engine import gate
 from .store import database, portfolio
+from . import ask_ai, news as news_cli  # alias: services.news() is the news envelope service
 
 def clean(value):
     if isinstance(value, dict): return {str(k):clean(v) for k,v in value.items()}
@@ -229,3 +230,74 @@ def operations(limit=20):
         model_version=model_version(),coverage_ready=coverage()['data'].get('release_ready',False))
     return envelope(result,result['checked_at'],'Persistent worker runs and immutable paper ledger')
 
+def _context():
+    from .outlook import load_context
+    return load_context()
+
+
+def _ai_allowed(source):
+    from .answers import ai_calls_today
+    limit = settings.chat_daily_limit if source == 'chat' else settings.ask_daily_limit
+    return ai_calls_today(database(), pd.Timestamp.now(tz='UTC'), ('ask', 'chat', 'cli', 'scheduled')) < limit
+
+
+def ask(text, ai=True, source='ask', ctx=None):
+    from .answers import record
+    from .outlook import answer
+    from .questions import rule_parse
+    ctx = ctx or _context()
+    question = rule_parse(text, ctx.now.to_pydatetime(), ctx.price or 0)
+    if question is None and ai:
+        try:
+            question = ask_ai.parse(text, ctx.now.to_pydatetime(), ctx.price or 0)
+        except (news_cli.UsageLimitReached, RuntimeError, ValueError, FileNotFoundError, OSError):
+            question = None
+    if question is None:
+        raise ValueError('Supported questions: up/down over 1h-7d, "will BTC touch $X by T", expected range, '
+                         'chance of a big move, or "why is BTC moving".')
+    result = answer(question, ctx)
+    result['track_record']['forward'] = _forward(question)
+    status, view = 'off', None
+    if ai and _ai_allowed(source):
+        try:
+            view = ask_ai.explain(result)
+            status = 'ok'
+        except news_cli.UsageLimitReached:
+            status = 'usage_limited'
+        except (RuntimeError, ValueError, FileNotFoundError, OSError):
+            status = 'failed'
+    elif ai:
+        status = 'daily_limit'
+    ai_record = dict(status=status, probability=(view or {}).get('ai_probability'), reasons=(view or {}).get('reasons', []),
+                     answer=(view or {}).get('answer'))
+    result['id'] = record(database(), result, source, ai=ai_record)
+    result['ai'] = ai_record
+    return result
+
+
+def _forward(question):
+    from .answers import bucket, scoreboard
+    return scoreboard(database()).get(f'{question.type}:{bucket(question.horizon_hours)}')
+
+
+def outlook_question(question, source='mcp', thread_id=None, run_id=None, ctx=None):
+    from .answers import record
+    from .outlook import answer
+    from .questions import Question
+    question = Question.model_validate(question)
+    result = answer(question, ctx or _context())
+    result['track_record']['forward'] = _forward(question)
+    result['id'] = record(database(), result, source, thread_id=thread_id, run_id=run_id)
+    return result
+
+
+def record_view(answer_id, probability, reasons, run_id=None):
+    from .answers import set_ai_view
+    return dict(recorded=set_ai_view(database(), answer_id, probability, reasons, run_id=run_id))
+
+
+def answers_view(limit=50):
+    from .answers import history, scoreboard
+    data = dict(history=history(database(), limit), scoreboard=scoreboard(database()))
+    observed = data['history'][0]['asked_at'] if data['history'] else None
+    return envelope(data, observed, 'Outlook answers scored after their horizon', max_age=86400)

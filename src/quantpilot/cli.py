@@ -34,6 +34,9 @@ def main():
     news_collect.add_argument('--reasoning', action='store_true', help='Analyze new batches with saved ChatGPT Codex login')
     sub.add_parser('analyze-news', help='Analyze at most one bounded news batch; no trading-policy changes')
     sub.add_parser('news-status', help='News coverage, feed health and local Codex login readiness')
+    asking = sub.add_parser('ask', help='Ask a BTC outlook question in plain language')
+    asking.add_argument('question')
+    asking.add_argument('--no-ai', action='store_true')
     sub.add_parser('outlook-refresh', help='Rebuild the cached hourly outlook panel (all history with --full)').add_argument('--full', action='store_true')
     sub.add_parser('validate-outlook', help='Walk-forward validation of the outlook methods; writes the gate report')
     sub.add_parser('shadow-forecast', help='Refit if due, record research forecasts and score finished ones')
@@ -109,6 +112,13 @@ def main():
     elif args.command == 'collect-news':
         from .news import run
         run(once=args.once, reasoning=args.reasoning)
+    elif args.command == 'ask':
+        from . import services
+        initialize(database())
+        result = services.ask(args.question, ai=not args.no_ai, source='cli')
+        head = result['headline']
+        print(json.dumps(dict(question=result['question'], headline=head, range=result['range'], ai=result['ai'],
+                              warnings=result['warnings']), indent=2, default=str))
     elif args.command == 'outlook-refresh':
         from .outlook import refresh_panel
         print(json.dumps(refresh_panel(full=args.full), indent=2))

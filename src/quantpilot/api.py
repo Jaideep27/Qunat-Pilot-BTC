@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Annotated, Literal
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
 from . import services
@@ -15,7 +16,7 @@ async def lifespan(app):
 
 app = FastAPI(title="QuantPilot BTC", version="0.1.0", lifespan=lifespan,
               description="Read-only BTC perpetual research and paper ledger. No real-money execution.")
-app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["GET"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["GET", "POST"], allow_headers=["*"])
 
 @app.get("/api/v1/health")
 def health(): return services.health()
@@ -101,3 +102,65 @@ def chart_studies(market: Literal['BTCUSDT']='BTCUSDT',
     result=studies(rows,selected.split(',')[:12])
     return services.envelope(result,rows[-1]['available_at'] if rows else None,'Causal chart study catalogue')
 
+
+LOOPBACK = {'127.0.0.1', '::1', 'localhost', 'testclient'}
+
+
+def local_only(request: Request):
+    if request.client is None or request.client.host not in LOOPBACK:
+        raise HTTPException(status_code=403, detail='Write endpoints accept local requests only')
+
+
+class AskBody(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    ai: bool = True
+
+
+class OutlookBody(BaseModel):
+    type: str
+    horizon_hours: int
+    level: float | None = None
+    side: str | None = None
+    threshold_pct: float | None = None
+    coverage: float = .8
+    thread_id: str | None = None
+    run_id: str | None = None
+
+
+class ViewBody(BaseModel):
+    probability: float = Field(ge=0, le=1)
+    reasons: list[str] = Field(default_factory=list, max_length=5)
+    run_id: str | None = None
+
+
+@app.post('/api/v1/ask')
+def ask_route(body: AskBody, request: Request):
+    local_only(request)
+    try:
+        result = services.ask(body.question, ai=body.ai)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return services.envelope(result, result.get('data_time'), 'Outlook engine + Claude explanation')
+
+
+@app.post('/api/v1/outlook')
+def outlook_route(body: OutlookBody, request: Request):
+    local_only(request)
+    fields = body.model_dump(exclude={'thread_id', 'run_id'}, exclude_none=True)
+    try:
+        result = services.outlook_question(fields, source='chat' if body.run_id else 'mcp',
+                                           thread_id=body.thread_id, run_id=body.run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return services.envelope(result, result.get('data_time'), 'Outlook engine')
+
+
+@app.post('/api/v1/answers/{answer_id}/ai-view')
+def ai_view_route(answer_id: str, body: ViewBody, request: Request):
+    local_only(request)
+    return services.envelope(services.record_view(answer_id, body.probability, body.reasons, body.run_id))
+
+
+@app.get('/api/v1/answers')
+def answers_route(limit: Annotated[int, Query(ge=1, le=500)] = 50):
+    return services.answers_view(limit)

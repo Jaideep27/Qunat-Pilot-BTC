@@ -68,6 +68,29 @@ async def get_paper_portfolio() -> dict[str, Any]:
     """Virtual balances, exposure, fees, funding, decisions and worker checkpoint."""
     return await asyncio.to_thread(services.paper)
 
+@mcp.tool(structured_output=True)
+async def ask_outlook(type: Literal['direction', 'touch', 'range', 'big_move', 'explain'],
+                      horizon_hours: Annotated[int, Field(ge=1, le=168)], level: float | None = None,
+                      side: Literal['above', 'below', 'up', 'down', 'either'] | None = None,
+                      threshold_pct: float | None = None, coverage: float = .8) -> dict[str, Any]:
+    """Validated outlook for a BTCUSDT question: probability or range, confidence label, evidence, track record."""
+    question = {k: v for k, v in dict(type=type, horizon_hours=horizon_hours, level=level, side=side,
+                                      threshold_pct=threshold_pct, coverage=coverage).items() if v is not None}
+    return services.envelope(await asyncio.to_thread(services.outlook_question, question))
+
+
+@mcp.tool(structured_output=True)
+async def record_ai_view(answer_id: str, probability: Annotated[float, Field(ge=0, le=1)],
+                         reasons: list[str]) -> dict[str, Any]:
+    """Record your own probability for an outlook answer so it is scored against the quant number."""
+    return services.envelope(await asyncio.to_thread(services.record_view, answer_id, probability, reasons))
+
+
+@mcp.tool(structured_output=True)
+async def get_answer_scoreboard() -> dict[str, Any]:
+    """Scored outlook answers: quant vs AI vs base-rate accuracy per question type and horizon."""
+    return await asyncio.to_thread(services.answers_view)
+
 def main():
     initialize(database())
     # Initialize native ML libraries before starting the stdio event loop.
