@@ -93,7 +93,7 @@ These are standing instructions from the owner and decisions already made. Follo
 | Frontend | **React 19** + **TypeScript 5.9**, built with **Vite 6**; **Tailwind CSS 4**; **lightweight-charts 5** (trading chart), **Recharts 3** (research plots), **lucide-react** (icons) |
 | Tests | **pytest** (36 test files, 257 tests), **Playwright** (10 browser specs), Node test for startup readiness |
 | Runtime and tooling | Node 22 (`scripts/start.cjs` launcher, verify scripts), Windows 11, PowerShell and Git Bash |
-| Version control | git; `main` = Codex snapshot, all later work on branch `news-pipeline` (no remote) |
+| Version control | git, local only (no remote). `main` holds everything: the Codex snapshot `821b45c` plus all later work, fast-forward merged from `news-pipeline` on 2026-10-20 |
 
 ---
 
@@ -255,14 +255,14 @@ Scripts (`scripts/`):
 | When | Who | What |
 |---|---|---|
 | Before 2026-10-20 | Codex | Built the platform: data acquisition and audit, 106 features, walk-forward training, released model `24c8238525d4`, paper engine and worker, PostgreSQL market store, chart workspace, the first nine MCP tools, recovery drills, operations monitoring. Imported as commit `821b45c` on `main`. |
-| 2026-10-20 | Claude | Took over; repository initialised; all later work on branch `news-pipeline` |
+| 2026-10-20 | Claude | Took over; repository initialised; work done on branch `news-pipeline`, then fast-forward merged into `main` the same day |
 | | | **News pipeline:** continuous RSS, Claude and Codex reasoners, budgets and usage-limit handling |
 | | | **Macro calendar** and the **five-year 5% event study** |
 | | | **Multi-horizon research harness** with validation-only champions and PBO; the **shadow forecaster** with a promotion gate |
 | | | **Market outlook Q&A and in-app Chat** (11-task plan), independent review, fix pass (commit `95d6274`) |
 | | | **Selective prediction research**: progress record, pre-registration, trade-style scoring, new data, forward collectors, 10 rule families + 2 meta-labeled primaries, report, dashboard panel, independent review, fixes (commits `5453862` → `c030629`) |
 
-`git log --oneline main..news-pipeline` lists all 36 commits.
+`git log --oneline 821b45c..main` lists the 36 commits since the Codex import.
 
 ---
 
@@ -387,7 +387,7 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 ## 13. Known limitations and operations
 - **Memory:** the laptop runs near its RAM limit; long jobs get killed (section 2). An always-on machine (for example a Mac mini M6 with 24 GB) would free memory and stop gaps in forward-only data.
 - **Forward-only data:** liquidation and order-book data exist only while the supervisor runs. Gaps while the laptop sleeps or is off are permanent. About 25 minutes were lost on 2026-10-20 when a restarted supervisor was reaped.
-- **Branch:** `news-pipeline` is not merged into `main`, and there is no git remote.
+- **Git:** everything is on `main`; there is no git remote, so nothing is backed up off this laptop except the PostgreSQL backups in `data/backups/`.
 - **Deployment and fills:** no public deployment. Paper fills are bar-based and margin is approximate.
 - **News:** only days of history, so it can't be evaluated yet.
 - **Leftovers:** 18 `scripts/fix*.cjs` one-off patch scripts could be removed.
@@ -398,11 +398,11 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 ## 14. Current state and next steps
 
 **State on 2026-10-20:**
-- All planned work is complete and committed on `news-pipeline`. The tests are green.
+- All planned work is complete and merged into `main`. The tests are green.
 - The services are running and recording depth every minute and liquidations as they happen.
 - The Prediction tab shows the strategy verdict.
 
-**Waiting for a decision from the owner:** merge `news-pipeline` into `main`, push it to a remote (one must be added first), or leave it as is.
+**Open choice for the owner:** add a git remote (for example a private GitHub repository) so the code is backed up off the laptop.
 
 **Next steps:**
 1. Keep the supervisor running as continuously as possible to build forward data.
