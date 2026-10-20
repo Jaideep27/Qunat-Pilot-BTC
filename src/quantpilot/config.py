@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # Shadow forecaster: refit the research champion on this much recent history this often.
     forecast_refit_hours: int = Field(24, ge=1, le=720)
     forecast_history_days: int = Field(730, ge=120, le=1825)
+    # Outlook Q&A and in-app chat: daily AI budgets (subscription protection) and the local API address.
+    ask_daily_limit: int = Field(100, ge=1, le=1000)
+    chat_daily_limit: int = Field(100, ge=1, le=1000)
+    ask_scheduled_ai_per_day: int = Field(6, ge=0, le=48)
+    api_base: str = 'http://127.0.0.1:8000'
     cors_origins: list[str] = ['http://localhost:5173']
 
 class RiskConfig(BaseSettings):
