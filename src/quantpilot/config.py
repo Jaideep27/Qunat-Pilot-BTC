@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     news_usage_backoff_seconds: int = Field(3600, ge=300, le=86400)
     news_model: str = 'gpt-6-luna'
     news_codex_command: str = 'codex'
+    # Subscription CLIs that reason over news, in priority order; the first one feeds research features.
+    news_reasoners: list[str] = ['claude', 'codex']
+    news_claude_model: str = 'claude-sonnet-5-5'
+    news_claude_command: str = 'claude'
+    news_claude_effort: str = 'low'
     news_timeout_seconds: int = Field(120, ge=10, le=300)
     cors_origins: list[str] = ['http://localhost:5173']
 

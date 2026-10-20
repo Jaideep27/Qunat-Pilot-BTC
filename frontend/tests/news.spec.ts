@@ -16,7 +16,7 @@ const macro={upcoming:{cpi:{...cpi,id:'cpi:2026-11-12',scheduled_at:'2026-11-12T
   jobs:null,fomc:{id:'fomc:2026-10-28',kind:'fomc',label:'FOMC rate decision',scheduled_at:'2026-10-28T18:00:00+00:00',status:'scheduled',values:{}}},
   recent:[cpi],total_events:180,surprise_status:'unavailable_no_timestamped_consensus',scope:'Official schedules.'};
 
-async function open(page:Page,status:string){
+async function open(page:Page,status:string,newsData?:unknown){
   const requested:string[]=[];
   const values:Record<string,unknown>={candles:[],indicators:{},positioning:[],sentiment:[],
     predictions:{action:'NO_TRADE',reasons:['MODEL_RELEASE_BLOCKED']},coverage:{release_ready:false},
@@ -24,7 +24,7 @@ async function open(page:Page,status:string){
     portfolio:{equity:10000,position:null,fills:[],decisions:[],paused:false}};
   await page.route('**/api/v1/**',route=>{
     const key=new URL(route.request().url()).pathname.split('/').at(-1)!;requested.push(key);
-    return route.fulfill({json:{data:key==='news'?news(status):key==='macro'?macro:values[key],
+    return route.fulfill({json:{data:key==='news'?(newsData??news(status)):key==='macro'?macro:values[key],
       provenance:{source:'News test fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
   });
   await page.goto('/');await page.waitForLoadState('networkidle');
@@ -62,4 +62,15 @@ test('macro calendar shows upcoming releases and first-release values without in
   await expect(calendar).toContainText('Core +0.21% m/m');
   await expect(calendar).toContainText('Consensus surprise unavailable');
   await expect(calendar.getByText('Employment Situation')).toHaveCount(0);
+});
+
+test('each reasoner reports its own status and analyses name the model that produced them',async({page})=>{
+  const data=news('delayed_usage_limit');
+  await open(page,'delayed_usage_limit',{...data,runs:[{...data.runs[0],provider:'claude',model:'claude-sonnet-5-5'}],
+    providers:{claude:{model:'claude-sonnet-5-5',analysis_status:'current'},
+      codex:{model:'gpt-6-luna',analysis_status:'delayed_usage_limit'}}});
+  const panel=page.getByRole('region',{name:'News evidence'});
+  await expect(panel.getByRole('list',{name:'News reasoners'})).toContainText('claude · claude-sonnet-5-5 · current');
+  await expect(panel.getByRole('list',{name:'News reasoners'})).toContainText('codex · gpt-6-luna · delayed: usage limit');
+  await expect(panel).toContainText('Analysed by claude-sonnet-5-5');
 });

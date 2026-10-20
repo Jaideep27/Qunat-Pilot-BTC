@@ -184,8 +184,9 @@ def test_collection_cycles_space_out_reasoning(account, monkeypatch):
     clock = {'t': STAMP+timedelta(seconds=10)}
     monkeypatch.setattr(news, 'now', lambda: clock['t'])
     calls = []
-    def analyzer(engine):
-        calls.append(clock['t'])
+    monkeypatch.setattr(settings, 'news_reasoners', ['claude', 'codex'])
+    def analyzer(engine, provider):
+        calls.append((clock['t'], provider))
         return {'status': 'idle'}
     with httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503))) as client:
         first, last = news.cycle(account, True, None, client=client, analyzer=analyzer)
@@ -195,5 +196,119 @@ def test_collection_cycles_space_out_reasoning(account, monkeypatch):
         third, last = news.cycle(account, True, last, client=client, analyzer=analyzer)
         quiet, _ = news.cycle(account, False, None, client=client, analyzer=analyzer)
     assert second['analysis'] == {'status': 'waiting_interval'}
-    assert calls == [STAMP+timedelta(seconds=10), STAMP+timedelta(minutes=16, seconds=10)]
+    first_at, later_at = STAMP+timedelta(seconds=10), STAMP+timedelta(minutes=16, seconds=10)
+    assert calls == [(first_at, 'claude'), (first_at, 'codex'), (later_at, 'claude'), (later_at, 'codex')]
+    assert set(third['analysis']) == {'claude', 'codex'}
     assert 'analysis' not in quiet and len(first['feeds']) == len(news.FEEDS)
+
+
+
+def claude_output(**fields):
+    base = dict(type='result', subtype='success', is_error=False, result='', structured_output=None)
+    return json.dumps({**base, **fields})
+
+
+def fake_claude(monkeypatch, returncode, stdout, seen=None):
+    monkeypatch.setattr(news, 'claude_executable', lambda: 'claude.exe')
+    def run(args, **kwargs):
+        if seen is not None:
+            seen.update(args=args, input=kwargs.get('input'), env=kwargs.get('env'), cwd=kwargs.get('cwd'))
+        return subprocess.CompletedProcess(args, returncode, stdout=stdout, stderr='')
+    monkeypatch.setattr(news.subprocess, 'run', run)
+
+
+def test_claude_reasoner_runs_isolated_without_tools_and_validates_output(monkeypatch):
+    items = sample()
+    seen = {}
+    fake_claude(monkeypatch, 0, claude_output(structured_output=answer(items)), seen)
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'never-pass')
+    assert news.invoke_claude(items) == answer(items)
+    args = seen['args']
+    assert args[args.index('--model')+1] == settings.news_claude_model
+    assert args[args.index('--tools')+1] == '' and '--strict-mcp-config' in args
+    assert '--no-session-persistence' in args and '--disable-slash-commands' in args
+    assert items[0]['payload']['title'] in seen['input']  # untrusted text only via stdin
+    assert not any(items[0]['payload']['title'] in a for a in args)
+    assert 'ANTHROPIC_API_KEY' not in seen['env']
+
+
+def test_claude_output_with_invented_evidence_is_rejected(monkeypatch):
+    items = sample()
+    bad = answer(items)
+    bad['events'][0]['evidence'][0]['quote'] = 'Bitcoin will crash 50 percent'
+    fake_claude(monkeypatch, 0, claude_output(structured_output=bad))
+    with pytest.raises(ValueError, match='quotation'):
+        news.invoke_claude(items)
+
+
+def test_claude_usage_limit_is_distinguished_from_other_failures(monkeypatch):
+    fake_claude(monkeypatch, 1, claude_output(is_error=True, subtype='error',
+                                              result='Claude AI usage limit reached|1792483200'))
+    with pytest.raises(news.UsageLimitReached):
+        news.invoke_claude(sample())
+    fake_claude(monkeypatch, 1, claude_output(is_error=True, subtype='error', result='Invalid model name'))
+    with pytest.raises(RuntimeError) as other:
+        news.invoke_claude(sample())
+    assert not isinstance(other.value, news.UsageLimitReached)
+
+
+def test_claude_environment_drops_api_keys_and_parent_session(monkeypatch):
+    for name in ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'CLAUDECODE',
+                 'CLAUDE_CODE_SESSION_ID', 'QUANTPILOT_DATABASE_URL'):
+        monkeypatch.setenv(name, 'x')
+    monkeypatch.setenv('CLAUDE_CONFIG_DIR', 'keep-me')
+    env = news.claude_env()
+    assert not {'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'CLAUDECODE',
+                'CLAUDE_CODE_SESSION_ID', 'QUANTPILOT_DATABASE_URL'} & set(env)
+    assert env['CLAUDE_CONFIG_DIR'] == 'keep-me' and 'PATH' in {k.upper() for k in env}
+
+
+def test_claude_executable_avoids_cmd_shims(monkeypatch, tmp_path):
+    shim = tmp_path/'claude.CMD'
+    shim.write_text('@echo off')
+    monkeypatch.setattr(news.shutil, 'which', lambda _: str(shim))
+    assert news.claude_executable() is None  # JSON arguments through cmd.exe are not safe
+    native = tmp_path/'node_modules'/'@anthropic-ai'/'claude-code'/'bin'/'claude.exe'
+    native.parent.mkdir(parents=True)
+    native.write_bytes(b'')
+    assert news.claude_executable() == str(native)
+
+
+def test_claude_requires_a_subscription_login(monkeypatch):
+    monkeypatch.setattr(news, 'claude_executable', lambda: 'claude.exe')
+    def status(method):
+        return lambda args, **kw: subprocess.CompletedProcess(
+            args, 0, stdout=json.dumps(dict(loggedIn=True, authMethod=method)), stderr='')
+    monkeypatch.setattr(news.subprocess, 'run', status('claude.ai'))
+    assert news.claude_status()['status'] == 'ready'
+    monkeypatch.setattr(news.subprocess, 'run', status('api_key'))
+    assert news.claude_status()['status'] == 'subscription_login_required'
+
+
+def test_reasoners_track_work_budgets_and_limits_independently(account, monkeypatch):
+    monkeypatch.setattr(news, 'now', lambda: STAMP+timedelta(seconds=10))
+    news.persist_items(account, sample())
+    def limited(items):
+        raise news.UsageLimitReached('claude allowance exhausted')
+    assert news.analyze(account, runner=limited, check_login=False, provider='claude')['status'] == 'usage_limited'
+    # A Claude limit never blocks Codex, and each provider analyzes the same items itself.
+    assert news.analyze(account, runner=answer, check_login=False, provider='codex')['status'] == 'completed'
+    assert news.analyze(account, runner=answer, check_login=False, provider='codex')['status'] == 'idle'
+    state = news.snapshot(account)
+    assert state['providers']['claude']['analysis_status'] == 'delayed_usage_limit'
+    assert state['providers']['codex']['analysis_status'] == 'current'
+    assert {r['provider'] for r in state['runs']} == {'claude', 'codex'}
+    assert state['providers']['claude']['model'] == settings.news_claude_model
+
+
+def test_research_features_use_one_reasoner_so_items_are_not_double_counted(account, monkeypatch):
+    import pandas as pd
+    from quantpilot.event_research import news_features
+    monkeypatch.setattr(news, 'now', lambda: STAMP+timedelta(seconds=10))
+    news.persist_items(account, sample())
+    for provider in ('claude', 'codex'):
+        news.analyze(account, runner=answer, check_login=False, provider=provider)
+    with Session(account) as session:
+        runs = [dict(status=r.status, **r.payload) for r in session.scalars(select(news.NewsRun)).all()]
+    cutoffs = pd.date_range(STAMP+timedelta(minutes=5), periods=1, freq='5min', tz='UTC')
+    assert news_features(cutoffs, runs, provider='claude')['news_count_1h'].tolist() == [1.0]

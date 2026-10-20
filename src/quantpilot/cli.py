@@ -117,9 +117,10 @@ def main():
         report = train_experiment(args.output, folds=args.folds)
         print(json.dumps(report['summary'], indent=2, default=str))
     elif args.command in ('analyze-news', 'news-status'):
-        from .news import analyze, snapshot, codex_status
+        from .news import analyze, snapshot, codex_status, claude_status
         initialize(database())
-        result = analyze() if args.command == 'analyze-news' else {**snapshot(), 'codex': codex_status()}
+        result = ({p: analyze(provider=p) for p in settings.news_reasoners} if args.command == 'analyze-news'
+                  else {**snapshot(), 'codex': codex_status(), 'claude': claude_status()})
         print(json.dumps(result, indent=2, default=str))
     elif args.command in ('backup-db','restore-check'):
         from .recovery import backup,restore_check,RecoveryError

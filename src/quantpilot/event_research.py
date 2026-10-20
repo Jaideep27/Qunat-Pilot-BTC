@@ -33,7 +33,7 @@ QUANTILES = (.1, .5, .9)
 DROP = .05
 
 
-def news_features(index, runs):
+def news_features(index, runs, provider=None):
     """Rolling evidence available AFTER actual reasoning completion.
 
     Unknown before the first successful forward extraction; no zero-filled
@@ -42,6 +42,9 @@ def news_features(index, runs):
     records = []
     for run in runs:
         if run['status'] != 'completed' or run.get('retrospective', True):
+            continue
+        # One reasoner only: several reasoners analyze the same items and must not be counted twice.
+        if provider is not None and (run.get('provider') or 'codex') != provider:
             continue
         t = pd.Timestamp(run['available_at'])
         for event in run.get('result', {}).get('events', []):
@@ -274,7 +277,7 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
         macro_events = stored_macro()
     f, _, d = build_features(frames['candles'], frames)
     y = targets(d.close, d.low)
-    nf = news_features(f.index, runs)
+    nf = news_features(f.index, runs, provider=settings.news_reasoners[0])
     mf = macro_features(f.index, macro_events)
     mf = mf.loc[:, mf.notna().any()]  # kinds absent from the calendar contribute no columns
     base_columns = list(f.columns)
