@@ -1,10 +1,10 @@
 import {test,expect} from '@playwright/test';
 
 const forecast=(horizon:string,extra:object)=>({cutoff:'2026-10-20T09:00:00+00:00',horizon,model_version:'abc123',
-  base_rate:.51,regime:'ranging',drop5_risk:.07,volatility:{ewma:.004,garch:.005},
+  base_rate:.51,regime:'ranging',drop5_risk:.07,volatility:{ewma:.004,garch:.005,model:'garch',value:.005},
   champion:{group:'price',training:'expanding',training_end:'2026-10-18T00:00:00+00:00'},...extra});
-const data={latest:[forecast('1h',{status:'forecast',probability_up:.53,return_q10:-.006,return_q50:.0002,return_q90:.0061}),
-    forecast('24h',{status:'no_validated_skill',probability_up:.51,return_q10:-.03,return_q50:.001,return_q90:.031})],
+const data={latest:[forecast('1h',{status:'forecast',range_status:'model',probability_up:.53,return_q10:-.006,return_q50:.0002,return_q90:.0061}),
+    forecast('24h',{status:'no_validated_skill',range_status:'unconditional',probability_up:.51,return_q10:-.03,return_q50:.001,return_q90:.031})],
   forward:{'1h':{scored:40,pending:12,brier:.2493,constant_brier:.2501,interval_coverage_80:.79}},
   champions:{'1h':{group:'price',training:'expanding',validation_skill:.0004,test_skill:.0002,configurations_tried:10},
     '24h':{group:'constant',training:null,validation_skill:0,test_skill:0,configurations_tried:10}},
@@ -24,4 +24,7 @@ test('research forecasts show ranges, risk and an honest no-skill label',async({
   await expect(panel).toContainText('40 scored');
   await expect(panel).toContainText('PBO 0.25');
   await expect(panel).toContainText('never trades');
+  await expect(panel).toContainText('GARCH champion');
+  await expect(panel).toContainText('range model');
+  await expect(panel).toContainText('unconditional range');
 });

@@ -63,15 +63,17 @@ def macro():
 
 def shadow_forecasts(limit=50):
     """Latest research forecast per horizon, the forward record and how the champion was chosen."""
-    from .forecaster import forecasts, forward_summary, latest_report
+    from .forecaster import champion_reports, forecasts, forward_summary
     rows = forecasts(database(), limit)
     latest = {}
     for row in rows:
         latest.setdefault(row['horizon'], row)
-    _, report = latest_report()
-    summary = (report or {}).get('summary', {})
+    found = champion_reports()
+    direction, risk = found.get('direction', (None, {}))[1], found.get('risk', (None, {}))[1]
     data = dict(latest=list(latest.values()), recent=rows, forward=forward_summary(database()),
-                champions=summary.get('champions', {}), backtest_overfitting=summary.get('backtest_overfitting', {}),
+                champions=direction.get('champions', {}), backtest_overfitting=direction.get('backtest_overfitting', {}),
+                range_champions=risk.get('range_champions', {}), range_overfitting=risk.get('range_overfitting', {}),
+                drop_champion=risk.get('drop_champion'), volatility_champions=risk.get('volatility_champions', {}),
                 status='shadow_only_never_trades',
                 note='Research forecasts are recorded and scored forward; they never place or size paper trades.')
     observed = max((r['cutoff'] for r in latest.values()), default=None)

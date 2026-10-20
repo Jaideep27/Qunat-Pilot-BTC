@@ -23,7 +23,9 @@ def synthetic_frames(days=75, seed=0):
                 sentiment=frame.iloc[::288].assign(fear_greed=50.))
 
 
-CHAMPIONS = {'1h': dict(group='technical', training='expanding'), '24h': dict(group='constant', training=None)}
+CHAMPIONS = dict(direction={'1h': dict(group='technical', training='expanding'), '24h': dict(group='constant', training=None)},
+                 range={'1h': dict(group='price', training='expanding'), '24h': dict(group='constant', training=None)},
+                 drop=dict(group='technical', training='expanding'), volatility={'1h': 'ewma', '24h': 'garch'})
 
 
 @pytest.fixture(scope='module')
@@ -35,11 +37,13 @@ def fitted():
 def test_fit_covers_each_horizon_and_records_its_training_end(fitted):
     frames, bundle = fitted
     assert set(bundle['horizons']) == {'1h', '24h'}
-    assert bundle['horizons']['24h']['kind'] == 'constant'
-    assert bundle['horizons']['1h']['kind'] == 'ensemble'
+    assert bundle['horizons']['24h']['direction']['kind'] == 'constant'
+    assert bundle['horizons']['1h']['direction']['kind'] == 'ensemble'
+    assert bundle['horizons']['1h']['range']['kind'] == 'model'
+    assert bundle['horizons']['24h']['range']['kind'] == 'unconditional'
     # Labels need the future: training must stop a full horizon before the data ends.
     last = pd.Timestamp(frames['candles'].available_at.max())
-    assert pd.Timestamp(bundle['horizons']['1h']['training_end']) <= last-pd.Timedelta(hours=1)
+    assert pd.Timestamp(bundle['horizons']['1h']['direction']['training_end']) <= last-pd.Timedelta(hours=1)
 
 
 def test_forecast_uses_the_latest_completed_bar_and_is_internally_consistent(fitted):
@@ -51,6 +55,8 @@ def test_forecast_uses_the_latest_completed_bar_and_is_internally_consistent(fit
     assert 0 <= one['probability_up'] <= 1 and one['status'] == 'forecast'
     assert one['return_q10'] <= one['return_q50'] <= one['return_q90']
     assert one['volatility']['ewma'] > 0 and one['volatility']['garch'] > 0
+    assert one['range_status'] == 'model' and by['24h']['range_status'] == 'unconditional'
+    assert by['24h']['volatility']['model'] == 'garch' and by['24h']['volatility']['value'] == by['24h']['volatility']['garch']
     assert by['24h']['status'] == 'no_validated_skill' and by['24h']['probability_up'] == by['24h']['base_rate']
     assert 0 <= by['24h']['drop5_risk'] <= 1
     assert 'news_count_1h' in one['news']
@@ -101,3 +107,11 @@ def test_forward_summary_reports_skill_only_from_scored_forecasts(account):
     # Outcomes up, down, up: model (.16+.36+.16)/3, constant .25.
     assert summary['brier'] == pytest.approx((.16+.36+.16)/3)
     assert summary['constant_brier'] == pytest.approx(.25)
+
+
+def test_champion_spec_falls_back_to_simple_forecasts_without_a_risk_report():
+    found = {'direction': ('d.json', dict(champions={'1h': dict(group='constant', training=None)}))}
+    spec = fc.champion_spec(found)
+    assert spec['direction'] == {'1h': dict(group='constant', training=None)}
+    assert spec['range'] == {} and spec['volatility'] == {}
+    assert spec['drop'] == dict(group='constant', training=None)
