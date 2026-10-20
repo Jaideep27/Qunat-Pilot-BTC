@@ -14,6 +14,7 @@ from quantpilot.store import database, initialize
 from quantpilot.market_store import feed_status
 from quantpilot.operations import next_paper_run
 from quantpilot import forecaster, macro, news
+from quantpilot.process import process_started
 
 
 def repeating_history():
@@ -94,7 +95,7 @@ if __name__=='__main__':
     settings.data_dir.mkdir(exist_ok=True,parents=True)
     try:
         with FileLock(str(settings.data_dir/'data-supervisor.lock'),timeout=0):
-            (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=time.time())),encoding='utf-8')
+            (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=process_started())),encoding="utf-8")
             initialize(database(settings.market_database_url))
             initialize(database())
             with ThreadPoolExecutor(max_workers=8) as pool:

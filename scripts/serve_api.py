@@ -1,12 +1,13 @@
 """Warm trusted native model libraries before starting Windows' async HTTP loop."""
 from quantpilot import services
+from quantpilot.process import process_started
 import uvicorn
 import json
 import os
 import time
 
 services.settings.data_dir.mkdir(exist_ok=True,parents=True)
-(services.settings.data_dir/'api-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=time.time())),encoding='utf-8')
+(services.settings.data_dir/'api-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=process_started())),encoding="utf-8")
 
 path=services.settings.artifact_dir/'released.joblib'
 if path.exists():
