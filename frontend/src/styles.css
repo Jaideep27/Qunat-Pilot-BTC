@@ -3,3 +3,15 @@
 @media(prefers-reduced-motion:reduce){.spin{animation:none}}
 
 .operations-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px;list-style:none;padding:18px 24px;margin:0}.operations-checks li{display:flex;gap:12px;justify-content:space-between;font-size:11px;color:#8a9aaf}.operations-checks strong{font-weight:500;text-align:right}.panel>h3{padding:12px 24px;font-size:12px;font-weight:500}@media(max-width:600px){.operations-checks{grid-template-columns:1fr;padding:16px}.operations-checks li{font-size:10px}}
+
+.chat-layout{display:grid;grid-template-columns:220px 1fr;gap:16px}
+.chat-threads{display:flex;flex-direction:column;gap:6px}
+.chat-threads button.active{border-color:var(--mint,#4bd6ad)}
+.chat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chat-messages{display:flex;flex-direction:column;gap:10px;min-height:240px;max-height:60vh;overflow:auto}
+.chat-message.user{align-self:flex-end;background:rgba(75,214,173,.12);padding:8px 12px;border-radius:10px;max-width:80%}
+.chat-message.assistant{align-self:flex-start;max-width:90%}
+.chat-tools{opacity:.75}
+.answer-card{border:1px solid var(--border,#263242);border-radius:8px;padding:8px 10px;margin-top:6px}
+.chat-input{display:flex;gap:8px;margin-top:10px}.chat-input textarea{flex:1;min-height:56px}
+@media (max-width:760px){.chat-layout{grid-template-columns:1fr}}

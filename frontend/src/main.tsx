@@ -1,6 +1,6 @@
 import React,{useEffect,useState,lazy,Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
-import {Activity,ArrowUpRight,BarChart3,BookOpen,ChevronRight,Clock3,Database,ExternalLink,FlaskConical,Layers3,RefreshCw,ShieldCheck,Wallet,Waypoints} from 'lucide-react';
+import {Activity,ArrowUpRight,BarChart3,BookOpen,ChevronRight,Clock3,Database,ExternalLink,FlaskConical,Layers3,MessageSquare,RefreshCw,ShieldCheck,Wallet,Waypoints} from 'lucide-react';
 import {request,preview,type Envelope,type Candle,type Coverage,type Decision,type Portfolio,type Research} from './api';
 import MarketChart from './MarketChart';
 import './styles.css';
@@ -11,10 +11,11 @@ const ResearchPlots=lazy(()=>import('./ResearchPlots'));
 const NewsPanel=lazy(()=>import('./NewsPanel'));
 const MacroCalendar=lazy(()=>import('./MacroCalendar'));
 const ShadowForecasts=lazy(()=>import('./ShadowForecasts'));
+const Chat=lazy(()=>import('./Chat'));
 
-const tabs=['Market','Prediction','Research','Paper portfolio','Chart workspace','News & events'] as const;
+const tabs=['Market','Prediction','Research','Paper portfolio','Chart workspace','News & events','Chat'] as const;
 type Tab=typeof tabs[number];
-const icons=[BarChart3,Waypoints,FlaskConical,Wallet,Layers3,BookOpen];
+const icons=[BarChart3,Waypoints,FlaskConical,Wallet,Layers3,BookOpen,MessageSquare];
 const money=(n:number|undefined)=>n===undefined?'—':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);
 const number=(n:number|undefined,d=2)=>n==null?'—':n.toLocaleString('en-US',{maximumFractionDigits:d});
 const pct=(n:number|undefined)=>n==null?'—':(n*100).toFixed(2)+'%';
@@ -30,7 +31,7 @@ function App(){
   useEffect(()=>{
     let alive=true;
     setLoading(true);
-    const resources=tab==='Chart workspace'||tab==='News & events'?['candles']:tab==='Market'?['candles','indicators','positioning','sentiment','predictions','coverage']:
+    const resources=tab==='Chart workspace'||tab==='News & events'||tab==='Chat'?['candles']:tab==='Market'?['candles','indicators','positioning','sentiment','predictions','coverage']:
       tab==='Prediction'?['candles','predictions']:tab==='Research'?['candles','coverage','backtests']:['candles','portfolio'];
     Promise.allSettled(resources.map(async key=>[key,await request(key)] as const)).then(results=>{
       if(!alive)return;
@@ -69,7 +70,7 @@ function App(){
       <main>
         {preview&&<div className="notice">INTERFACE PREVIEW · Synthetic chart and indicator values. No released model, measured results, or paper trades.</div>}
         {error&&<div role="alert" className="error">{error}<button onClick={()=>setRefresh(r=>r+1)}>Retry</button></div>}
-        <div className="page-heading"><div><div className="eyebrow mint">QUANTPILOT / BTC INTELLIGENCE</div><h1>{tab==='Chart workspace'?'Trading workspace.':tab==='News & events'?'What moved the market, and when.':tab==='Market'?'The market, in context.':tab==='Prediction'?'From signals to decisions.':tab==='Research'?'Evidence before conviction.':'A portfolio you can audit.'}</h1><p>{tab==='Chart workspace'?'Persistent history, indicator studies and saved drawing tools.':tab==='News & events'?'Source-linked news and macro releases, timestamped when first observed.':tab==='Market'?'Price action, positioning, and sentiment. One research surface.':tab==='Prediction'?'Calibrated probabilities with transparent cost and risk checks.':tab==='Research'?'Purged walk-forward evaluation. Identical timestamps. Untouched holdout.':'Virtual capital. Chronological accounting. Every cost recorded.'}</p></div><button className="secondary" onClick={()=>setRefresh(r=>r+1)} aria-label="Refresh data"><RefreshCw size={14} className={loading?'spin':''}/> Refresh</button></div>
+        <div className="page-heading"><div><div className="eyebrow mint">QUANTPILOT / BTC INTELLIGENCE</div><h1>{tab==='Chat'?'Ask QuantPilot.':tab==='Chart workspace'?'Trading workspace.':tab==='News & events'?'What moved the market, and when.':tab==='Market'?'The market, in context.':tab==='Prediction'?'From signals to decisions.':tab==='Research'?'Evidence before conviction.':'A portfolio you can audit.'}</h1><p>{tab==='Chat'?'Plain-language questions, validated numbers, scored answers.':tab==='Chart workspace'?'Persistent history, indicator studies and saved drawing tools.':tab==='News & events'?'Source-linked news and macro releases, timestamped when first observed.':tab==='Market'?'Price action, positioning, and sentiment. One research surface.':tab==='Prediction'?'Calibrated probabilities with transparent cost and risk checks.':tab==='Research'?'Purged walk-forward evaluation. Identical timestamps. Untouched holdout.':'Virtual capital. Chronological accounting. Every cost recorded.'}</p></div><button className="secondary" onClick={()=>setRefresh(r=>r+1)} aria-label="Refresh data"><RefreshCw size={14} className={loading?'spin':''}/> Refresh</button></div>
         <div className="market-context"><div className="coin">₿</div><div><strong>Bitcoin <span>BTC / USDT</span></strong><small>USD-M perpetual · Binance</small></div><span className="context-divider"/><span className="context-tag">5 MINUTE BARS</span><span className={'status '+(freshness==='fresh'?'fresh':'')}><span className="dot"/>{freshness==='fresh'?'Data current':freshness==='stale'?'Data stale':'Awaiting data'}</span><small className="context-time"><Clock3 size={13}/>{stamp(data.candles?.provenance.observed_at)}</small></div>
         {tab==='Chart workspace'&&<Suspense fallback={<p>Loading chart workspace...</p>}><TradingWorkspace/></Suspense>}
         {tab==='Market'&&<>
@@ -88,6 +89,7 @@ function App(){
           <section className="panel"><div className="panel-heading"><h2>Feature group comparison</h2><span className="subtle-tag">HOLDOUT RESULTS</span></div>{research?.comparisons.length?<><div className="table-scroll"><table><thead><tr><th>Features</th><th>Model</th><th>Brier ↓</th><th>ROC-AUC</th><th>Balanced accuracy</th><th>Net return</th><th>Drawdown</th></tr></thead><tbody>{research.comparisons.map(c=><tr key={c.group} className={group===c.group?'selected-row':''} onClick={()=>setGroup(c.group)}><td><button className="inline-button" onClick={()=>setGroup(c.group)}>{c.group}</button></td><td>{c.kind}</td><td>{number(c.holdout.brier,4)}</td><td>{number(c.holdout.roc_auc??undefined,3)}</td><td>{pct(c.holdout.balanced_accuracy)}</td><td>{pct(c.trading.net_return)}</td><td>{pct(c.trading.max_drawdown)}</td></tr>)}</tbody></table></div><div className="panel-source">Common eligible observations: {number(research.metadata?.eligible_rows,0)} · {research.metadata?.version}</div></>:<Empty title="Research has not been released">{research?.reason??'Run the coverage audit and reproducible training workflow to publish measured evaluation results.'}</Empty>}</section>
           {selected&&<><Suspense fallback={<section className="panel"><p>Loading research charts...</p></section>}><ResearchPlots comparison={selected}/></Suspense><section className="panel"><div className="panel-heading"><h2>Holdout trade ledger</h2><span className="subtle-tag">LAST 100 FILLS</span></div>{selected.trading.fills.length?<div className="table-scroll"><table><thead><tr><th>Time (UTC)</th><th>Action</th><th>Side</th><th>BTC</th><th>Fill</th><th>Fee</th><th>Gross P&amp;L</th><th>Exit reason</th></tr></thead><tbody>{[...selected.trading.fills].reverse().slice(0,100).map((fill,i)=><tr key={i}><td>{stamp(fill.time)}</td><td>{fill.action}</td><td>{fill.side===1?'Long':'Short'}</td><td>{number(fill.quantity,6)}</td><td>{money(fill.price)}</td><td>{money(fill.fee)}</td><td>{money(fill.pnl)}</td><td>{fill.reason??'N/A'}</td></tr>)}</tbody></table></div>:<Empty title="No holdout trades">The frozen policy did not execute a trade in this holdout. Classification metrics remain available above.</Empty>}</section><section className="stats-grid"><Stat label="PROFIT FACTOR" value={number(selected.trading.profit_factor??undefined)} detail="Net realized winning / losing P&L"/><Stat label="EXPOSURE" value={pct(selected.trading.exposure)} detail="Average notional / equity"/><Stat label="TURNOVER" value={number(selected.trading.turnover)+'×'} detail="Traded notional / starting balance"/><Stat label="COMPLETED TRADES" value={number(selected.trading.trades,0)} detail={'Frozen confidence threshold '+pct(selected.threshold)}/></section><section className="panel"><div className="panel-heading"><h2>Benchmarks</h2></div><table><thead><tr><th>Strategy</th><th>Net return</th><th>Drawdown</th></tr></thead><tbody>{Object.entries(research!.benchmarks).map(([name,b])=><tr key={name}><td>{name.replaceAll('_',' ')}</td><td>{pct(b.net_return)}</td><td>{pct(b.max_drawdown)}</td></tr>)}</tbody></table></section></>}
         </>}
+        {tab==='Chat'&&<Suspense fallback={<p>Loading chat...</p>}><Chat/></Suspense>}
         {tab==='News & events'&&<Suspense fallback={<p>Loading news...</p>}><MacroCalendar/><NewsPanel/></Suspense>}
         {tab==='Paper portfolio'&&<>
           <Suspense fallback={<p>Loading worker monitoring...</p>}><PaperOperations/></Suspense>

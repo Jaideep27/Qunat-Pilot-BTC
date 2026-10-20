@@ -26,3 +26,9 @@ export async function request<T>(resource:string):Promise<Envelope<T>> {
   } finally { clearTimeout(timer); }
 }
 
+export async function post<T>(resource:string,body:unknown):Promise<Envelope<T>>{
+  const response=await fetch((import.meta.env.VITE_API_URL??'')+'/api/v1/'+resource,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!response.ok){const detail=await response.json().catch(()=>({}));throw new Error(detail.detail??('Service returned '+response.status))}
+  return await response.json();
+}
