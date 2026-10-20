@@ -48,6 +48,9 @@ def main():
     risk.add_argument('--output', required=True, help='New directory, or an interrupted run to resume')
     risk.add_argument('--folds', type=int, choices=range(1, 27), default=4)
     sub.add_parser('research-data', help='Fetch spot, Coinbase, DVOL and funding history; build research panels')
+    strategies=sub.add_parser('research-strategies', help='Pre-registered selective strategy research (never trades)')
+    strategies.add_argument('--output', default=None, help='Run directory (resumes an interrupted run)')
+    strategies.add_argument('--holdout', action='store_true', help='Evaluate the frozen passing rules ONCE on the holdout')
     experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
     experiment.add_argument('--output', required=True, help='New directory; existing directories are refused')
     experiment.add_argument('--folds', type=int, choices=range(1, 27), default=6)
@@ -151,6 +154,14 @@ def main():
         hourly, daily = build_panels()
         print(json.dumps(dict(fetched=fetched, hourly=dict(rows=len(hourly), first=str(hourly.index.min())),
                               daily=dict(rows=len(daily), first=str(daily.index.min()))), indent=2))
+    elif args.command == 'research-strategies':
+        from .strategy_research import holdout, load_panels, output_dir, run
+        if args.holdout:
+            report = json.loads((output_dir(args.output)/'report.json').read_text(encoding='utf-8'))
+            print(json.dumps(holdout(report, load_panels(), args.output), indent=2, default=str))
+        else:
+            report = run(args.output)
+            print(json.dumps(dict(passing=report['passing'], trials=report['trials']), indent=2))
     elif args.command == 'research-events':
         from .event_research import train_experiment
         report = train_experiment(args.output, folds=args.folds)

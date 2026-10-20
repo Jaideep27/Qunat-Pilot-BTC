@@ -36,12 +36,12 @@ def settlement_funding(rates):
     return rates.where(settles, 0.0).fillna(0.0)
 
 
-def simulate(frame, signal, horizon, width, funding=None, round_trip=ROUND_TRIP):
+def simulate(frame, signal, horizon, width, funding=None, round_trip=ROUND_TRIP, overlap=False):
     """Score every call of `signal` (+1 long, -1 short, 0 none) one position at a time.
 
     Entry at the signal bar's close; barriers at +/- width x entry; time exit at the close `horizon`
     bars later. A bar touching both barriers counts as the stop. Calls without a complete future path
-    are not scored.
+    are not scored. With `overlap`, every signal bar is scored (labels for meta-labeling).
     """
     close, high, low = (frame[c].to_numpy(float) for c in ('close', 'high', 'low'))
     sig = pd.Series(signal, index=frame.index).reindex(frame.index).fillna(0).to_numpy(float)
@@ -77,7 +77,7 @@ def simulate(frame, signal, horizon, width, funding=None, round_trip=ROUND_TRIP)
         rows.append(dict(entry_time=frame.index[i], exit_time=frame.index[j], side=int(s), entry=entry,
                          exit=exit_price, reason=reason, bars_held=j-i, gross=gross, funding=carry, net=net,
                          hit=int(net > 0)))
-        i = j
+        i = i+1 if overlap else j
     columns = ['entry_time', 'exit_time', 'side', 'entry', 'exit', 'reason', 'bars_held', 'gross', 'funding',
                'net', 'hit']
     return pd.DataFrame(rows, columns=columns)

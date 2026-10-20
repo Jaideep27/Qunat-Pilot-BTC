@@ -137,3 +137,10 @@ def test_gate_reports_each_criterion():
     result = selective.gate(selective.report(calls, bars=1000), track='swing', trials=10, sharpe_variance=.001, pbo=.5)
     assert result['criteria']['enough_calls'] and result['criteria']['beats_break_even']
     assert result['criteria']['low_overfitting'] is False and result['passed'] is False
+
+
+def test_overlap_mode_labels_every_signal_bar():
+    frame = bars([100]*10)
+    calls = selective.simulate(frame, side(frame, [0, 1, 2]), horizon=3, width=pd.Series(.05, index=frame.index),
+                               overlap=True)
+    assert list(calls.entry_time) == list(frame.index[:3])
