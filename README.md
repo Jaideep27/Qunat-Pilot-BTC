@@ -1,6 +1,6 @@
 # QuantPilot BTC
 
-Bitcoin research with technical indicators, derivatives positioning, daily sentiment, calibrated ML, simulated perpetual-futures accounting source-linked news analysis and eleven read-only MCP tools.
+Bitcoin research with technical indicators, derivatives positioning, daily sentiment, calibrated ML, simulated perpetual-futures accounting source-linked news analysis and twelve read-only MCP tools.
 
 **PostgreSQL chart workspace:** open [localhost:5173/#chart](http://localhost:5173/#chart). **BTCUSDT is the only active symbol**, backed by Binance USD-M perpetual data for consistent chart, prediction and paper accounting. The native workspace offers 86 selectable studies, seven timeframes and saved drawing tools, with an optional official TradingView hosted chart. Actual provider price changes have been verified through PostgreSQL onto the chart. The five-year perpetual candle audit contains 525,888 observations with zero gaps at its recorded cutoff. Previously imported spot/reference records are retained as inactive archives; they are not merged into BTCUSDT or synchronized by the updated collector. See [market setup and exact status](docs/market-platform.md). Run `node scripts/start.cjs --restart-services` once from your regular network-enabled terminal to activate this update in already-running services; subsequent starts use `node scripts/start.cjs`.
 
@@ -10,7 +10,7 @@ Bitcoin research with technical indicators, derivatives positioning, daily senti
 
 **Fast live chart:** BTCUSDT candles update incrementally through the exchange WebSocket, with reconnect and PostgreSQL fallback. The agent-controlled browser's provider WebSocket is blocked by network policy; actual stream latency remains unverified here. A separate actual-database sample observed four saved snapshots at a median interval of 5.638 seconds, with median local API request time of 159.5 ms. These are save intervals rather than exchange latency. See [live-data behavior](docs/live-data.md) and [sample evidence](docs/persistence-runtime.json).
 
-**Frozen research release: `24c8238525d4`.** The experiment below and the nine original read-only MCP tools remain available (`get_news_events` and `get_macro_calendar` were added later). Original release evidence is preserved separately from later storage, chart and operational work.
+**Frozen research release: `24c8238525d4`.** The experiment below and the nine original read-only MCP tools remain available (`get_news_events`, `get_macro_calendar` and `get_shadow_forecasts` were added later). Original release evidence is preserved separately from later storage, chart and operational work.
 
 **Local recovery verified:** the full PostgreSQL backup restores seven tables and 3,639,242 rows in an isolated drill. Use `uv run quantpilot doctor` for current readiness and see [backup/recovery commands](docs/recovery.md). [Latest doctor evidence](docs/local-doctor.json) retains its actual check time; earlier runtime reports remain historical snapshots.
 
@@ -58,6 +58,8 @@ Macro calendar: `uv run quantpilot macro-calendar` stores CPI, jobs-report and F
 Research (descriptive and experimental only; nothing is released or traded):
 - `uv run quantpilot event-study` — five-year hourly study of 5% drops and rallies with matched ordinary controls; results in [docs/event-study.md](docs/event-study.md).
 - `uv run quantpilot research-events --output <new dir> --folds 4` — 1h/4h/24h direction, return ranges, large-drop risk and EWMA vs GARCH volatility, on identical walk-forward timestamps.
+- Overfitting controls: champions are chosen on validation only (a constant base-rate forecast wins when nothing beats it), test skill is reported with the number of configurations tried, PBO (probability of backtest overfitting) is measured per horizon, and XGBoost uses large leaves plus row/column subsampling. Interrupted runs resume from `progress.jsonl`.
+- `uv run quantpilot shadow-forecast` — the dynamic forecaster: refits each horizon's champion daily on recent PostgreSQL history and records 1h/4h/24h probabilities, 80% return ranges, 24h large-drop risk and EWMA/GARCH volatility every 15 minutes (the supervisor runs it). Each forecast is scored when its horizon passes; `GET /api/v1/forecasts`, MCP `get_shadow_forecasts` and the Prediction tab show the forward record. It never trades.
 
 Run `uv run quantpilot worker` for one public-feed update or let the supervisor schedule attempts. The existing network-enabled supervisor has recorded forward no-trade decisions; the agent process itself is denied outbound provider sockets. `uv run quantpilot status` shows current readiness and recorded outcomes. Owner commands `pause` and `resume` control entries while exits/reconciliation continue. There is no real-order API.
 
@@ -110,7 +112,7 @@ flowchart LR
     Model --> Services
     Ledger --> Services
     Services --> API[FastAPI]
-    Services --> MCP[Eleven MCP tools]
+    Services --> MCP[Twelve MCP tools]
     API --> UI[React dashboard]
 ```
 
