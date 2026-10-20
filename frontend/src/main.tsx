@@ -11,6 +11,7 @@ const ResearchPlots=lazy(()=>import('./ResearchPlots'));
 const NewsPanel=lazy(()=>import('./NewsPanel'));
 const MacroCalendar=lazy(()=>import('./MacroCalendar'));
 const ShadowForecasts=lazy(()=>import('./ShadowForecasts'));
+const StrategyResearch=lazy(()=>import('./StrategyResearch'));
 const Chat=lazy(()=>import('./Chat'));
 
 const tabs=['Market','Prediction','Research','Paper portfolio','Chart workspace','News & events','Chat'] as const;
@@ -81,6 +82,7 @@ function App(){
         </>}
         {tab==='Prediction'&&<>
           <Suspense fallback={<p>Loading research forecasts...</p>}><ShadowForecasts/></Suspense>
+          <Suspense fallback={<p>Loading strategy research...</p>}><StrategyResearch/></Suspense>
           <section className="stats-grid"><Stat label="PREDICTED UPWARD PROBABILITY" value={forecast.probability==null?'—':pct(forecast.probability)} detail="Positive versus non-positive 60m return"/><Stat label="POLICY OUTCOME" value={forecast.action.replaceAll('_',' ')} detail="Long · short · no position"/><Stat label="EXPECTED DIRECTIONAL EDGE" value={pct(forecast.expected_edge)} detail="Training-only conditional magnitudes"/><Stat label="MODEL VERSION" value={data.predictions?.model_version??'Unreleased'} detail="Calibrated · frozen before holdout"/></section>
           <div className="two-col"><section className="panel"><div className="panel-heading"><h2>Decision gates</h2><ShieldCheck size={18}/></div><div className="gate-list">{(forecast.reasons.length?forecast.reasons:['ALL_GATES_PASSED']).map(reason=><div key={reason}><span className={'gate-dot '+(reason==='ALL_GATES_PASSED'?'pass':'')}/><div><strong>{reason.replaceAll('_',' ')}</strong><p>{reason==='MODEL_RELEASE_BLOCKED'?'Historical coverage and frozen model artifacts are required.':'Recorded policy outcome at the prediction cutoff.'}</p></div></div>)}</div><div className="panel-source">Fee 5 bps / side · spread & slippage 3 bps / side · edge buffer 5 bps</div></section><section className="panel"><div className="panel-heading"><h2>Feature contributions</h2><span className="subtle-tag">ASSOCIATIONS</span></div>{contributions.length?<div className="contributions">{contributions.map(c=><div key={c.feature}><span>{c.feature.replaceAll('_',' ')}</span><div className="contribution-track"><i style={{width:Math.min(100,Math.abs(c.value)*50)+'%',background:c.value>0?'#4bd6ad':'#ed7d80'}}/></div><b>{c.value.toFixed(3)}</b></div>)}<p>{forecast.explanation?.method}. Associations do not establish causation.</p></div>:<Empty title="Explanations await a released model">Coefficient or SHAP associations appear alongside each eligible forecast.</Empty>}</section></div>
         </>}

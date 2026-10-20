@@ -39,6 +39,11 @@ async def get_shadow_forecasts() -> dict[str, Any]:
     return await asyncio.to_thread(services.shadow_forecasts)
 
 @mcp.tool(structured_output=True)
+async def get_strategy_research() -> dict[str, Any]:
+    """Pre-registered selective strategy research: per-family hit rate, call rate, pass/fail; never trades."""
+    return await asyncio.to_thread(services.strategy_research)
+
+@mcp.tool(structured_output=True)
 async def get_macro_calendar() -> dict[str, Any]:
     """Upcoming CPI, jobs and FOMC releases plus recent first-release values; no consensus surprise."""
     return await asyncio.to_thread(services.macro)

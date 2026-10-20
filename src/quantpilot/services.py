@@ -83,6 +83,38 @@ def shadow_forecasts(limit=50):
     observed = max((r['cutoff'] for r in latest.values()), default=None)
     return envelope(data, observed, 'Validated research champion, refitted on recent market history', max_age=1800)
 
+def strategy_research():
+    """Verdict of the latest pre-registered strategy research run and forward-only data collection."""
+    from sqlalchemy import func, select
+    from .market_store import FORWARD_VALUES, MarketObservation
+    runs = sorted((settings.artifact_dir/'strategy-research').glob('*/report.json'), key=lambda p: p.stat().st_mtime)
+    report = json.loads(runs[-1].read_text(encoding='utf-8')) if runs else None
+    families = []
+    for name, r in (report or {}).get('results', {}).items():
+        rep, gate = r['report'], r['gate']
+        families.append(dict(id=name, track=r['track'], kind=r['kind'], configurations=r['configurations'],
+                             calls=rep['calls'], call_rate=rep.get('coverage'), hit_rate=rep.get('hit_rate'),
+                             wilson_low=rep.get('wilson_low'), wilson_high=rep.get('wilson_high'),
+                             break_even=rep.get('break_even'), mean_net=rep.get('mean_net'),
+                             deflated_sharpe=gate['deflated_sharpe'], pbo=r.get('pbo'), passed=gate['passed'],
+                             failed=[k for k, ok in gate['criteria'].items() if not ok]))
+    forward = {}
+    with database(settings.market_database_url).connect() as connection:
+        for family in FORWARD_VALUES:
+            rows, first, last = connection.execute(select(func.count(), func.min(MarketObservation.event_time),
+                                                          func.max(MarketObservation.event_time))
+                                                   .where(MarketObservation.family == family)).one()
+            forward[family] = dict(rows=int(rows), first=first, last=last)
+    folder = runs[-1].parent if runs else None
+    data = dict(status='complete' if report else 'not_run', run=folder.name if folder else None,
+                generated=(report or {}).get('generated'), trials=(report or {}).get('trials', {}),
+                passing=(report or {}).get('passing', []), families=families,
+                holdout_evaluated=bool(folder and (folder/'holdout.lock').exists()),
+                forward=forward, next_test='2027-04-20',
+                note='Pre-registered research; nothing here trades. See docs/strategy-research.md.')
+    return envelope(data, (report or {}).get('generated'), 'QuantPilot pre-registered strategy research',
+                    max_age=400*86400)
+
 def market_root():
     live = settings.data_dir / "live"
     return live if (live / "candles.parquet").exists() else settings.data_dir

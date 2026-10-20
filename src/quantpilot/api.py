@@ -52,6 +52,8 @@ def news(limit: Annotated[int, Query(ge=1, le=100)] = 20, compact: bool = False)
 
 @app.get('/api/v1/forecasts')
 def forecasts(): return services.shadow_forecasts()
+@app.get('/api/v1/strategy-research')
+def strategy_research(): return services.strategy_research()
 
 @app.get('/api/v1/macro')
 def macro(): return services.macro()

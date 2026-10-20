@@ -33,7 +33,7 @@ def test_official_sdk_stdio_discovery_calls_and_invalid_inputs(account):
                 assert {t.name for t in discovered.tools} == {"get_market_snapshot","get_indicators",
                     "get_market_positioning","get_sentiment","check_data_coverage","get_prediction",
                     "explain_decision","compare_backtests","get_paper_portfolio","get_news_events","get_macro_calendar","get_shadow_forecasts",
-                    "ask_outlook","record_ai_view","get_answer_scoreboard"}
+                    "ask_outlook","record_ai_view","get_answer_scoreboard","get_strategy_research"}
                 expected = {
                     "get_market_snapshot": services.candles,
                     "get_indicators": services.indicators,
@@ -48,6 +48,7 @@ def test_official_sdk_stdio_discovery_calls_and_invalid_inputs(account):
                     "get_macro_calendar": services.macro,
                     "get_shadow_forecasts": services.shadow_forecasts,
                     "get_answer_scoreboard": lambda: services.answers_view(),
+                    "get_strategy_research": services.strategy_research,
                 }
                 for tool in discovered.tools:
                     if tool.name in ("ask_outlook", "record_ai_view"):

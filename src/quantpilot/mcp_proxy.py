@@ -91,6 +91,12 @@ async def get_shadow_forecasts() -> dict[str, Any]:
 
 
 @mcp.tool(structured_output=True)
+async def get_strategy_research() -> dict[str, Any]:
+    """Pre-registered strategy research verdict and forward-only data collection status."""
+    return await _get('strategy-research')
+
+
+@mcp.tool(structured_output=True)
 async def get_paper_portfolio() -> dict[str, Any]:
     """Virtual portfolio, fills and decisions."""
     return await _get('portfolio')

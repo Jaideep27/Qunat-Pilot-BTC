@@ -53,7 +53,7 @@ The actual trained release **24c8238525d4** passed discovery and all nine struct
 
 ## Asking outlook questions from Claude Code
 
-Later additions bring the full server to fifteen tools: `get_news_events`, `get_macro_calendar`, `get_shadow_forecasts`, and three outlook tools: `ask_outlook` (validated probability or range for direction, touch, range, big-move and explain questions), `record_ai_view` (logs the assistant's own probability so it is scored separately) and `get_answer_scoreboard`.
+Later additions bring the full server to sixteen tools: `get_news_events`, `get_macro_calendar`, `get_shadow_forecasts`, `get_strategy_research` (the pre-registered strategy research verdict and forward data collection), and three outlook tools: `ask_outlook` (validated probability or range for direction, touch, range, big-move and explain questions), `record_ai_view` (logs the assistant's own probability so it is scored separately) and `get_answer_scoreboard`.
 
 Connect QuantPilot to Claude Code with the fast proxy, which forwards to the running local API (start services first with `node scripts/start.cjs`):
 
