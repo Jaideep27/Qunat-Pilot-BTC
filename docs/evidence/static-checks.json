@@ -7,10 +7,10 @@
     "Manifest uniqueness, UTC boundaries and warm-up",
     "Python relative module imports resolve",
     "Local Markdown document links resolve",
-    "Four dashboard views, attribution and browser audit source exist"
+    "Seven dashboard views, attribution and browser audit source exist"
   ],
   "python_files": 46,
-  "python_test_functions": 317,
+  "python_test_functions": 319,
   "source_sha256": {
     "src/quantpilot/agent_research.py": "86ea213dad07f6407d25eac7046aecb717b7d5d5ab7cb64f4c783853c921d014",
     "src/quantpilot/analogs.py": "114d3fd0356b43e21ddf70c2be3816b42ddbf6fd2c000cec34af4e6d55019acc",
@@ -50,7 +50,7 @@
     "src/quantpilot/research.py": "8de9837946785746681cf8ae8489bac3c747414396b4a2c42db4ded8eb00496b",
     "src/quantpilot/research_data.py": "b8c4d6fec3cb17e95ea296f5a3779e87fdbff317b4fddbca669dde3a84275508",
     "src/quantpilot/selective.py": "820495d5d97d328d49f4dc8de559f3830e4bf246f9b628c7ea1ab29ad3c7e85d",
-    "src/quantpilot/services.py": "48b30031aa32bad231d4223becfcc4dbdd3875b15ea558159c3cf39d98e1c73a",
+    "src/quantpilot/services.py": "6941a7041b29d9c08142a84c6e065d18ed85e747b5e76460363382b2e40a0de7",
     "src/quantpilot/signals.py": "e88ca6f3cd05d6182e61f7c2065d14bd05d390805d00fdb6659a77c40f1c99e3",
     "src/quantpilot/snapshots.py": "1c97099aa404ec19de8da6433fa6de4ebe510ba446f0650b9a34db621376ada2",
     "src/quantpilot/store.py": "d7697bafad96c7a9aead6eea01907abf4f10a6f55f3f74c747db4ac2b04e017c",

@@ -114,7 +114,7 @@ These are standing instructions from the owner and decisions already made. Follo
 | Ask a question | `.venv\Scripts\quantpilot ask "Will BTC go up in the next 4 hours?"` (add `--no-ai` for numbers only) |
 | Connect Claude Code | `claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.mcp_proxy` (needs the API running; `-m quantpilot.mcp_server` works without it) |
 
-Latest results (2026-10-20): **257 Python tests pass; 22 browser tests pass, 2 skipped.** The Python tests include leakage canaries: a signal that peeks at the future must pass the strategy gate (it shows a 92% hit rate), and random or lagged signals must fail.
+Latest results (2026-10-21): **333 Python tests pass; 26 browser tests pass, 2 skipped.** The Python tests include leakage canaries: a signal that peeks at the future must pass the strategy gate (it shows a 92% hit rate), and random or lagged signals must fail.
 
 ---
 
@@ -143,7 +143,7 @@ Latest results (2026-10-20): **257 Python tests pass; 22 browser tests pass, 2 s
 | API | Read endpoints plus loopback-only write endpoints (ask, outlook, chat, AI view) | `api.py`, `services.py` |
 | MCP | 16 tools; read-only except logging outlook answers and AI views | `mcp_server.py` (full), `mcp_proxy.py` (fast, forwards to the API) |
 | Chat agent | Claude Sonnet via `claude -p` (stream-json, max 8 turns), allowed only `mcp__quantpilot__*` tools | `chat.py` |
-| Dashboard | React tabs; polls the API; live chart through the exchange websocket with PostgreSQL fallback | `frontend/src/` |
+| Dashboard | React + Vite, redesigned 2026-10-21: Overview home plus Chart, Ask, Research, Paper, News and System pages; top bar with live price and an Ask box (`/` to focus); hash links (`#overview`, `#chart`…) | `frontend/src/main.tsx`, `routes.ts`, `ui.tsx`, `pages/` |
 
 ---
 
@@ -192,14 +192,26 @@ Scripts (`scripts/`):
 
 ## 7. Interfaces
 
-**Dashboard tabs:**
-- **Chart workspace:** 86 studies, 7 timeframes, saved drawings.
-- **Market:** price, positioning, sentiment.
-- **Prediction:** research forecasts, the **Strategy research** panel and the frozen model's decision gates.
-- **Research:** coverage audit and holdout comparisons.
-- **Chat:** Claude agent, quick quant-only questions and the answer scoreboard.
-- **News & events:** source-linked news and the macro calendar.
-- **Paper portfolio:** virtual account and worker monitoring.
+**Dashboard pages (redesigned 2026-10-21):**
+- **Overview:**
+  - price strip and live 5m chart;
+  - outlook with a 1h/4h/24h toggle, the base rate and the 80% range;
+  - market pulse: RSI, Fear & Greed, ADX, funding, open interest, long/short ratios;
+  - next macro event with a countdown, latest headlines, the research verdict and system status.
+- **Chart:** trading workspace with 86 studies, 7 timeframes and drawings.
+- **Ask:** chat with Claude plus quick quant answers and the answer scoreboard. The top-bar Ask box sends a question here and answers it instantly.
+- **Research:** what the research found, research forecasts, strategy research with the trading-agent results, and the original release model (collapsed).
+- **Paper:** account stats, the frozen model's current decision and gates, feature contributions, execution ledger and decision audit.
+- **News:** the macro calendar, plus news and AI analysis.
+- **System:** readiness, data collection, forward-only collectors, paper-worker monitoring and historical coverage.
+
+Interactions:
+- every jargon term has a hover/focus tooltip (`glossary.ts`);
+- sections are collapsible;
+- an "updated Xs ago" indicator refreshes on click;
+- other pages' code is prefetched after load;
+- an error boundary keeps a malformed response from blanking the app;
+- phones get a bottom tab bar.
 
 **API** (`/api/v1/…`). The ones marked POST are loopback-only.
 
@@ -265,6 +277,7 @@ Scripts (`scripts/`):
 | | | **Market outlook Q&A and in-app Chat** (11-task plan), independent review, fix pass (commit `95d6274`) |
 | | | **Fixes to seven verified defects:**<br>- direction "down" intent;<br>- the live price from completed candles only;<br>- scoring against the recorded price over gap-free windows (scoring v2);<br>- stale labels;<br>- the Claude-timeout fallback;<br>- Codex environment stripping;<br>- the smoke check and doc counts.<br>Commit `6dd7430`, branch `trading-agent` |
 | | | **Trading agent, step A:** market context, trade plans, futures simulator (commit `5ef0cae`, branch `trading-agent`). Design: `docs/superpowers/specs/2026-10-20-trading-agent-step-a-design.md` |
+| 2026-10-21 | Claude | **Cleanup:**<br>- unused imports and variables removed (side-effect imports kept and marked);<br>- `/backtests` 4.8 MB → summary;<br>- evidence JSON moved to `docs/evidence/`;<br>- Codex `fix*.cjs` scripts archived and deleted.<br>**Dashboard redesign:** Overview home, focused pages, tooltips, live price and Ask box (commits `50fafc7`, `f40e57d`) |
 | | | **Selective prediction research**: progress record, pre-registration, trade-style scoring, new data, forward collectors, 10 rule families + 2 meta-labeled primaries, report, dashboard panel, independent review, fixes (commits `5453862` → `c030629`) |
 
 `git log --oneline 821b45c..main` lists the 36 commits since the Codex import.
