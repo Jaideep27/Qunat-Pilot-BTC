@@ -154,3 +154,18 @@ def test_champion_spec_applies_the_gate_to_every_component():
     assert spec['range'] == {'1h': dict(group='macro', training='expanding'), '24h': dict(group='constant', training=None)}
     assert spec['volatility'] == {'4h': 'ewma', '24h': 'garch'}
     assert spec['drop'] == dict(group='constant', training=None)
+
+
+def test_constant_fallbacks_match_the_validated_baseline_over_the_whole_history():
+    from quantpilot.event_research import targets
+    from quantpilot.features import build_features
+    frames = synthetic_frames(days=130)  # longer than any recent sub-window, so the two would differ
+    constant = dict(group='constant', training=None)
+    bundle = fc.fit(frames, dict(direction={'24h': constant}, range={'24h': constant}, drop=constant), min_days=20)
+    _, _, d = build_features(frames['candles'], frames)
+    y = targets(d.close, d.low)
+    recent = y.index >= y['up_24h'].dropna().index.max()-pd.Timedelta(days=90)
+    assert y.loc[recent, 'drop5_24h'].mean() != pytest.approx(y['drop5_24h'].dropna().mean())
+    # The experiments compared models with the training-window rate, not a recent sub-window.
+    assert bundle['horizons']['24h']['base_rate'] == pytest.approx(y['up_24h'].dropna().mean())
+    assert bundle['drop']['rate'] == pytest.approx(y['drop5_24h'].dropna().mean())

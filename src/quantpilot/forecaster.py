@@ -55,6 +55,10 @@ def _groups(columns, macro_columns, usable_macro):
     return groups
 
 
+def code_hash():
+    return sha256(Path(__file__).read_bytes()).hexdigest()
+
+
 def _windows(common, training, train_step):
     lookback = 90 if training == 'rolling90d' else None
     return er.thin(er.split(common, common.max()+pd.Timedelta(minutes=5), rolling_days=lookback), train_step)
@@ -80,7 +84,8 @@ def fit(frames, champions, macro_events=None, seed=42, train_step=3, min_days=60
     for horizon in dict.fromkeys([*champions.get('direction', {}), *champions.get('range', {})]):
         up, returns = y[f'up_{horizon}'], y[f'return_{horizon}']
         known = up.dropna()
-        recent = known.index[known.index >= known.index.max()-pd.Timedelta(days=90)]
+        # The validated baseline is the whole training history, not a recent sub-window.
+        recent = known.index
         model = dict(base_rate=float(up.loc[recent].mean()), training_end=known.index.max().isoformat(),
                      quantiles=np.quantile(returns.loc[recent].dropna(), er.QUANTILES).tolist())
         spec = champions.get('direction', {}).get(horizon, dict(group='constant', training=None))
@@ -123,17 +128,17 @@ def fit(frames, champions, macro_events=None, seed=42, train_step=3, min_days=60
     garch = er.garch_fit(hourly.to_numpy())
     volatility = {h: champions.get('volatility', {}).get(h, 'ewma') for h in horizons}
     version = sha256(json.dumps(dict(champions=champions, ends={h: v['training_end'] for h, v in horizons.items()},
-                                     code=sha256(Path(__file__).read_bytes()).hexdigest()),
+                                     code=code_hash()),
                                 sort_keys=True, default=str).encode()).hexdigest()[:12]
     return dict(version=version, fitted_at=datetime.now(timezone.utc).isoformat(), champions=champions,
-                horizons=horizons, drop=drop, garch=garch, volatility=volatility)
+                horizons=horizons, drop=drop, garch=garch, volatility=volatility, code=code_hash())
 
 
 def _fit_drop(f, y, groups, spec, seed, train_step):
     """The validated large-drop champion; the recent base rate when none beat it on validation."""
     target = y['drop5_24h']
     known = target.dropna()
-    rate = float(known.loc[known.index >= known.index.max()-pd.Timedelta(days=90)].mean())
+    rate = float(known.mean())  # the validated baseline: the whole training history's rate
     if spec.get('group') in (None, 'constant'):
         return dict(kind='constant', group='constant', training=None, rate=rate)
     columns = groups[spec['group']]
@@ -329,7 +334,8 @@ def run_cycle(engine=None, now=None):
     champions = champion_spec(found)
     store = settings.artifact_dir/'shadow'/'forecaster.joblib'
     bundle = joblib.load(store) if store.exists() else None
-    stale = bundle is None or bundle['champions'] != champions or \
+    # Refit when champions or this code change, or the fit is older than the refit interval.
+    stale = bundle is None or bundle['champions'] != champions or bundle.get('code') != code_hash() or \
         now-pd.Timestamp(bundle['fitted_at']) > pd.Timedelta(hours=settings.forecast_refit_hours)
     events = macro_events()
     with Session(engine) as session:
