@@ -40,6 +40,7 @@ def initialize(engine):
     from . import macro  # register the official macro release calendar
     from . import forecaster  # register shadow forecasts and their scored outcomes
     from . import answers  # register outlook answers and scores
+    from . import chat  # register in-app chat threads and messages
     with serialized(engine) as session:
         Base.metadata.create_all(session.connection())
         if engine.dialect.name == "postgresql":

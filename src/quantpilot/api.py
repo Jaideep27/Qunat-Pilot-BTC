@@ -164,3 +164,35 @@ def ai_view_route(answer_id: str, body: ViewBody, request: Request):
 @app.get('/api/v1/answers')
 def answers_route(limit: Annotated[int, Query(ge=1, le=500)] = 50):
     return services.answers_view(limit)
+
+
+class ChatBody(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    thread_id: str | None = Field(default=None, max_length=32)
+
+
+@app.post('/api/v1/chat')
+def chat_route(body: ChatBody, request: Request):
+    local_only(request)
+    from .chat import Busy
+    try:
+        result = services.chat_send(body.message, body.thread_id)
+    except Busy:
+        raise HTTPException(status_code=409, detail='A chat answer is already in progress') from None
+    except ValueError as exc:
+        status = 429 if 'limit' in str(exc) else 422
+        raise HTTPException(status_code=status, detail=str(exc)) from None
+    return services.envelope(result, source='In-app chat (Claude with QuantPilot tools)')
+
+
+@app.get('/api/v1/chat/threads')
+def chat_threads_route():
+    return services.chat_threads()
+
+
+@app.get('/api/v1/chat/threads/{thread_id}')
+def chat_thread_route(thread_id: str):
+    result = services.chat_thread(thread_id)
+    if result['data'] is None:
+        raise HTTPException(status_code=404, detail='Unknown chat thread')
+    return result

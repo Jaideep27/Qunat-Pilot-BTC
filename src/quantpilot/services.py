@@ -301,3 +301,18 @@ def answers_view(limit=50):
     data = dict(history=history(database(), limit), scoreboard=scoreboard(database()))
     observed = data['history'][0]['asked_at'] if data['history'] else None
     return envelope(data, observed, 'Outlook answers scored after their horizon', max_age=86400)
+
+
+def chat_send(message, thread_id=None):
+    from .chat import send
+    return send(database(), message, thread_id)
+
+
+def chat_threads():
+    from .chat import threads
+    return envelope(threads(database()), source='In-app chat')
+
+
+def chat_thread(thread_id):
+    from .chat import thread
+    return envelope(thread(database(), thread_id), source='In-app chat')
