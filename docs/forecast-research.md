@@ -86,3 +86,15 @@ Each forecast is scored when its horizon passes (Brier score vs base rate, 80% r
 The best model this data supports is a **risk model, not a direction model**. It forecasts how wide the next one to four hours are likely to be (with macro events helping), uses GARCH volatility for the next day, and reports a coin-flip probability for direction, because nothing beat that out of sample. Claims of reliable BTC direction prediction from indicators, volume, positioning or sentiment should be treated with suspicion. A real edge will show up first in the forward record, not in a backtest.
 
 Reproduce: `uv run quantpilot research-events --output <dir> --folds 4`, `uv run quantpilot research-risk --output <dir> --folds 4`, then `uv run quantpilot shadow-forecast`.
+
+## Outlook Q&A validation (2026-10-20)
+
+`quantpilot validate-outlook` replayed the outlook methods walk-forward over the five-year hourly panel (44,064 hours; cutoffs every 12 hours after a one-year burn-in; the last 12 months held back as a confirmation span). A method may set a headline number only if it beats its baseline on the validation span **and** the confirmation span, and in most yearly sub-periods.
+
+| Method | Result | Gate | Answer label |
+|---|---|---|---|
+| Similar-situations direction estimate, 1h–7d | Validation skill between −0.004 and +0.0014 Brier; every horizon fails the confirmation year or most years | Not promoted at any horizon | `no_edge`: the base rate is the headline |
+| Touch probability (volatility barrier + isotonic calibration), ±1–10%, 1h–7d | 211,548 cases; Brier 0.09320 calibrated vs 0.09361 raw vs 0.09351 historical frequency | Promoted, improvement 0.3% | `weak` |
+| 80% ranges (volatility-scaled history) | Coverage 82.5% (1h), 83.6% (4h), 74.5% (12h), 79.9% (24h), 82.3% (72h), 83.2% (7d) | Within ±5 points except 12h | `validated` (12h: `weak`) |
+
+So the chat and `quantpilot ask` answer up/down questions with the base rate and say plainly that this is about a coin flip; touch and big-move probabilities carry a small validated edge over historical frequencies; and ranges are well calibrated. Claude's own probabilities are logged on every chat answer and scored separately on the scoreboard (`GET /api/v1/answers`); a verdict appears only after 30 independent scored answers per question type and horizon.
