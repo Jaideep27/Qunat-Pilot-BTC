@@ -128,3 +128,36 @@ Two forward-only intraday families are registered now, before their data exists 
 - **Intraday meta-labeling features.** These were `event_study.STATE` **plus** the 168-hour taker-share z-score, the Coinbase premium and the DVOL-minus-realised-volatility gap. Section 6 listed only STATE and DVOL. M2 lost money in every year regardless.
 - **Development cutoff.** The development span was implemented as bars closing before 2025-10-20 00:00 UTC, so the daily bar of 2025-10-19 (which closes at 2025-10-20 00:00) was excluded. That bar is not used in the holdout either.
 - **Forward depth.** Each snapshot also records how far it reaches on each side (`bid_reach_bps`, `ask_reach_bps`), so an `imbalance_15bps` computed from a book thinner than 15 bps can be detected and excluded in I7.
+
+**A4 — 2026-10-20, trading agent step B: deterministic trade plans with simple entry rules. Registered before any of them was evaluated.**
+
+- **Question.** Do the step A trade plans make money after costs when entered by simple, pre-defined rules? The plans set the stop, target and size; nothing else adjusts them.
+- **Data and spans.**
+  - Binance USD-M BTCUSDT 5m candles, mark price and funding settlements, plus the macro calendar, from the PostgreSQL store.
+  - Development: 2021-10 → bars closing before 2025-10-20. The holdout (2025-10-20 → 2026-10-19) stays untouched unless something passes.
+  - The context is built in yearly chunks with 60 days of warm-up, using only data known at each bar close.
+  - No historical news or shadow forecasts are used: they didn't exist causally. The 24h range therefore comes from 24h volatility.
+- **Decisions.** At every completed 1h close while flat, the entry rule picks a side (or none). The trade-plan rules v1 (step A design) must accept the plan, including the macro blackout.
+- **Entries and exits.**
+  - Fill at the next 5m open in the `futures-v1` simulator, $10,000 account, 2× isolated, 0.25% risk per trade.
+  - Exits are only the plan's stop, target and the 24h time limit; stops are never moved.
+  - The 2% daily-loss halt applies. A 10% drawdown halt is recorded and, for historical evaluation only, reviewed automatically at the next UTC day.
+- **Entry rules.** Each rule is run with the plan's minimum reward:risk at 1.5 and at 2.0.
+
+  | ID | Rule |
+  |---|---|
+  | B1 | trend: long if the 1h and 4h trend (close vs EMA50) are both up; short if both down |
+  | B2 | best plan: of the long and short plans that pass every rule, take the one with the higher reward:risk |
+  | B3 | pullback: long if the 4h trend is up and 1h RSI < 40; short if the 4h trend is down and 1h RSI > 60 |
+  | B0 | control: a seeded coin flip (seed 0) picks the side; enter if that plan passes |
+
+  B1–B3 form the family "TP" (6 configurations). B0 forms the family "TP-control" (2 configurations); it is reported, not selected.
+- **Scoring.**
+  - Each trade's net return = (price P&L − fees + funding) / entry notional.
+  - Hit = net return > 0.
+  - Account return, maximum drawdown, trades per month and the exit-reason mix are also reported.
+- **Selection.** Walk-forward over 6-month blocks (section 5): the configuration with the best mean net return over trades that exited before the block, among those with ≥ 10 trades.
+- **Pass rule.** Section 7 with the intraday thresholds (≥ 100 trades), applied to the pooled out-of-sample trades.
+  - N = every intraday trial: the 105 earlier ones plus these 8.
+  - V[SR] = the variance of per-call Sharpe across intraday trials with ≥ 30 calls (amendment A3).
+- **Holdout.** Evaluated once, only for a family that passes: ≥ 10 trades, mean net > 0, hit rate ≥ the development break-even.
