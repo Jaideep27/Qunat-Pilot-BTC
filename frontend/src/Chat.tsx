@@ -3,7 +3,7 @@ import {post,request} from './api';
 
 type Evidence=Record<string,{value:number|null;percentile:number|null;label:string}>;
 type Forward={scored:number;independent:number;brier:number|null;base_brier:number|null;ai_brier:number|null;verdict:string};
-type Answer={id:string;asked_at?:string;question?:{type:string;horizon_hours:number};
+type Answer={id:string;asked_at?:string;question?:{type:string;horizon_hours:number;side?:string};
   headline:{kind:string;probability:number|null;base_rate:number|null;method:string;confidence:string};
   range:{low:number;high:number;coverage:number}|null;warnings:string[];evidence?:Evidence;
   ai?:{status?:string;probability?:number|null};track_record?:{forward?:Forward|null};outcome?:{hit?:number;unscored?:boolean}};
@@ -21,7 +21,7 @@ function Card({a}:{a:Answer}){
   const top=Object.values(a.evidence??{}).filter(e=>e.percentile!=null).slice(0,3);
   const forward=a.track_record?.forward;
   return <div className="answer-card">
-    {a.headline.kind==='probability'&&<strong>{pct(a.headline.probability)}</strong>}
+    {a.headline.kind==='probability'&&<strong>{pct(a.headline.probability)}{a.question?.type==='direction'?(a.question.side==='down'?' chance of falling':' chance of rising'):''}</strong>}
     {a.range&&<span> · {Math.round(a.range.coverage*100)}% range {usd(a.range.low)} – {usd(a.range.high)}</span>}
     <small> · {labels[a.headline.confidence]??a.headline.confidence} · {a.headline.method.replaceAll('_',' ')}</small>
     {a.ai?.probability!=null&&<p className="control-note">Claude's view {pct(a.ai.probability)} (scored separately)</p>}

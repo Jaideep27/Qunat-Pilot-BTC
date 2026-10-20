@@ -54,17 +54,33 @@ def set_ai_view(engine, answer_id, probability, reasons, run_id=None, now=None):
     return True
 
 
+SCORING_VERSION = 2   # v2: scored against the recorded answer price over a complete 5-minute window
+BAR = pd.Timedelta(minutes=5)
+INCOMPLETE_GRACE = pd.Timedelta(days=2)
+INCOMPLETE = object()
+
+
+def _complete(window, start, end):
+    times = window.index
+    return bool(len(times) and times[0]-start <= BAR and end-times[-1] < BAR
+                and (len(times) == 1 or (times[1:]-times[:-1]).max() <= BAR))
+
+
 def _outcome(payload, bars):
+    """The outcome dict; None when the window has not fully arrived; INCOMPLETE when bars are missing."""
     q = payload['question']
     start = pd.Timestamp(payload['asked_at'])
     end = start+pd.Timedelta(hours=q['horizon_hours'])
     window = bars[(bars.index > start) & (bars.index <= end)]
     before = bars[bars.index <= start]
-    if window.empty or bars.index.max() < end or before.empty:
+    if bars.empty or bars.index.max() < end or (before.empty and payload.get('price') is None):
         return None
-    s, close = float(before.close.iloc[-1]), float(window.close.iloc[-1])
+    if not _complete(window, start, end):
+        return INCOMPLETE
+    s = float(payload['price']) if payload.get('price') else float(before.close.iloc[-1])
+    close = float(window.close.iloc[-1])
     if q['type'] == 'direction':
-        hit = float(close > s)
+        hit = float(close <= s) if q.get('side') == 'down' else float(close > s)
     elif q['type'] == 'touch':
         side = q.get('side') or ('above' if q['level'] >= s else 'below')
         hit = float(window.high.max() >= q['level']) if side in ('above', 'up') else float(window.low.min() <= q['level'])
@@ -75,8 +91,8 @@ def _outcome(payload, bars):
     elif q['type'] == 'range' and payload.get('range'):
         hit = float(payload['range']['low'] <= close <= payload['range']['high'])
     else:
-        return dict(unscored=True, evaluated_at=end.isoformat())
-    outcome = {'hit': hit, 'return': close/s-1, 'evaluated_at': end.isoformat()}
+        return dict(unscored=True, evaluated_at=end.isoformat(), scoring_version=SCORING_VERSION)
+    outcome = {'hit': hit, 'return': close/s-1, 'evaluated_at': end.isoformat(), 'scoring_version': SCORING_VERSION}
     head = payload.get('headline') or {}
     if head.get('probability') is not None:
         outcome['brier'] = (hit-head['probability'])**2
@@ -94,15 +110,25 @@ def evaluate(engine, bars, now=None):
     with serialized(engine) as session:
         for row in session.scalars(select(OutlookAnswer)).all():
             payload = row.payload
-            if 'outcome' in payload:
+            old = payload.get('outcome')
+            if old and (old.get('scoring_version') == SCORING_VERSION or old.get('reconstructible') is False):
                 continue
             end = pd.Timestamp(payload['asked_at'])+pd.Timedelta(hours=payload['question']['horizon_hours'])
             if end > now:
                 continue
             outcome = _outcome(payload, bars)
-            if outcome is not None:
-                row.payload = {**payload, 'outcome': outcome}
-                scored += 1
+            if outcome is INCOMPLETE:
+                if now-end < INCOMPLETE_GRACE:
+                    continue   # missing bars may still be backfilled
+                outcome = dict(unscored=True, reason='incomplete_data', evaluated_at=end.isoformat(),
+                               scoring_version=SCORING_VERSION)
+            if outcome is None:
+                if old and len(bars) and pd.Timestamp(payload['asked_at']) < bars.index.min():
+                    row.payload = {**payload, 'outcome': {**old, 'reconstructible': False}}   # keep the v1 score
+                continue
+            # A rescored answer keeps its original score next to the corrected one.
+            row.payload = {**payload, 'outcome': outcome, **({'previous_outcome': old} if old else {})}
+            scored += 1
     return scored
 
 

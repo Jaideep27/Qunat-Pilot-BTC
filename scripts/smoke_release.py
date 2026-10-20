@@ -21,6 +21,11 @@ ROUTES = {
 }
 
 
+def missing_release_tools(listed):
+    """Release tools absent from the server; tools added after the release are allowed."""
+    return set(ROUTES)-set(listed)
+
+
 def main():
     expected, timings = {}, {}
     with TestClient(app) as client:
@@ -53,8 +58,8 @@ def main():
             async with ClientSession(read,write) as session:
                 await session.initialize()
                 listed=await session.list_tools()
-                assert {tool.name for tool in listed.tools} == set(ROUTES)
-                for tool in listed.tools:
+                assert not missing_release_tools(tool.name for tool in listed.tools)
+                for tool in (t for t in listed.tools if t.name in ROUTES):
                     print("Checking MCP "+tool.name,flush=True)
                     result=await asyncio.wait_for(session.call_tool(tool.name,{}),timeout=90)
                     assert not result.isError, tool.name

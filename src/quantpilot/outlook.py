@@ -159,9 +159,15 @@ def answer(question, ctx):
         confidence = _confidence(gate)
         # Stale or incomplete state never feeds a promoted method: the base rate needs no current state.
         use = confidence != 'no_edge' and estimate['probability'] is not None and not base['stale']
-        base['headline'] = dict(kind='probability', probability=estimate['probability'] if use else estimate['base_rate'],
-                                base_rate=estimate['base_rate'], method='analogs' if use else 'base_rate',
-                                confidence=confidence, ci=estimate['ci'] if use else None)
+        probability, base_rate = estimate['probability'] if use else estimate['base_rate'], estimate['base_rate']
+        ci = estimate['ci'] if use else None
+        if q.side == 'down':   # the question asks for P(fall): report the complement, with its interval mirrored
+            probability, base_rate = _complement(probability), _complement(base_rate)
+            ci = [1-ci[1], 1-ci[0]] if ci else None
+        base['question']['side'] = q.side
+        base['headline'] = dict(kind='probability', probability=probability, base_rate=base_rate,
+                                method='analogs' if use else 'base_rate', confidence=confidence if use else 'no_edge',
+                                ci=ci)
         base['context']['analog'] = estimate
         base['track_record']['validation'] = gate
     elif q.type in ('touch', 'big_move'):
@@ -182,8 +188,11 @@ def answer(question, ctx):
             if touch.get('use_calibration') else None
         method, probability = ('calibrated_volatility', calibrated) if calibrated is not None and touch.get('promoted') \
             else (('volatility', raw) if touch.get('promoted') else ('historical_frequency', empirical))
+        confidence = _confidence(touch)
+        if base['stale']:   # stale state never feeds the validated volatility method
+            method, probability, confidence = 'historical_frequency', empirical, 'no_edge'
         base['headline'] = dict(kind='probability', probability=probability, base_rate=empirical, method=method,
-                                confidence=_confidence(touch), ci=None)
+                                confidence=confidence, ci=None)
         base['context'].update(sigma=sigma, raw_probability=raw, calibrated_probability=calibrated,
                                historical_frequency=empirical, threshold=threshold, side=side)
         base['track_record']['validation'] = touch or None
@@ -199,7 +208,8 @@ def answer(question, ctx):
         coverage = (ctx.report.get('ranges') or {}).get(f'{_nearest(h)}h')
         base['range'] = dict(low=float(low), high=float(high), coverage=q.coverage, method=method)
         base['headline'] = dict(kind='range', probability=None, base_rate=None, method=method,
-                                confidence='validated' if coverage and coverage.get('promoted') else 'weak', ci=None)
+                                confidence='validated' if coverage and coverage.get('promoted') and not base['stale']
+                                else 'weak', ci=None)
         base['track_record']['validation'] = coverage
     else:
         lookback = ctx.panel.loc[:t].iloc[-(h+1):]
@@ -208,6 +218,10 @@ def answer(question, ctx):
         base['headline'] = dict(kind='explain', probability=None, base_rate=None, method='evidence',
                                 confidence='no_edge', ci=None)
     return base
+
+
+def _complement(p):
+    return None if p is None else 1-p
 
 
 def refresh_panel(now=None, full=False):
@@ -241,8 +255,10 @@ def load_context(now=None, engine=None):
     panel = pd.read_parquet(path) if path.exists() else pd.DataFrame()
     report = json.loads(report_path().read_text(encoding='utf-8')) if report_path().exists() else {}
     with database(settings.market_database_url).connect() as connection:
+        # Completed candles known by `now` only: never a forming bar or a timestamp after the cutoff.
         latest = connection.execute(select(MarketCandle.close, MarketCandle.available_at).where(
-            MarketCandle.market == PERP, MarketCandle.interval == '5m')
+            MarketCandle.market == PERP, MarketCandle.interval == '5m', MarketCandle.complete.is_(True),
+            MarketCandle.available_at <= now.to_pydatetime())
             .order_by(MarketCandle.event_time.desc()).limit(1)).first()
     price, price_time = (float(latest[0]), pd.Timestamp(latest[1])) if latest else (None, None)
     engine = engine or database()

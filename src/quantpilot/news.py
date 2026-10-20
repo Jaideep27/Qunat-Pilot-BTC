@@ -236,8 +236,7 @@ def codex_status():
 def subscription_env():
     # Saved CLI ChatGPT authentication only. Never fall through to billed API keys.
     return {k: v for k, v in os.environ.items()
-            if k.upper() not in {'OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_BASE_URL'}
-            and not k.upper().startswith('QUANTPILOT_')}
+            if k.upper() != 'CODEX_API_KEY' and not k.upper().startswith(('OPENAI_', 'AZURE_OPENAI_', 'QUANTPILOT_'))}
 
 
 class UsageLimitReached(RuntimeError):
@@ -335,8 +334,11 @@ def claude_json(system, prompt, schema):
                 '--tools', '', '--strict-mcp-config', '--settings', str(hooks), '--disable-slash-commands',
                 '--no-session-persistence', '--system-prompt-file', str(system_file)]
         # Untrusted text is stdin, never an argument; the empty working directory has no CLAUDE.md.
-        result = subprocess.run(args, input=prompt, capture_output=True, text=True, encoding='utf-8',
-                                cwd=work, env=claude_env(), timeout=settings.news_timeout_seconds)
+        try:
+            result = subprocess.run(args, input=prompt, capture_output=True, text=True, encoding='utf-8',
+                                    cwd=work, env=claude_env(), timeout=settings.news_timeout_seconds)
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError('Claude Code timed out') from exc
     if len(result.stdout or '') > 200_000:
         raise ValueError('oversized agent response')
     try:

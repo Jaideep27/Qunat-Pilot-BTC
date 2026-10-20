@@ -347,6 +347,8 @@ def ask(text, ai=True, source='ask', ctx=None):
             status = 'ok'
         except news_cli.UsageLimitReached:
             status = 'usage_limited'
+        except TimeoutError:
+            status = 'timeout'
         except (RuntimeError, ValueError, FileNotFoundError, OSError):
             status = 'failed'
         finally:

@@ -25,6 +25,8 @@ class Question(BaseModel):
     def _complete(self):
         if self.type == 'touch' and self.level is None:
             raise ValueError('touch questions need a price level')
+        if self.type == 'direction':
+            self.side = 'down' if self.side in ('down', 'below') else 'up'   # probability is P(side)
         if self.type == 'touch' and self.side in ('up', 'down'):
             self.side = 'above' if self.side == 'up' else 'below'
         if self.type == 'big_move':
@@ -97,5 +99,8 @@ def rule_parse(text, now, price):
     if re.search(r'\brange\b|where will|how (far|much)|between', t):
         return Question(type='range', horizon_hours=horizon or 24, text=text)
     if re.search(r'\bup\b|\bdown\b|higher|lower|rise|fall|bull|bear|direction|pump|dump', t):
-        return Question(type='direction', horizon_hours=horizon or 24, text=text)
+        bearish = re.search(r'\bdown\b|lower|fall|drop|bear|dump|declin|crash', t)
+        bullish = re.search(r'\bup\b|higher|rise|bull|pump|rall', t)
+        side = 'down' if bearish and not bullish else 'up'
+        return Question(type='direction', horizon_hours=horizon or 24, side=side, text=text)
     return None

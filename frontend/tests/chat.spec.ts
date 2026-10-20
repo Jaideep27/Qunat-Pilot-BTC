@@ -26,6 +26,7 @@ test('chat shows replies, tools used, answer cards and quant-only quick question
   await expect(chat).toContainText('roughly a coin flip');
   await expect(chat).toContainText('ask_outlook');
   await expect(chat).toContainText('51.0%');
+  await expect(chat).toContainText('chance of rising');
   await expect(chat).toContainText('No edge');
   await chat.getByRole('button',{name:'Up or down next 1h?'}).click();
   await expect(chat).toContainText('Quant-only answer');
