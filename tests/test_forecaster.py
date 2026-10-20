@@ -115,3 +115,42 @@ def test_champion_spec_falls_back_to_simple_forecasts_without_a_risk_report():
     assert spec['direction'] == {'1h': dict(group='constant', training=None)}
     assert spec['range'] == {} and spec['volatility'] == {}
     assert spec['drop'] == dict(group='constant', training=None)
+
+
+
+def test_promotion_gate_requires_validation_and_confirming_test_folds():
+    passed = dict(group='macro', training='expanding', validation_skill=.00005, test_skill=.00005,
+                  folds_beating_constant=4, folds=4)
+    assert fc.promote(passed) == dict(group='macro', training='expanding')
+    failed_test = {**passed, 'test_skill': -.00003, 'folds_beating_constant': 1}
+    assert fc.promote(failed_test) == dict(group='constant', training=None)
+    minority = {**passed, 'test_skill': .00001, 'folds_beating_constant': 1}
+    assert fc.promote(minority) == dict(group='constant', training=None)
+    half = {**passed, 'test_skill': .00001, 'folds_beating_constant': 2}
+    assert fc.promote(half) == dict(group='macro', training='expanding')
+    assert fc.promote(dict(group='constant', training=None, validation_skill=0, test_skill=0,
+                           folds_beating_constant=None)) == dict(group='constant', training=None)
+
+
+def test_volatility_gate_falls_back_to_ewma_without_test_confirmation():
+    assert fc.promote_volatility(dict(model='garch', test_windows_better=3, windows=4)) == 'garch'
+    assert fc.promote_volatility(dict(model='garch', test_windows_better=1, windows=4)) == 'ewma'
+    assert fc.promote_volatility(dict(model='ewma', test_windows_better=1, windows=4)) == 'ewma'
+
+
+def test_champion_spec_applies_the_gate_to_every_component():
+    found = {'direction': ('d.json', dict(champions={'1h': dict(group='constant', training=None, validation_skill=0,
+                                                                  test_skill=0, folds_beating_constant=None)})),
+             'risk': ('r.json', dict(
+                 range_champions={'1h': dict(group='macro', training='expanding', validation_skill=1, test_skill=1,
+                                             folds_beating_constant=4, folds=4),
+                                  '24h': dict(group='macro', training='expanding', validation_skill=1, test_skill=-1,
+                                              folds_beating_constant=1, folds=4)},
+                 drop_champion=dict(group='constant', training=None, validation_skill=0, test_skill=0,
+                                    folds_beating_constant=None),
+                 volatility_champions={'4h': dict(model='garch', test_windows_better=1, windows=4),
+                                       '24h': dict(model='garch', test_windows_better=3, windows=4)}))}
+    spec = fc.champion_spec(found)
+    assert spec['range'] == {'1h': dict(group='macro', training='expanding'), '24h': dict(group='constant', training=None)}
+    assert spec['volatility'] == {'4h': 'ewma', '24h': 'garch'}
+    assert spec['drop'] == dict(group='constant', training=None)

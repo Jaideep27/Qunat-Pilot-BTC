@@ -285,15 +285,35 @@ def champion_reports():
     return found
 
 
+CONSTANT = dict(group='constant', training=None)
+
+
+def promote(champion):
+    """Promotion gate, fixed before deployment: a validation-selected champion is used only when its test
+    results confirm it (positive mean skill and at least half the folds better). The gate can only reject,
+    never choose, so it cannot inflate the reported skill of what is deployed."""
+    if champion.get('group') in (None, 'constant'):
+        return dict(CONSTANT)
+    folds, better = champion.get('folds') or 0, champion.get('folds_beating_constant') or 0
+    confirmed = (champion.get('validation_skill') or 0) > 0 and (champion.get('test_skill') or 0) > 0 \
+        and folds and 2*better >= folds
+    return dict(group=champion['group'], training=champion.get('training')) if confirmed else dict(CONSTANT)
+
+
+def promote_volatility(champion):
+    """GARCH replaces the simpler EWMA only when it was also better in at least half the test windows."""
+    if champion.get('model') == 'garch' and 2*champion.get('test_windows_better', 0) >= champion.get('windows', 0):
+        return 'garch'
+    return 'ewma'
+
+
 def champion_spec(found):
-    """Forecaster champions from the reports; missing parts fall back to the simplest forecast."""
-    def spec(c):
-        return dict(group=c['group'], training=c.get('training'))
+    """Deployed champions after the promotion gate; missing or rejected parts use the simplest forecast."""
     direction, risk = found.get('direction', (None, {}))[1], found.get('risk', (None, {}))[1]
-    return dict(direction={h: spec(c) for h, c in direction.get('champions', {}).items()},
-                range={h: spec(c) for h, c in risk.get('range_champions', {}).items()},
-                drop=spec(risk['drop_champion']) if risk.get('drop_champion') else dict(group='constant', training=None),
-                volatility={h: v['model'] for h, v in risk.get('volatility_champions', {}).items()})
+    return dict(direction={h: promote(c) for h, c in direction.get('champions', {}).items()},
+                range={h: promote(c) for h, c in risk.get('range_champions', {}).items()},
+                drop=promote(risk['drop_champion']) if risk.get('drop_champion') else dict(CONSTANT),
+                volatility={h: promote_volatility(v) for h, v in risk.get('volatility_champions', {}).items()})
 
 
 def run_cycle(engine=None, now=None):
