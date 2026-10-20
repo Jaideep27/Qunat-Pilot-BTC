@@ -315,7 +315,15 @@ Scripts (`scripts/`):
 - **Independent review:** found no bug that could change the verdict.
 - Full tables: [docs/strategy-research.md](docs/strategy-research.md).
 
-**Bottom line:** this data predicts **how much** BTC moves, not **which way**, even when a rule may stay silent most of the time.
+### Trading agent step B (pre-registered, 2026-10-21)
+- **Setup:** structure-based trade plans (stop behind support/resistance, target at the next level, reward:risk ≥ 1.5 or 2.0, 0.25% risk), entered by trend, best-plan or pullback rules plus a coin-flip control. Decisions hourly from 2021-10 to 2025-10, run in the futures simulator after all costs.
+- **Configurations:**
+  - Trend at reward:risk 1.5: 66 trades, 42.4% hit vs 44.6% break-even, +0.4% on the account.
+  - Best plan at 1.5: 380 trades, −12.1% on the account.
+  - Coin flip at 1.5: 266 trades, −5.6% on the account.
+- **Walk-forward (out of sample):** 192 trades, 30.2% hit vs 36.9% break-even, −0.23% per trade, PBO 1.0. **Fail.** The holdout stays untouched.
+
+**Bottom line:** this data predicts **how much** BTC moves, not **which way**, even when a rule may stay silent most of the time, and structure-based trade plans don't change that.
 
 ---
 
@@ -415,8 +423,8 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 | Step | What | Status |
 |---|---|---|
 | A | Verify and fix the defects; MarketContext; deterministic TradePlans; versioned futures simulator | **done** (branch `trading-agent`, not merged) |
-| B | Pre-register the trade-plan rules plus a baseline entry policy; evaluate walk-forward with the existing strategy harness (same costs and pass rule) | next |
-| C | RL for trade management only (hold, exit, tighten stop, pull in target), compared against fixed exits | after B |
+| B | Pre-register the trade-plan rules plus simple entry rules (amendment A4); evaluate walk-forward with the same costs and pass rule | **done: no edge.** Every rule lost after costs, and a coin flip did as well. See [docs/trading-agent-research.md](docs/trading-agent-research.md) |
+| C | RL for trade management only (hold, exit, tighten stop, pull in target), compared against fixed exits | waiting for the owner's decision: management cannot create an edge the entries lack (only 13–14% of stopped trades were ever 1R ahead) |
 | D | Experimental forward paper account ($10,000 or $1,000, 2× isolated), worker, persistence, dashboard and API/MCP inspection | after C |
 
 Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
