@@ -11,8 +11,8 @@ process.chdir(path.resolve(__dirname,'..'));
   const smoke=JSON.parse(fs.readFileSync('.verification/release-smoke.json','utf8'));
   assert.equal(smoke.status,'passed');
   assert.equal(smoke.mcp_tools_matched,9);
-  const verification=JSON.parse(fs.readFileSync('docs/local-readiness-verification.json','utf8'));
-  const recovery=JSON.parse(fs.readFileSync('docs/recovery-verification.json','utf8'));
+  const verification=JSON.parse(fs.readFileSync('docs/evidence/local-readiness-verification.json','utf8'));
+  const recovery=JSON.parse(fs.readFileSync('docs/evidence/recovery-verification.json','utf8'));
   const inspection=spawnSync(process.platform==='win32'?'.venv/Scripts/python.exe':'.venv/bin/python',
     ['-c','import json; from quantpilot.diagnostics import doctor; print(json.dumps(doctor(),default=str))'],{encoding:'utf8',windowsHide:true});
   if(inspection.status!==0)throw new Error('Current doctor inspection failed; no video replaced.');

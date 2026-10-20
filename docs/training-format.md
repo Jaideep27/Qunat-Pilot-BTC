@@ -27,7 +27,7 @@ The released selector retained 40 technical features. It selected zero derivativ
 
 ## Verification and performance
 
-[Machine-readable audit](training-format-verification.json) records the checks, split counts, selected feature names, dataset/model hashes and reproduced metrics. All 13 focused research/feature tests passed, including future-row mutation, completed-timeframe alignment and purged-window checks.
+[Machine-readable audit](evidence/training-format-verification.json) records the checks, split counts, selected feature names, dataset/model hashes and reproduced metrics. All 13 focused research/feature tests passed, including future-row mutation, completed-timeframe alignment and purged-window checks.
 
 An isolated sigmoid-calibration replica was fitted around the already-frozen base pipeline using only the designated calibration rows. Its probabilities on validation rows match the released model. The saved scaler, selector, classifier, original calibrator, model files and policy threshold were not changed. Holdout probabilities were reproduced to check the existing report; no tuning used those outcomes.
 

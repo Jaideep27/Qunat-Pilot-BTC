@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 from sqlalchemy import select
 from fastapi.testclient import TestClient
-from quantpilot import operations,worker,services
+from quantpilot import worker,services
 from quantpilot.operations import WorkerRun,begin_run,finish_run,report,next_paper_run,ledger_evidence
 from quantpilot.store import portfolio,apply_events,LedgerEvent
 from quantpilot.market_store import save_frame

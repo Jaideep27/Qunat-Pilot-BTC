@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import math
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -244,7 +243,7 @@ def refresh_panel(now=None, full=False):
 
 
 def load_context(now=None, engine=None):
-    from sqlalchemy import func, select
+    from sqlalchemy import select
     from .forecaster import forecasts
     from .macro import events as macro_events
     from .market_store import PERP, MarketCandle

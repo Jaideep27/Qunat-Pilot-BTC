@@ -33,14 +33,14 @@ def _database(url):
                          pool_pre_ping=True)
 
 def initialize(engine):
-    from . import snapshots  # register all operational tables
-    from . import market_store  # register durable historical/live market tables
-    from . import operations  # register persistent worker-run evidence
-    from . import news  # register versioned news and reasoning evidence
-    from . import macro  # register the official macro release calendar
-    from . import forecaster  # register shadow forecasts and their scored outcomes
-    from . import answers  # register outlook answers and scores
-    from . import chat  # register in-app chat threads and messages
+    from . import snapshots  # noqa: F401  register all operational tables
+    from . import market_store  # noqa: F401  register durable historical/live market tables
+    from . import operations  # noqa: F401  register persistent worker-run evidence
+    from . import news  # noqa: F401  register versioned news and reasoning evidence
+    from . import macro  # noqa: F401  register the official macro release calendar
+    from . import forecaster  # noqa: F401  register shadow forecasts and their scored outcomes
+    from . import answers  # noqa: F401  register outlook answers and scores
+    from . import chat  # noqa: F401  register in-app chat threads and messages
     with serialized(engine) as session:
         Base.metadata.create_all(session.connection())
         if engine.dialect.name == "postgresql":

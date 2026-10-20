@@ -1,6 +1,6 @@
 # PostgreSQL backup and local recovery checks
 
-Owner commands now create PostgreSQL custom-format archives and verify restoration into separate temporary databases. [Actual recovery evidence](recovery-verification.json) records the result; dump files and manifests stay in ignored local storage.
+Owner commands now create PostgreSQL custom-format archives and verify restoration into separate temporary databases. [Actual recovery evidence](evidence/recovery-verification.json) records the result; dump files and manifests stay in ignored local storage.
 
 The recorded full backup is 90,880,746 bytes from a 1,427,486,399-byte source database. Restoration recovered seven tables and 3,639,242 rows in about 140 seconds, with all checks passing. These totals include preserved inactive archives as well as the active BTCUSDT market and operational state. The temporary database was removed; the working database was not replaced.
 

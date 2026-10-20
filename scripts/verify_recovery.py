@@ -17,7 +17,7 @@ def main():
         'note':'Actual local databases, not fixtures. Source metrics and dump share one exported PostgreSQL snapshot. '
             'Market rows verified by counts and timestamp ranges; accounting and checkpoint rows by SHA256. '
             'Database files remain local and ignored; this is not an off-device disaster backup.'}
-    Path('docs/recovery-verification.json').write_text(json.dumps(evidence,indent=2)+'\n',encoding='utf-8')
+    Path('docs/evidence/recovery-verification.json').write_text(json.dumps(evidence,indent=2)+'\n',encoding='utf-8')
     Path('.verification/latest-backup.json').write_text(json.dumps({'manifest':str(manifest)},indent=2)+'\n',encoding='utf-8')
     print(json.dumps(evidence,indent=2),flush=True)
 

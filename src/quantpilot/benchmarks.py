@@ -1,5 +1,4 @@
 """Passive, fully collateralized long comparator using the shared accounting reducer."""
-import pandas as pd
 from .config import RiskConfig
 from .data import utc
 from .engine import initial, equity, market_events, reduce_event, close_position, performance

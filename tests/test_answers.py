@@ -71,6 +71,6 @@ def test_scheduled_questions_run_hourly_with_a_daily_ai_cap(account, monkeypatch
         return dict(id=rid)
     first = answers.scheduled_cycle(account, ask_fn, now=T0)
     again = answers.scheduled_cycle(account, ask_fn, now=T0+pd.Timedelta(minutes=20))   # same hour: skipped
-    later = answers.scheduled_cycle(account, ask_fn, now=T0+pd.Timedelta(hours=1))
+    answers.scheduled_cycle(account, ask_fn, now=T0+pd.Timedelta(hours=1))   # next hour: asked again
     assert first['asked'] == len(answers.SCHEDULED) and again['asked'] == 0
     assert sum(ai for _, ai in calls) == 2   # cap holds across cycles in one UTC day

@@ -1,10 +1,10 @@
 # Local release verification
 
-Current local readiness is documented in [operations](operations.md) and [current verification](local-readiness-verification.json): 88 Python cases, 14 browser cases and seven real PostgreSQL checks pass; the production build has no oversized chunks. Actual runtime evidence shows a connected five-second collector and 22 forward decisions. The new monitor requires a regular-terminal service reload; public hosting is deferred. The rest of this page preserves the original research-release verification, whose test counts and runtime restrictions describe that earlier checkpoint.
+Current local readiness is documented in [operations](operations.md) and [current verification](evidence/local-readiness-verification.json): 88 Python cases, 14 browser cases and seven real PostgreSQL checks pass; the production build has no oversized chunks. Actual runtime evidence shows a connected five-second collector and 22 forward decisions. The new monitor requires a regular-terminal service reload; public hosting is deferred. The rest of this page preserves the original research-release verification, whose test counts and runtime restrictions describe that earlier checkpoint.
 
-For the newer PostgreSQL market-storage and chart-workspace extension, see [market-platform.md](market-platform.md) and [its execution evidence](market-platform-verification.json). The frozen research experiment below remains a separate reproducible result.
+For the newer PostgreSQL market-storage and chart-workspace extension, see [market-platform.md](market-platform.md) and [its execution evidence](evidence/market-platform-verification.json). The frozen research experiment below remains a separate reproducible result.
 
-Verified on 19 October 2026 against frozen research model **24c8238525d4**. The [machine-readable manifest](release-verification.json) contains source/artifact hashes, training identity, API latency and remaining deployment work. Earlier attempts are preserved in [verification history](verification-history.md).
+Verified on 19 October 2026 against frozen research model **24c8238525d4**. The [machine-readable manifest](evidence/release-verification.json) contains source/artifact hashes, training identity, API latency and remaining deployment work. Earlier attempts are preserved in [verification history](verification-history.md).
 
 | Gate | Actual result |
 |---|---|
@@ -36,7 +36,7 @@ Four browser cases cover fixture navigation, mobile usability, explicit backend 
 - [Research](screenshots/release-research.png)
 - [Paper portfolio](screenshots/release-paper.png)
 
-The real-data MCP smoke test starts a separate server with the official Python SDK, discovers all nine tools and compares each structured data result against FastAPI. Native ML libraries are initialized before the stdio event loop; tools run shared services in threads. This resolves a Windows cold-import stall observed when loading the trained model during a tool call. [Smoke evidence](release-smoke.json) records the actual data/freshness gates and measured API latency: 14.69 seconds for the first full-history feature computation, 0.27 seconds for a cached indicator read and 9.63 seconds for the first prediction including model explanation. These are local single-run timings, not hosted service latency guarantees.
+The real-data MCP smoke test starts a separate server with the official Python SDK, discovers all nine tools and compares each structured data result against FastAPI. Native ML libraries are initialized before the stdio event loop; tools run shared services in threads. This resolves a Windows cold-import stall observed when loading the trained model during a tool call. [Smoke evidence](evidence/release-smoke.json) records the actual data/freshness gates and measured API latency: 14.69 seconds for the first full-history feature computation, 0.27 seconds for a cached indicator read and 9.63 seconds for the first prediction including model explanation. These are local single-run timings, not hosted service latency guarantees.
 
 ## Interpretation and remaining work
 
@@ -60,4 +60,4 @@ uv run python scripts/smoke_release.py
 uv run quantpilot backtest --group full
 ```
 
-The release verification scripts also retain raw command logs under `.verification/`. [Python evidence](python-regression-verification.json) and [frontend evidence](frontend-milestone-status.json) carry report/source hashes. Re-running tests does not refresh or retrain the frozen holdout experiment.
+The release verification scripts also retain raw command logs under `.verification/`. [Python evidence](evidence/python-regression-verification.json) and [frontend evidence](evidence/frontend-milestone-status.json) carry report/source hashes. Re-running tests does not refresh or retrain the frozen holdout experiment.

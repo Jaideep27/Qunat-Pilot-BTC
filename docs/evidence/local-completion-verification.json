@@ -2,7 +2,7 @@
   "verified_at": "2026-10-19T18:22:39.523528+00:00",
   "status": "local_checks_verified_service_reload_pending",
   "public_deployment": "deferred_by_owner",
-  "baseline_evidence": "docs/local-readiness-verification.json",
+  "baseline_evidence": "docs/evidence/local-readiness-verification.json",
   "baseline_verified_at": "2026-10-19T18:01:54.176057+00:00",
   "application_regression": {
     "python_passed": 88,
@@ -229,13 +229,13 @@
     "tests/test_worker.py": "136af2cfdfcf16f85081737ea5842040535187e5bb2b215fbbe1596e29e587f8"
   },
   "evidence_sha256": {
-    "docs/local-readiness-verification.json": "b6bcfed5f1f15c63da730e287ba55759ff0b1a6f1bb3a3a884fa65ef53803d51",
+    "docs/evidence/local-readiness-verification.json": "b6bcfed5f1f15c63da730e287ba55759ff0b1a6f1bb3a3a884fa65ef53803d51",
     ".verification/service-readiness.xml": "b79866f712a6cb945d16889b3c47a20866240da51e2cc9fa1b252a79c154b998",
-    "docs/static-checks.json": "7087bb3e933d2b8b016b1dbba52ce32d5bd20e981f65a2eda86f2bcb5bd3c6e2",
-    "docs/persistence-runtime.json": "fc5c4ddf56d9d0783e2e2a002955fc9ce2186e3eec87976d8df25e28c9292a40",
+    "docs/evidence/static-checks.json": "7087bb3e933d2b8b016b1dbba52ce32d5bd20e981f65a2eda86f2bcb5bd3c6e2",
+    "docs/evidence/persistence-runtime.json": "fc5c4ddf56d9d0783e2e2a002955fc9ce2186e3eec87976d8df25e28c9292a40",
     "docs/walkthrough/recording.json": "167fcbed0eb3a93b0372bf8cdf6a57a38c247b69914447625e0ab1847ef75156",
     "docs/walkthrough/verification.json": "53e0a59d4e546048cd110c261bb06cdfc318c8fafd36a33097d0c8f6b1b5367a",
     "docs/walkthrough/runtime-snapshot.json": "15b52dd3b75ae1aaa8b7dd5e3cc64348659ee04d23aaff9c960d37a5773068c2",
-    "docs/completion-readiness.json": "bd3c48e87fce937b0e390d0102b32f53f5341991bee29eb5ac51b29b1b9ae0a8"
+    "docs/evidence/completion-readiness.json": "bd3c48e87fce937b0e390d0102b32f53f5341991bee29eb5ac51b29b1b9ae0a8"
   }
 }

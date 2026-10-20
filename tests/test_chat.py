@@ -26,9 +26,9 @@ def test_stream_output_yields_text_and_tools_used():
 
 def test_send_stores_the_conversation_and_links_answers_from_the_run(account):
     def runner(transcript, thread_id, run_id):
-        answer_id = answers.record(account, dict(question=dict(type='direction', horizon_hours=4),
-                                                  asked_at='2026-10-20T00:00:00+00:00', headline={}, range=None),
-                                   'chat', thread_id=thread_id, run_id=run_id)
+        answers.record(account, dict(question=dict(type='direction', horizon_hours=4),
+                                     asked_at='2026-10-20T00:00:00+00:00', headline={}, range=None),
+                       'chat', thread_id=thread_id, run_id=run_id)
         assert 'up or down next 4h' in transcript
         return dict(text='Roughly 51%, no edge.', tools=['ask_outlook'], status='ok')
     result = chat.send(account, 'up or down next 4h', runner=runner)

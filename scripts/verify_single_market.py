@@ -39,7 +39,7 @@ def main():
         preserved_inactive_candles=[dict(row) for row in inactive],
         restart_command='node scripts/start.cjs --restart-services' if not (api_current and single_collector) else None,
         note='Inactive archives are preserved and never merged into BTCUSDT. Coverage applies to price candles only.')
-    path=Path('docs/single-market-status.json')
+    path=Path('docs/evidence/single-market-status.json')
     path.write_text(json.dumps(result,indent=2,default=str)+'\n',encoding='utf-8')
     print(json.dumps(result,indent=2,default=str))
     if not ready:raise SystemExit(2)

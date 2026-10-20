@@ -59,3 +59,26 @@ def test_strategy_endpoint(account):
 def services_app():
     from quantpilot.api import app
     return app
+
+
+def test_strategy_view_includes_the_trading_agent_results(account):
+    write_report()
+    folder = settings.artifact_dir/'agent-research'/'run-a'
+    folder.mkdir(parents=True)
+    gate = dict(passed=False, criteria=dict(enough_calls=True, positive_mean=False), deflated_sharpe=0.0, trials=113)
+    family = dict(family='TP', configurations=6, pbo=1.0, gate=gate,
+                  report=dict(calls=192, hit_rate=.302, wilson_low=.242, wilson_high=.37, break_even=.369, mean_net=-.00234))
+    config = dict(trades=66, hit_rate=.424, break_even=.446, mean_net=-.0007, account_return=.0038,
+                  max_drawdown_closed=-.014, exit_reasons=dict(STOP=31))
+    (folder/'report.json').write_text(json.dumps(dict(generated='2026-10-21T00:40:00+00:00', trials=113,
+                                                      configurations={'B1:rr1.5': config},
+                                                      families=dict(TP=family, control=family))), encoding='utf-8')
+    agent = services.strategy_research()['data']['agent']
+    assert agent['families']['TP']['passed'] is False and agent['families']['TP']['failed'] == ['positive_mean']
+    assert agent['configurations'][0] == dict(id='B1:rr1.5', **config)
+    assert agent['run'] == 'run-a'
+
+
+def test_strategy_view_without_agent_results(account):
+    write_report()
+    assert services.strategy_research()['data']['agent'] is None

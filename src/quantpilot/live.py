@@ -1,5 +1,4 @@
 """Public REST ingestion with pagination. No authenticated trading API calls."""
-import time
 import json
 from pathlib import Path
 import httpx

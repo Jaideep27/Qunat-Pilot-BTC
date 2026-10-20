@@ -1,4 +1,3 @@
-import io
 import zipfile
 import httpx
 import pandas as pd

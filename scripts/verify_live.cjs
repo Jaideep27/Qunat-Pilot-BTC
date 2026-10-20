@@ -49,7 +49,7 @@ const {chromium}=require(path.resolve('frontend/node_modules/@playwright/test'))
     const storage=(await storageResponse.json()).data;
     report.collector_poll_interval_seconds=storage.feeds.find(feed=>feed.id==='live:collector')?.state.poll_interval_seconds??null;
     report.status=report.stream_verified&&report.database_advanced?'actual_stream_and_periodic_postgres_verified':'partial_runtime_verification';
-    fs.writeFileSync('docs/fast-live-runtime.json',JSON.stringify(report,null,2)+'\n');
+    fs.writeFileSync('docs/evidence/fast-live-runtime.json',JSON.stringify(report,null,2)+'\n');
     console.log(JSON.stringify({...report,messages:report.messages.length,first_database_observation:report.first_database_observation?.received_at,last_database_observation:report.last_database_observation?.received_at},null,2));
     if(!report.stream_verified||!report.database_advanced)process.exitCode=2;
   }finally{await browser.close()}

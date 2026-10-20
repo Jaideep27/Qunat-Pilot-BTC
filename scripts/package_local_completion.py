@@ -21,7 +21,7 @@ def save(path,value):Path(path).write_text(json.dumps(value,indent=2)+'\n',encod
 
 
 def main():
-    baseline=read('docs/local-readiness-verification.json')
+    baseline=read('docs/evidence/local-readiness-verification.json')
     # The application, Python tests and dashboard did not change in this stage.
     # Reuse their recorded executions only when the exact source still matches.
     for path,value in baseline['source_sha256'].items():
@@ -30,8 +30,8 @@ def main():
     node=ET.parse('.verification/service-readiness.xml').getroot()
     assert len(node.findall('.//testcase'))==7
     assert not any(node.findall('.//'+kind) for kind in ('failure','error','skipped'))
-    static=read('docs/static-checks.json');assert len(static['passed'])==7
-    persistence=read('docs/persistence-runtime.json')
+    static=read('docs/evidence/static-checks.json');assert len(static['passed'])==7
+    persistence=read('docs/evidence/persistence-runtime.json')
     assert persistence['status']=='periodic_postgresql_updates_verified'
     recording=read('docs/walkthrough/recording.json')
     decoded=read('docs/walkthrough/verification.json')
@@ -46,18 +46,18 @@ def main():
         capture_output=True,text=True,check=True,timeout=30)
     runtime=json.loads(check.stdout)
     runtime['checked_at']=datetime.now(timezone.utc).isoformat()
-    save('docs/completion-readiness.json',runtime)
+    save('docs/evidence/completion-readiness.json',runtime)
     sources=[*Path('src/quantpilot').glob('*.py'),*Path('frontend/src').glob('*.*'),
         *Path('tests').glob('*.py'),*Path('frontend/tests').glob('*.ts'),*Path('migrations').rglob('*.py'),
         *map(Path,['scripts/start.cjs','scripts/service_readiness.cjs','scripts/record_walkthrough.cjs',
             'scripts/verify_walkthrough.cjs','scripts/verify_persistence.cjs','scripts/verify.cjs',
             'scripts/package_local_completion.py','tests/service-readiness.test.cjs','.github/workflows/ci.yml'])]
-    evidence=['docs/local-readiness-verification.json','.verification/service-readiness.xml','docs/static-checks.json',
-        'docs/persistence-runtime.json','docs/walkthrough/recording.json','docs/walkthrough/verification.json',
-        'docs/walkthrough/runtime-snapshot.json','docs/completion-readiness.json']
+    evidence=['docs/evidence/local-readiness-verification.json','.verification/service-readiness.xml','docs/evidence/static-checks.json',
+        'docs/evidence/persistence-runtime.json','docs/walkthrough/recording.json','docs/walkthrough/verification.json',
+        'docs/walkthrough/runtime-snapshot.json','docs/evidence/completion-readiness.json']
     result=dict(verified_at=datetime.now(timezone.utc).isoformat(),
         status='local_ready_stream_latency_unverified' if runtime['ready'] else 'local_checks_verified_service_reload_pending',
-        public_deployment='deferred_by_owner',baseline_evidence='docs/local-readiness-verification.json',
+        public_deployment='deferred_by_owner',baseline_evidence='docs/evidence/local-readiness-verification.json',
         baseline_verified_at=baseline['verified_at'],
         application_regression=dict(python_passed=baseline['python']['passed'],browser_passed=baseline['browser']['passed'],
             postgres_checks_passed=baseline['postgres']['passed'],build='passed',
@@ -75,15 +75,15 @@ def main():
         provider_blocker='Actual exchange WebSocket latency remains unverified under the agent browser network policy',
         source_sha256={path.as_posix():digest(path) for path in sorted(set(sources))},
         evidence_sha256={path:digest(path) for path in evidence})
-    save('docs/local-completion-verification.json',result)
-    latest=read('docs/latest-verification.json')
-    latest.update(verified_at=result['verified_at'],status=result['status'],evidence='docs/local-completion-verification.json',
-        previous_evidence='docs/local-readiness-verification.json',ready=runtime['ready'],
+    save('docs/evidence/local-completion-verification.json',result)
+    latest=read('docs/evidence/latest-verification.json')
+    latest.update(verified_at=result['verified_at'],status=result['status'],evidence='docs/evidence/local-completion-verification.json',
+        previous_evidence='docs/evidence/local-readiness-verification.json',ready=runtime['ready'],
         running_api_loaded_monitoring=runtime['status'] in ('ready','needs_attention'),
-        readiness_evidence='docs/completion-readiness.json',startup_readiness_tests_passed=7,
-        persistence_evidence='docs/persistence-runtime.json',walkthrough='docs/walkthrough/quantpilot-btc.webm',
+        readiness_evidence='docs/evidence/completion-readiness.json',startup_readiness_tests_passed=7,
+        persistence_evidence='docs/evidence/persistence-runtime.json',walkthrough='docs/walkthrough/quantpilot-btc.webm',
         walkthrough_duration_seconds=decoded['duration_seconds'])
-    save('docs/latest-verification.json',latest)
+    save('docs/evidence/latest-verification.json',latest)
     print(json.dumps(dict(status=result['status'],startup_checks_passed=7,median_saved_snapshot_interval_ms=persistence['median_saved_snapshot_interval_ms'],
         walkthrough_seconds=decoded['duration_seconds'],service_readiness=runtime['status']),indent=2))
 

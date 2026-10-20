@@ -1,6 +1,6 @@
 # Acceptance map
 
-Current local verification passes 88 Python cases, 14 browser cases and seven real PostgreSQL checks. See [operations](operations.md) for reload/readiness details and [current evidence](local-readiness-verification.json) for exact execution results. The frozen research experiment remains model 24c8238525d4.
+Current local verification passes 88 Python cases, 14 browser cases and seven real PostgreSQL checks. See [operations](operations.md) for reload/readiness details and [current evidence](evidence/local-readiness-verification.json) for exact execution results. The frozen research experiment remains model 24c8238525d4.
 
 | Requirement | Code / intended evidence |
 |---|---|

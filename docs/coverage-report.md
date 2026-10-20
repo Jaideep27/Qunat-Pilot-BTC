@@ -8,7 +8,7 @@ All 874 original Binance archives and two supplemental daily repair archives hav
 
 ## Remaining raw source defects
 
-Positioning has five missing timestamps and 57 rows with invalid values: 62 source rows out of 221,760 expected warm-up/research observations (0.02796%). Five timestamps are absent: 28 October 2024 at 16:25 and 16:30 UTC, and 29 August 2025 at 06:20, 06:25 and 06:30 UTC. Invalid rows span 23 January, 3 February, 15 April, 21 July and 22 July 2025. Exact ranges and per-column counts remain in [the audit JSON](coverage-report.json).
+Positioning has five missing timestamps and 57 rows with invalid values: 62 source rows out of 221,760 expected warm-up/research observations (0.02796%). Five timestamps are absent: 28 October 2024 at 16:25 and 16:30 UTC, and 29 August 2025 at 06:20, 06:25 and 06:30 UTC. Invalid rows span 23 January, 3 February, 15 April, 21 July and 22 July 2025. Exact ranges and per-column counts remain in [the audit JSON](evidence/coverage-report.json).
 
 ## Quarantine and common eligibility
 
@@ -20,7 +20,7 @@ Missing positioning observations become explicit missing feature inputs, never o
 - Positioning/lookback invalidity affects 177 of those excluded cutoffs. Other exclusions include undefined calculations around zero-volume/zero-range observations.
 - The final two months remain reserved as a holdout; no missing-data decision uses predictive or trading results.
 
-[Data-quality summary](data-quality.json) records monthly eligibility. [Excluded windows](excluded-windows.csv) records each rejected cutoff and its missing features. The model and policy must be selected on training/validation data, then frozen before holdout evaluation.
+[Data-quality summary](evidence/data-quality.json) records monthly eligibility. [Excluded windows](excluded-windows.csv) records each rejected cutoff and its missing features. The model and policy must be selected on training/validation data, then frozen before holdout evaluation.
 
 ## Reproduce
 

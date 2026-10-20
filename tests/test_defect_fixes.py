@@ -1,7 +1,6 @@
 """Regression tests for the seven defects verified on 2026-10-20 (one or more tests per defect)."""
 import subprocess
 
-import numpy as np
 import pandas as pd
 import pytest
 

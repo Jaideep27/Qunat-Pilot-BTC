@@ -1,5 +1,4 @@
 """Regression tests for the final-review findings on the outlook Q&A (one test per finding)."""
-import threading
 
 import numpy as np
 import pandas as pd

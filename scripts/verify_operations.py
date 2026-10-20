@@ -29,7 +29,7 @@ def main():
         result['verification']['running_api_loaded_monitoring']=running.status_code==200
     except httpx.HTTPError as exc:
         result['verification']['running_api_error_type']=type(exc).__name__
-    output=Path('docs/operations-runtime.json')
+    output=Path('docs/evidence/operations-runtime.json')
     output.write_text(json.dumps(result,indent=2,default=str)+'\n',encoding='utf-8')
     print(json.dumps({key:result[key] for key in ('checked_at','ready','checks','collector','forward_evidence','verification')},indent=2))
 

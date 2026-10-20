@@ -4,7 +4,6 @@ from quantpilot.process import process_started
 import uvicorn
 import json
 import os
-import time
 
 services.settings.data_dir.mkdir(exist_ok=True,parents=True)
 (services.settings.data_dir/'api-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=process_started())),encoding="utf-8")
@@ -13,7 +12,7 @@ path=services.settings.artifact_dir/'released.joblib'
 if path.exists():
     bundle=services.joblib.load(path)
     if bundle['kind']=='xgboost':
-        import shap
+        import shap  # noqa: F401  warm the native library before the async loop starts
     del bundle
     # Build the immutable feature snapshot before accepting concurrent browser reads.
     # This avoids a cold history calculation competing with chart/API requests.

@@ -24,7 +24,7 @@
   "process_blocker": "Earlier automatic approval review rejected terminating the existing API; process-termination approval remains unavailable. Existing working services were preserved.",
   "activation_command": "node scripts/start.cjs --restart-services",
   "runtime_check_command": "node scripts/verify_live.cjs",
-  "runtime_evidence": "docs/fast-live-runtime.json",
+  "runtime_evidence": "docs/evidence/fast-live-runtime.json",
   "screenshot_visually_reviewed": true,
   "source_sha256": {
     "frontend/src/liveFeed.ts": "04c0c071367d80a45730f83d0ed0c99c963bde7853919830793a0ba326d290c6",

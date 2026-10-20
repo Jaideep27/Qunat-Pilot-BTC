@@ -65,7 +65,7 @@ def coverage(): return services.coverage()
 def predictions(): return services.prediction()
 
 @app.get("/api/v1/backtests")
-def backtests(): return services.research()
+def backtests(detail: bool = False): return services.research(detail=detail)
 
 @app.get("/api/v1/portfolio")
 def portfolio(): return services.paper()

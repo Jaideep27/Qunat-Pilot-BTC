@@ -1,6 +1,5 @@
 """Research data: archive/REST parsers, incremental caches and the daily/hourly research panels."""
 import io
-import json
 import zipfile
 
 import httpx

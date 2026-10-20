@@ -58,8 +58,8 @@ def main():
             Path('frontend/dist/index.html'), *Path('docs/screenshots').glob('release-*.png')]})
     manifest_files = [*Path('release').glob('*'), *Path('docs/screenshots').glob('release-*.png'),
         Path('uv.lock'), Path('requirements.lock'), Path('requirements-dev.lock'),
-        Path('frontend/package-lock.json'), Path('docs/data-quality.json'),
-        Path('docs/excluded-windows.csv'), Path('docs/coverage-report.json'),
+        Path('frontend/package-lock.json'), Path('docs/evidence/data-quality.json'),
+        Path('docs/excluded-windows.csv'), Path('docs/evidence/coverage-report.json'),
         Path('docs/evaluation-report.md'), Path('docs/model-card.md')]
     video = Path('docs/walkthrough/quantpilot-btc.webm')
     if video.exists():
@@ -82,13 +82,13 @@ def main():
         remaining=['Public GitHub repository', 'Supabase/PostgreSQL integration verification',
                    'Render/Vercel deployment', 'Network-enabled live worker and forward paper uptime'],
         code_identity_note='Training identity is frozen. Runtime hashes separately include later MCP startup and worker funding-tail fixes; no model or holdout policy was retuned.')
-    write('docs/python-regression-verification.json', regression)
-    write('docs/frontend-milestone-status.json', frontend)
-    write('docs/release-smoke.json', smoke)
-    write('docs/release-verification.json', result)
-    write('docs/latest-verification.json', dict(status=result['status'], verified_at=now,
+    write('docs/evidence/python-regression-verification.json', regression)
+    write('docs/evidence/frontend-milestone-status.json', frontend)
+    write('docs/evidence/release-smoke.json', smoke)
+    write('docs/evidence/release-verification.json', result)
+    write('docs/evidence/latest-verification.json', dict(status=result['status'], verified_at=now,
         model_version=smoke['model_version'], python_passed=int(suite.attrib['tests']),
-        browser_passed=int(match[1]), mcp_tools_matched=9, evidence='docs/release-verification.json',
+        browser_passed=int(match[1]), mcp_tools_matched=9, evidence='docs/evidence/release-verification.json',
         public_deployment='pending', forward_paper='pending'))
     print(json.dumps(dict(status=result['status'], model_version=smoke['model_version'],
                          python_passed=int(suite.attrib['tests']), browser_passed=int(match[1]), mcp_tools_matched=9),indent=2))

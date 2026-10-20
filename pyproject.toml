@@ -28,3 +28,6 @@ pythonpath = ["src"]
 [tool.ruff]
 line-length = 110
 
+[tool.ruff.lint.per-file-ignores]
+# pytest fixtures named like the imported `candles` function shadow it on purpose.
+"tests/test_market_store.py" = ["F811"]

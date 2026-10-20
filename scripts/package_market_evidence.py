@@ -50,10 +50,10 @@ result=dict(verified_at=datetime.now(timezone.utc).isoformat(),status='local_dat
     source_sha256={p.as_posix():digest(p) for p in files},
     evidence_sha256={p:digest(p) for p in ['.verification/pytest-platform.xml','.verification/workspace-browser-final.log',
         '.verification/postgres-platform.json','.verification/workspace-build-final.log','.verification/release-smoke.json']})
-Path('docs/market-platform-verification.json').write_text(json.dumps(result,indent=2,default=str)+'\n',encoding='utf-8')
-Path('docs/latest-verification.json').write_text(json.dumps(dict(status=result['status'],verified_at=result['verified_at'],
+Path('docs/evidence/market-platform-verification.json').write_text(json.dumps(result,indent=2,default=str)+'\n',encoding='utf-8')
+Path('docs/evidence/latest-verification.json').write_text(json.dumps(dict(status=result['status'],verified_at=result['verified_at'],
     frozen_model_version='24c8238525d4',python_passed=int(suite.attrib['tests']),browser_passed=int(browser[1]),
     mcp_tools_matched=9,postgresql_stored_rows=result['stored_rows'],
-    evidence='docs/market-platform-verification.json',research_evidence='docs/release-verification.json',
+    evidence='docs/evidence/market-platform-verification.json',research_evidence='docs/evidence/release-verification.json',
     complete_earlier_history='blocked by provider socket permissions',real_live_feed='blocked by provider socket permissions'),indent=2)+'\n',encoding='utf-8')
 print(json.dumps({key:result[key] for key in ['status','stored_rows','python','browser','real_live_provider_verified']},indent=2))

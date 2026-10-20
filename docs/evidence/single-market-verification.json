@@ -25,7 +25,7 @@
   "activation_command": "node scripts/start.cjs --restart-services",
   "activation_check": "uv run python scripts/verify_single_market.py",
   "blocker": "Automatic approval review rejected stopping the existing API; sandbox approval is disabled. Agent outbound provider sockets are denied. Existing connected services were preserved.",
-  "runtime_evidence": "docs/single-market-status.json",
+  "runtime_evidence": "docs/evidence/single-market-status.json",
   "source_sha256": {
     "src/quantpilot/market_store.py": "498d1e8b6e8ceb972890385799341d645107f7c8949e8fff603220a2f6283369",
     "src/quantpilot/history.py": "fa4aecfc7ec06f229e3f2cefe0c43297d21d459ecd6d82f3a47a3b83f9df5ede",

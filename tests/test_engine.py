@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 from quantpilot.config import RiskConfig
-from quantpilot.engine import initial, gate, reduce_event, close_position, equity, Forecast
+from quantpilot.engine import initial, gate, reduce_event, close_position
 from quantpilot.store import apply_events, portfolio, LedgerEvent
 from sqlalchemy.orm import Session
 

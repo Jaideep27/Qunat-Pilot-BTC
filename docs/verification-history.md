@@ -29,7 +29,7 @@ Known approximations are documented in README and the model card. Dependency loc
 
 ## Continuation verification
 
-The environment restrictions were rechecked: Python still exits with access denied; npm/provider requests still return EACCES. PowerShell also refused local script execution under its existing execution policy. No policy settings were changed. The portable Node runner executed the static checks and then failed at Python provisioning with socket error 10013; subsequent compilation, pytest, frontend and browser stages are marked not run in [latest-verification.json](latest-verification.json).
+The environment restrictions were rechecked: Python still exits with access denied; npm/provider requests still return EACCES. PowerShell also refused local script execution under its existing execution policy. No policy settings were changed. The portable Node runner executed the static checks and then failed at Python provisioning with socket error 10013; subsequent compilation, pytest, frontend and browser stages are marked not run in [latest-verification.json](evidence/latest-verification.json).
 
 Source review corrected these accounting/evaluation issues and added regression fixtures:
 
@@ -52,7 +52,7 @@ A local `uv lock` attempt could not refresh the existing lockfile because the Nu
 
 The dependency correction installed successfully in the user terminal. That first functional run reported 34 passing cases and two failures: weekly support/resistance leakage and missing MCP structured content. Both defects have been corrected. Weekly levels now use fixed, right-closed seven-day bins anchored at UTC Monday midnight, preventing Monday afternoon observations from appearing at Monday midnight. All nine MCP tools explicitly require structured output and return `dict[str, Any]`, allowing the official SDK to publish object schemas and structured results.
 
-The original mutation regression passes. Added boundary cases cover Monday and midweek dataset starts, and the official SDK stdio test now checks output schemas, structured content, provenance and service parity for all nine tools, plus invalid inputs. The complete suite passed locally: **38 passed, 0 failed, 1 deprecation warning in 180.34 seconds**. Python compilation and seven static checks also passed. See [regression evidence](python-regression-verification.json) for source/report hashes. The warning concerns Starlette's deprecated httpx test client integration and did not fail a case.
+The original mutation regression passes. Added boundary cases cover Monday and midweek dataset starts, and the official SDK stdio test now checks output schemas, structured content, provenance and service parity for all nine tools, plus invalid inputs. The complete suite passed locally: **38 passed, 0 failed, 1 deprecation warning in 180.34 seconds**. Python compilation and seven static checks also passed. See [regression evidence](evidence/python-regression-verification.json) for source/report hashes. The warning concerns Starlette's deprecated httpx test client integration and did not fail a case.
 
 The static checker no longer hardcodes an environment-blocked functional status: it directs readers to runtime evidence. The previous `.verification/result.json` reflects the user's earlier failing verifier run; the successful corrected Python run is recorded separately in `.verification/pytest-fixed.xml`. Frontend dependency installation was retried and still failed here with npm registry EACCES, so TypeScript, Vite and browser acceptance remain pending. Rerun `node scripts/verify.cjs` in the regular terminal to continue through those stages. Historical coverage, model release and deployment remain unverified.
 
@@ -66,11 +66,11 @@ A focused continuation command is now available: `node scripts/verify.cjs --fron
 
 The user executed `node scripts/verify.cjs --frontend` successfully. The saved result records every stage passing: static checks, dependency installation, TypeScript/Vite production build, Chromium installation and browser suite. The browser last-run record reports no failed tests. The suite covers four-view navigation, mobile overflow and backend failures. This validates preview and failure states; live provider ingestion and a released-model experience remain separate checks.
 
-The production HTML and dependency lockfile exist. The [paper portfolio screenshot](screenshots/paper-audit.png) was visually reviewed: the synthetic-preview disclosure, paused initial portfolio, empty ledger and stale-data state are visible and legible. [Frontend evidence](frontend-milestone-status.json) preserves the verifier result and artifact hashes. Historical acquisition is the next milestone.
+The production HTML and dependency lockfile exist. The [paper portfolio screenshot](screenshots/paper-audit.png) was visually reviewed: the synthetic-preview disclosure, paused initial portfolio, empty ledger and stale-data state are visible and legible. [Frontend evidence](evidence/frontend-milestone-status.json) preserves the verifier result and artifact hashes. Historical acquisition is the next milestone.
 
 ## Historical acquisition attempt
 
-The actual Python audit executed after the frontend milestone. It wrote `data/coverage.json`: zero verified archives and zero observations in every mandatory family. All 874 archive requests and the sentiment request failed; see [acquisition evidence](acquisition-audit.json). Model release remains blocked. The audit must be rerun in the regular network-enabled terminal; no data was fabricated or substituted.
+The actual Python audit executed after the frontend milestone. It wrote `data/coverage.json`: zero verified archives and zero observations in every mandatory family. All 874 archive requests and the sentiment request failed; see [acquisition evidence](evidence/acquisition-audit.json). Model release remains blocked. The audit must be rerun in the regular network-enabled terminal; no data was fabricated or substituted.
 
 ## Real-data audit and development continuation ? 19 October 2026
 
@@ -80,11 +80,11 @@ Corrected a false funding gap caused by millisecond settlement offsets: shared a
 
 Five new Python regression cases cover funding jitter versus missing settlements, invalid positioning, cached raw corruption, changed Parquet files and worker reconciliation. **All 43 cases pass**, with one pre-existing Starlette test-client deprecation warning. The final suite completed in 25.16 seconds after vectorizing contiguous-gap grouping (an earlier run with row-by-row grouping also passed). Python compilation, seven static checks, TypeScript and Vite build pass. The frontend bundle-size advisory remains.
 
-The browser rerun could not execute assertions: all four cases failed at browser launch because the required Chromium headless shell executable (revision 1248) is unavailable here. Prior user-executed browser evidence remains valid for the earlier three cases; the new coverage-table case is pending. Run `node scripts/verify.cjs --frontend` in the regular terminal to install the matching browser and check all four cases. [Updated regression evidence](python-regression-verification.json) records current hashes and limitations.
+The browser rerun could not execute assertions: all four cases failed at browser launch because the required Chromium headless shell executable (revision 1248) is unavailable here. Prior user-executed browser evidence remains valid for the earlier three cases; the new coverage-table case is pending. Run `node scripts/verify.cjs --frontend` in the regular terminal to install the matching browser and check all four cases. [Updated regression evidence](evidence/python-regression-verification.json) records current hashes and limitations.
 
 ## Updated browser verification passed
 
-The user reran `node scripts/verify.cjs --frontend` successfully after the data-quality UI changes. All four browser cases passed in 6.5 seconds: four-view audit navigation, mobile navigation/overflow, backend failure/retry state, and missing-versus-invalid coverage reporting. Static checks, dependency installation, TypeScript/Vite build and matching Chromium installation also passed. The supplied npm audit reported zero vulnerabilities. Vite reports a 798.38 kB main JavaScript chunk advisory; it did not fail the build. [Frontend evidence](frontend-milestone-status.json) records the saved verifier result and current source hashes.
+The user reran `node scripts/verify.cjs --frontend` successfully after the data-quality UI changes. All four browser cases passed in 6.5 seconds: four-view audit navigation, mobile navigation/overflow, backend failure/retry state, and missing-versus-invalid coverage reporting. Static checks, dependency installation, TypeScript/Vite build and matching Chromium installation also passed. The supplied npm audit reported zero vulnerabilities. Vite reports a 798.38 kB main JavaScript chunk advisory; it did not fail the build. [Frontend evidence](evidence/frontend-milestone-status.json) records the saved verifier result and current source hashes.
 
 The current verified implementation has 43 passing Python cases and four passing browser cases. Model training remains blocked by the historical source gaps documented in the coverage report.
 
@@ -92,7 +92,7 @@ The current verified implementation has 43 passing Python cases and four passing
 
 Added `quantpilot repair-data --as-of 2026-10-18`: corrected/monthly and alternate daily archive recovery, historical mark/index REST fallback, timestamp/availability checks, conflict rejection, raw evidence retention, hash-verified offline re-audit and fail-closed publication. Seven new regression cases test exact timestamp insertion, preservation of valid history, conflicting partially invalid rows, invalid/duplicate/future candidates, REST provenance/date bounds, missing supplemental evidence and successful/unsuccessful publication. **All 50 Python cases pass** in 21.92 seconds; compilation and seven static checks pass. Four frontend cases remain verified from the preceding user run; no frontend source changed in this recovery work.
 
-The real recovery attempt made 13 bounded public-source requests. All were denied by socket permissions (WinError 10013), so no historical observations were repaired. Run `uv run quantpilot repair-data --as-of 2026-10-18` from the regular terminal to obtain actual provider responses. See [repair evidence](repair-status.json). The source gaps and model release block remain in place.
+The real recovery attempt made 13 bounded public-source requests. All were denied by socket permissions (WinError 10013), so no historical observations were repaired. Run `uv run quantpilot repair-data --as-of 2026-10-18` from the regular terminal to obtain actual provider responses. See [repair evidence](evidence/repair-status.json). The source gaps and model release block remain in place.
 
 ## Network-enabled repair verified
 

@@ -3,7 +3,7 @@ import time
 import httpx
 import pandas as pd
 from .config import settings
-from .data import utc, KLINES
+from .data import utc
 from .store import database, initialize
 from .market_store import PERP, MarketCandle, _upsert, feed_status
 from sqlalchemy import select,func

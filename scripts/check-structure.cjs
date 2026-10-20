@@ -13,20 +13,25 @@ check('Bootstrap configuration uses UTF-8 without BOM',()=>{
  }
 });
 check('JSON configuration syntax',()=>{
- for(const p of ['frontend/package.json','frontend/tsconfig.json','frontend/vercel.json','docs/coverage-report.json','docs/expected-archives.json'])JSON.parse(read(p));
+ for(const p of ['frontend/package.json','frontend/tsconfig.json','frontend/vercel.json','docs/evidence/coverage-report.json','docs/evidence/expected-archives.json'])JSON.parse(read(p));
 });
-check('Nine unique read-only MCP tools and shared services',()=>{
+check('Sixteen unique MCP tools, shared services and loopback-only writes',()=>{
  const mcp=read('src/quantpilot/mcp_server.py');
  const tools=[...mcp.matchAll(/@mcp\.tool\(structured_output=True\)\s+(?:async )?def (\w+)/g)].map(m=>m[1]);
- assert.equal(tools.length,9);assert.equal(new Set(tools).size,9);
+ assert.equal(tools.length,16);assert.equal(new Set(tools).size,16);
  const functions=new Set([...read('src/quantpilot/services.py').matchAll(/^def (\w+)\(/gm)].map(m=>m[1]));
  for(const m of [...mcp.matchAll(/services\.(\w+)\(/g)])assert(functions.has(m[1]),m[1]);
- for(const m of [...read('src/quantpilot/api.py').matchAll(/services\.(\w+)\(/g)])assert(functions.has(m[1]),m[1]);
- assert(!/@app\.(post|put|patch|delete)\(/.test(read('src/quantpilot/api.py')));
+ const api=read('src/quantpilot/api.py');
+ for(const m of [...api.matchAll(/services\.(\w+)\(/g)])assert(functions.has(m[1]),m[1]);
+ assert(!/@app\.(put|patch|delete)\(/.test(api));
+ // Every write route checks the client is this machine before doing anything.
+ for(const m of [...api.matchAll(/@app\.post\('([^']+)'\)\n(?:async )?def \w+\([^)]*\):\n((?:    .*\n){1,3})/g)])
+  assert(m[2].includes('local_only(request)'),m[1]+' must be loopback-only');
+ assert.equal([...api.matchAll(/@app\.post\(/g)].length,[...api.matchAll(/local_only\(request\)/g)].length);
 });
 check('Manifest uniqueness, UTC boundaries and warm-up',()=>{
- const report=JSON.parse(read('docs/coverage-report.json'));
- const m=JSON.parse(read('docs/expected-archives.json'));
+ const report=JSON.parse(read('docs/evidence/coverage-report.json'));
+ const m=JSON.parse(read('docs/evidence/expected-archives.json'));
  assert.equal(m.archives.length,874);
  assert.equal(new Set(m.archives.map(x=>x.filename)).size,874);
  assert.equal(report.expected_5m_windows,221760);
@@ -61,6 +66,6 @@ const result={kind:'static_structure_only',passed:checks,python_files:sourceFile
  python_test_functions:fs.readdirSync('tests').filter(x=>x.endsWith('.py')).reduce((n,p)=>n+[...read('tests/'+p).matchAll(/^def test_/gm)].length,0),
  source_sha256:Object.fromEntries(sourceFiles.map(p=>[p,crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex')])),
  functional_tests:'Not evaluated by static checks; see .verification/result.json and pytest.xml'};
-fs.writeFileSync('docs/static-checks.json',JSON.stringify(result,null,2));
+fs.writeFileSync('docs/evidence/static-checks.json',JSON.stringify(result,null,2));
 console.log(JSON.stringify({passed:checks.length,checks,python_files:result.python_files,python_test_functions:result.python_test_functions,functional_tests:result.functional_tests},null,2));
 

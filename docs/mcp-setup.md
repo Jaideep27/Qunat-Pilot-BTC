@@ -48,7 +48,7 @@ Verify discovery and calls through the real official SDK client with `uv run pyt
 
 Example assistant workflow: call `check_data_coverage`, then `get_market_snapshot`, `get_prediction` and `explain_decision`. Treat stale data and blocked gates as evidence to withhold a trade claim.
 
-The actual trained release **24c8238525d4** passed discovery and all nine structured tool/API comparisons on 19 October 2026. See [smoke evidence](release-smoke.json). Cold Windows startup preloads trusted model/native libraries before starting the stdio event loop. Calls dispatch shared services to threads, and indicator results reuse a cache keyed by the current Parquet file generation. Initial feature/model loading is slower than cached reads.
+The actual trained release **24c8238525d4** passed discovery and all nine structured tool/API comparisons on 19 October 2026. See [smoke evidence](evidence/release-smoke.json). Cold Windows startup preloads trusted model/native libraries before starting the stdio event loop. Calls dispatch shared services to threads, and indicator results reuse a cache keyed by the current Parquet file generation. Initial feature/model loading is slower than cached reads.
 
 
 ## Asking outlook questions from Claude Code

@@ -106,7 +106,19 @@ def strategy_research():
                                                    .where(MarketObservation.family == family)).one()
             forward[family] = dict(rows=int(rows), first=first, last=last)
     folder = runs[-1].parent if runs else None
-    data = dict(status='complete' if report else 'not_run', run=folder.name if folder else None,
+    agent_runs = sorted((settings.artifact_dir/'agent-research').glob('*/report.json'), key=lambda p: p.stat().st_mtime)
+    agent = None
+    if agent_runs:
+        result = json.loads(agent_runs[-1].read_text(encoding='utf-8'))
+        agent = dict(run=agent_runs[-1].parent.name, generated=result.get('generated'), trials=result.get('trials'),
+                     families={name: dict(configurations=f['configurations'], pbo=f.get('pbo'), passed=f['gate']['passed'],
+                                          failed=[k for k, ok in f['gate']['criteria'].items() if not ok], **f['report'])
+                               for name, f in result.get('families', {}).items()},
+                     configurations=[dict(id=name, **{k: c.get(k) for k in ('trades', 'hit_rate', 'break_even', 'mean_net',
+                                                                             'account_return', 'max_drawdown_closed',
+                                                                             'exit_reasons')})
+                                     for name, c in result.get('configurations', {}).items()])
+    data = dict(status='complete' if report else 'not_run', run=folder.name if folder else None, agent=agent,
                 generated=(report or {}).get('generated'), trials=(report or {}).get('trials', {}),
                 passing=(report or {}).get('passing', []), families=families,
                 holdout_evaluated=bool(folder and (folder/'holdout.lock').exists()),
@@ -229,7 +241,28 @@ def prediction():
                     explanation=explanations(bundle["model"], last[bundle["columns"]], bundle["kind"]))
     return envelope(decision, t.isoformat(), "Frozen calibrated model, completed bars")
 
-def research(groups=None):
+MAX_CURVE_POINTS = 400
+
+
+def thin(points, limit=MAX_CURVE_POINTS):
+    """Evenly spaced points for charting, always keeping the first and the last."""
+    if len(points) <= limit:
+        return points
+    step = (len(points)-1)/(limit-1)
+    return [points[round(i*step)] for i in range(limit)]
+
+
+def _summarized(result):
+    """Charts and agents need fold summaries and thinned curves, not every per-fold fill (about 5 MB)."""
+    for row in result.get("comparisons", []):
+        row["walk_forward_policy"] = [{k: v for k, v in fold.items() if not isinstance(v, (list, dict))}
+                                      for fold in row.get("walk_forward_policy", [])]
+        if row.get("trading", {}).get("curve"):
+            row["trading"]["curve"] = thin(row["trading"]["curve"])
+    return result
+
+
+def research(groups=None, detail=False):
     p = settings.artifact_dir / "evaluation.json"
     if not p.exists():
         cached = remote("backtests")
@@ -240,7 +273,7 @@ def research(groups=None):
         status="blocked", comparisons=[], benchmarks={}, reason="Audited historical data and a frozen experiment are required")
     if groups:
         result["comparisons"] = [r for r in result["comparisons"] if r["group"] in groups]
-    return envelope(result, source="Purged walk-forward experiments and untouched holdout")
+    return envelope(result if detail else _summarized(result), source="Purged walk-forward experiments and untouched holdout")
 
 def paper():
     state = portfolio(database())

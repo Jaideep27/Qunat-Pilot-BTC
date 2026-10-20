@@ -31,14 +31,12 @@ def test_confirmed_swing_emitted_only_after_two_following_bars():
 
 def test_incomplete_higher_timeframe_has_no_effect(candles, frames):
     f, _, _ = build_features(candles, frames)
-    i = 2101  # Choose any non-4h-close row then compare within its completed 4h bin.
     group = f.index.floor("4h")
     columns = [c for c in f if c.startswith("4h_")]
     for _, part in f[columns].groupby(group):
         assert (part.nunique(dropna=False) <= 1).all()
 
 def test_availability_and_stale_tolerance(candles, frames):
-    t = candles.available_at.iloc[100]
     frames["positioning"] = frames["positioning"].iloc[[101]].copy()
     joined = join_external(candles.iloc[100:110], frames)
     assert pd.isna(joined.open_interest.iloc[0])

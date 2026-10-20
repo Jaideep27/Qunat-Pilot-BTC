@@ -1,6 +1,5 @@
 """Local continuous collector, resumable history, and serialized paper updates."""
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 import time
 import os
 import json

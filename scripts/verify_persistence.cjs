@@ -29,7 +29,7 @@ const median=values=>{const sorted=[...values].sort((a,b)=>a-b),middle=Math.floo
   report.price_changed=new Set(report.observations.map(row=>row.close)).size>1;
   report.status=writes.length>=2?'periodic_postgresql_updates_verified':'no_database_advance_observed';
   report.note='Intervals describe observed receipt timestamps, not exchange-to-database or exchange-to-browser latency. A small local sample does not establish uptime.';
-  fs.writeFileSync('docs/persistence-runtime.json',JSON.stringify(report,null,2)+'\n');
+  fs.writeFileSync('docs/evidence/persistence-runtime.json',JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({...report,observations:report.observations.length},null,2));
   if(writes.length<2)process.exitCode=2;
 })().catch(error=>{console.error(error.message);process.exitCode=1});

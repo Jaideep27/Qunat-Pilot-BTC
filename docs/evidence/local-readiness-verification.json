@@ -17,7 +17,7 @@
     ]
   },
   "recovery": {
-    "evidence": "docs/recovery-verification.json",
+    "evidence": "docs/evidence/recovery-verification.json",
     "status": "passed",
     "archives": [
       {
@@ -39,7 +39,7 @@
     ]
   },
   "doctor": {
-    "evidence": "docs/local-doctor.json",
+    "evidence": "docs/evidence/local-doctor.json",
     "checked_at": "2026-10-19T17:54:14.530533+00:00",
     "ready": false,
     "checks": {
@@ -158,7 +158,7 @@
     ]
   },
   "runtime": {
-    "evidence": "docs/operations-runtime.json",
+    "evidence": "docs/evidence/operations-runtime.json",
     "checked_at": "2026-10-19T14:19:25.735057+00:00",
     "ready": false,
     "checks": {
@@ -291,9 +291,9 @@
     ".verification/local-readiness-pytest.xml": "a1efcb6c6369bdcb1c731cd7bbe20e77750d93e40af513b4fc26cc935a2f1d7f",
     ".verification/local-readiness-browser.json": "16bdf0febea4700ac1a6a64c9f98a1ec6fde901dc639b2262ca2072e840b4a29",
     ".verification/postgres-platform.json": "242c593b3e87229a0eaffe04945e1ed690ca9fe9bed0d0205444c47b4911dfb3",
-    "docs/operations-runtime.json": "eef23dbaa5c9d86821ac42ed0b3b5885fa7650631a4e9b2e39262984dd37bff6",
-    "docs/static-checks.json": "7087bb3e933d2b8b016b1dbba52ce32d5bd20e981f65a2eda86f2bcb5bd3c6e2",
-    "docs/local-doctor.json": "8a76c8a45a850bf44cfa8496d618f452b0149846187dbc549fd73290e001a7f4",
-    "docs/recovery-verification.json": "ee54b214f8826387586a7a4336e1fcadb7bfc906bbad22551f9ec9caefe266e1"
+    "docs/evidence/operations-runtime.json": "eef23dbaa5c9d86821ac42ed0b3b5885fa7650631a4e9b2e39262984dd37bff6",
+    "docs/evidence/static-checks.json": "7087bb3e933d2b8b016b1dbba52ce32d5bd20e981f65a2eda86f2bcb5bd3c6e2",
+    "docs/evidence/local-doctor.json": "8a76c8a45a850bf44cfa8496d618f452b0149846187dbc549fd73290e001a7f4",
+    "docs/evidence/recovery-verification.json": "ee54b214f8826387586a7a4336e1fcadb7bfc906bbad22551f9ec9caefe266e1"
   }
 }

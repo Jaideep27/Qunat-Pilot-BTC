@@ -11,7 +11,7 @@ import pandas as pd
 from filelock import FileLock
 
 from .data import (BASE, KLINES, VALUES, audit_cached, audit_frames, dataset_hashes,
-                   fetch, load_frames, manifest, parse, period, utc)
+                   fetch, load_frames, manifest, parse, period)
 
 
 def targets(frames, as_of=None):

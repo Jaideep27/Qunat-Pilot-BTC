@@ -38,7 +38,7 @@ Returns are simulated and net of modeled fees, slippage and realized funding. Pr
 
 | Strategy | Net return | Max drawdown |
 |---|---:|---:|
-'''+'\n'.join(benchmarks)+f'''
+'''+'\n'.join(benchmarks)+'''
 
 The passive comparator is fully collateralized BTC perpetual exposure, with entry/exit costs and actual funding. The moving-average comparator uses the shared active risk/accounting engine. No-trade holds cash.
 
@@ -48,7 +48,7 @@ Each expanding fold fits candidates on past data, calibrates separately, selects
 
 | Test month start | Selected model | Confidence threshold | Net return | Max drawdown | Closed trades |
 |---|---|---:|---:|---:|---:|
-'''+'\n'.join(policy)+f'''
+'''+'\n'.join(policy)+'''
 
 ## Full-group holdout calibration
 
@@ -58,7 +58,7 @@ Each expanding fold fits candidates on past data, calibrates separately, selects
 
 ## Coverage and exclusions
 
-Strict source completeness is false. The user-authorized policy quarantines {quality['quarantine']['source_rows']} affected positioning rows and dependent feature windows without interpolation. All families and calendar months are retained. There are {quality['positioning_lookback_exclusions']} positioning/lookback exclusions; total research exclusions are {quality['excluded_rows']} including the final label/purge boundary. Exact invalid-feature windows are listed in [excluded-windows.csv](excluded-windows.csv); monthly eligibility is in [data-quality.json](data-quality.json).
+Strict source completeness is false. The user-authorized policy quarantines {quality['quarantine']['source_rows']} affected positioning rows and dependent feature windows without interpolation. All families and calendar months are retained. There are {quality['positioning_lookback_exclusions']} positioning/lookback exclusions; total research exclusions are {quality['excluded_rows']} including the final label/purge boundary. Exact invalid-feature windows are listed in [excluded-windows.csv](excluded-windows.csv); monthly eligibility is in [data-quality.json](evidence/data-quality.json).
 
 ## Costs, identity and limits
 

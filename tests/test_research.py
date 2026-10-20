@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from quantpilot.research import splits, fit_model, metrics, train, PURGE
+from quantpilot.research import splits, fit_model, train, PURGE
 
 def test_expanding_folds_purge_and_holdout():
     index=pd.date_range("2024-01-01","2026-01-01",freq="5min",tz="UTC")

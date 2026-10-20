@@ -1,8 +1,6 @@
 """Resumable, source-separated history acquisition into the market database."""
 import hashlib
 import io
-import json
-from pathlib import Path
 import time
 import zipfile
 import httpx

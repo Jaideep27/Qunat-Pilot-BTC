@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 from sqlalchemy import select,func
-from quantpilot.market_store import save_frame,candles,summary,MarketCandle,MarketObservation,PERP,SPOT,SYMBOL
+from quantpilot.market_store import save_frame,candles,summary,MarketCandle,MarketObservation,PERP,SPOT,SYMBOL  # noqa: F401,F811  candles is read via globals()
 from quantpilot.charting import studies
 
 

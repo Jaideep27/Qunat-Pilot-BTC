@@ -22,7 +22,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy import JSON, Column, String, select
 from sqlalchemy.orm import Session
-from xgboost import XGBClassifier, XGBRegressor
+from xgboost import XGBClassifier
 
 from . import event_research as er
 from .config import settings

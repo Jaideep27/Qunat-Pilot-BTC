@@ -1,7 +1,6 @@
 """Pre-registered signal families: each outputs +1/-1/0 from information known at the bar's close."""
 import numpy as np
 import pandas as pd
-import pytest
 
 from quantpilot import signals
 

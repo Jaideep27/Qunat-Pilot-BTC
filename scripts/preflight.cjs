@@ -24,7 +24,7 @@ for(let t=+warmup;t<+end;t+=86400000){
 }
 assert.equal(new Set(manifest.map(x=>x.filename)).size,manifest.length);
 fs.mkdirSync('docs',{recursive:true});
-fs.writeFileSync('docs/expected-archives.json',JSON.stringify({start:start.toISOString(),end_exclusive:end.toISOString(),warmup_start:warmup.toISOString(),archives:manifest},null,2));
+fs.writeFileSync('docs/evidence/expected-archives.json',JSON.stringify({start:start.toISOString(),end_exclusive:end.toISOString(),warmup_start:warmup.toISOString(),archives:manifest},null,2));
 async function probe(url){
   try{
     const r=await fetch(url,{signal:AbortSignal.timeout(10000)});
@@ -41,7 +41,7 @@ async function probe(url){
     warmup_start:warmup.toISOString(),expected_archive_counts:counts,expected_archives:manifest.length,
     expected_5m_windows:(+end-+warmup)/300000,verified_archives:0,probes,
     reason:'Connectivity preflight only. No historical observations or checksums have been verified. Run the Python audit in a network-enabled environment.'};
-  fs.writeFileSync('docs/coverage-report.json',JSON.stringify(result,null,2));
+  fs.writeFileSync('docs/evidence/coverage-report.json',JSON.stringify(result,null,2));
   console.log(JSON.stringify(result,null,2));
 })().catch(e=>{console.error(e);process.exitCode=1});
 

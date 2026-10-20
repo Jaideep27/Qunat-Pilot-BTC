@@ -1,10 +1,8 @@
 """Durable market history, independent of the immutable research dataset."""
-from datetime import timedelta
 import math
-import json
 from pathlib import Path
 import pandas as pd
-from sqlalchemy import Column, String, DateTime, Float, Boolean, JSON, Index, select, func, text
+from sqlalchemy import Column, String, DateTime, Float, Boolean, JSON, Index, select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from .store import Base, database
