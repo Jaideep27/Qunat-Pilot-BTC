@@ -93,6 +93,7 @@ def hourly_panel(frames, macro_events=None):
     close, low, high, volume = hours.close, hours.low, hours.high, hours.volume
     panel = technical(hours)[['rsi_14', 'ema_50_distance', 'adx', 'atr_fraction']].copy()
     panel['close'] = close
+    panel['high'], panel['low'], panel['volume'] = high, low, volume
     panel['ret_24h'] = close/close.shift(24)-1
     panel['realized_vol_24h'] = np.log(close).diff().rolling(24).std()*np.sqrt(24)
     panel['dist_7d_low'] = close/low.shift(1).rolling(168).min()-1
