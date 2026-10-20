@@ -321,21 +321,21 @@ def claude_status():
 LIMIT_MESSAGE = re.compile(r'usage limit|hit your limit|limit reached|rate.?limit', re.I)
 
 
-def invoke_claude(items):
-    """`claude -p` on the saved subscription: no tools, MCP servers, hooks, skills or saved session."""
+def claude_json(system, prompt, schema):
+    """`claude -p` on the saved subscription with no tools, MCP servers, hooks, skills or saved session."""
     command = claude_executable()
     if not command:
         raise FileNotFoundError('Claude Code CLI missing')
     with tempfile.TemporaryDirectory(prefix='quantpilot-claude-') as work:
-        system, hooks = Path(work)/'system.txt', Path(work)/'settings.json'
-        system.write_text(CLAUDE_SYSTEM, encoding='utf-8')
+        system_file, hooks = Path(work)/'system.txt', Path(work)/'settings.json'
+        system_file.write_text(system, encoding='utf-8')
         hooks.write_text(json.dumps({'disableAllHooks': True}), encoding='utf-8')
         args = [command, '-p', '--model', settings.news_claude_model, '--effort', settings.news_claude_effort,
-                '--output-format', 'json', '--json-schema', json.dumps(Batch.model_json_schema()),
+                '--output-format', 'json', '--json-schema', json.dumps(schema),
                 '--tools', '', '--strict-mcp-config', '--settings', str(hooks), '--disable-slash-commands',
-                '--no-session-persistence', '--system-prompt-file', str(system)]
-        # Article text is stdin, never an argument; the empty working directory has no CLAUDE.md.
-        result = subprocess.run(args, input=task_prompt(items), capture_output=True, text=True, encoding='utf-8',
+                '--no-session-persistence', '--system-prompt-file', str(system_file)]
+        # Untrusted text is stdin, never an argument; the empty working directory has no CLAUDE.md.
+        result = subprocess.run(args, input=prompt, capture_output=True, text=True, encoding='utf-8',
                                 cwd=work, env=claude_env(), timeout=settings.news_timeout_seconds)
     if len(result.stdout or '') > 200_000:
         raise ValueError('oversized agent response')
@@ -346,11 +346,16 @@ def invoke_claude(items):
     if result.returncode or output.get('is_error'):
         message = f"{output.get('result', '')} {result.stderr or ''}"
         if output.get('api_error_status') == 429 or LIMIT_MESSAGE.search(message):
-            raise UsageLimitReached('Claude usage limit reached; analysis is delayed')
+            raise UsageLimitReached('Claude usage limit reached')
         raise RuntimeError('Claude Code failed; check login, plan allowance and model availability locally')
     if output.get('structured_output') is None:
         raise ValueError('missing structured output')
-    return validate_batch(output['structured_output'], items)
+    return output['structured_output']
+
+
+def invoke_claude(items):
+    """News extraction through the shared Claude JSON helper."""
+    return validate_batch(claude_json(CLAUDE_SYSTEM, task_prompt(items), Batch.model_json_schema()), items)
 
 
 PROVIDERS = {'codex': dict(model='news_model', status='codex_status', invoke='invoke_codex'),
