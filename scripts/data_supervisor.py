@@ -13,7 +13,7 @@ from quantpilot.config import settings
 from quantpilot.store import database, initialize
 from quantpilot.market_store import feed_status
 from quantpilot.operations import next_paper_run
-from quantpilot import macro, news
+from quantpilot import forecaster, macro, news
 
 
 def repeating_history():
@@ -40,6 +40,16 @@ def macro_calendar():
         time.sleep(3600)
 
 
+def shadow_forecasts():
+    # Research forecasts every 15 minutes (minutes 7/22/37/52, after the paper worker); refits once a day.
+    engine=database()
+    while True:
+        try:print(json.dumps(dict(forecasts=forecaster.run_cycle(engine)),default=str),flush=True)
+        except Exception as exc:print(json.dumps(dict(forecasts='blocked',error_type=type(exc).__name__)),flush=True)
+        now=pd.Timestamp.now(tz='UTC');target=now.floor('15min')+pd.Timedelta(minutes=7)
+        time.sleep(max(1,((target if target>now else target+pd.Timedelta(minutes=15))-now).total_seconds()))
+
+
 def paper():
     engine=database(settings.market_database_url)
     while True:
@@ -57,8 +67,8 @@ if __name__=='__main__':
             (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=time.time())),encoding='utf-8')
             initialize(database(settings.market_database_url))
             initialize(database())
-            with ThreadPoolExecutor(max_workers=5) as pool:
-                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar)]
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts)]
                 for future in futures:future.result()
     except Timeout:
         print('A data supervisor is already running.',flush=True)

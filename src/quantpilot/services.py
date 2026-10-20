@@ -61,6 +61,22 @@ def macro():
     return envelope(data, observed, 'FRED release calendar / Federal Reserve FOMC calendar / ALFRED first releases',
                     max_age=40*86400)
 
+def shadow_forecasts(limit=50):
+    """Latest research forecast per horizon, the forward record and how the champion was chosen."""
+    from .forecaster import forecasts, forward_summary, latest_report
+    rows = forecasts(database(), limit)
+    latest = {}
+    for row in rows:
+        latest.setdefault(row['horizon'], row)
+    _, report = latest_report()
+    summary = (report or {}).get('summary', {})
+    data = dict(latest=list(latest.values()), recent=rows, forward=forward_summary(database()),
+                champions=summary.get('champions', {}), backtest_overfitting=summary.get('backtest_overfitting', {}),
+                status='shadow_only_never_trades',
+                note='Research forecasts are recorded and scored forward; they never place or size paper trades.')
+    observed = max((r['cutoff'] for r in latest.values()), default=None)
+    return envelope(data, observed, 'Validated research champion, refitted on recent market history', max_age=1800)
+
 def market_root():
     live = settings.data_dir / "live"
     return live if (live / "candles.parquet").exists() else settings.data_dir

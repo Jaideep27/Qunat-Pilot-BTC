@@ -34,6 +34,11 @@ async def get_news_events(limit: Annotated[int, Field(ge=1, le=100)] = 20) -> di
     return await asyncio.to_thread(services.news, limit)
 
 @mcp.tool(structured_output=True)
+async def get_shadow_forecasts() -> dict[str, Any]:
+    """Research forecasts (1h/4h/24h direction, ranges, drop risk, volatility) with their forward record; never trades."""
+    return await asyncio.to_thread(services.shadow_forecasts)
+
+@mcp.tool(structured_output=True)
 async def get_macro_calendar() -> dict[str, Any]:
     """Upcoming CPI, jobs and FOMC releases plus recent first-release values; no consensus surprise."""
     return await asyncio.to_thread(services.macro)

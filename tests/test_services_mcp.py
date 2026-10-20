@@ -32,7 +32,7 @@ def test_official_sdk_stdio_discovery_calls_and_invalid_inputs(account):
                 discovered=await session.list_tools()
                 assert {t.name for t in discovered.tools} == {"get_market_snapshot","get_indicators",
                     "get_market_positioning","get_sentiment","check_data_coverage","get_prediction",
-                    "explain_decision","compare_backtests","get_paper_portfolio","get_news_events","get_macro_calendar"}
+                    "explain_decision","compare_backtests","get_paper_portfolio","get_news_events","get_macro_calendar","get_shadow_forecasts"}
                 expected = {
                     "get_market_snapshot": services.candles,
                     "get_indicators": services.indicators,
@@ -45,6 +45,7 @@ def test_official_sdk_stdio_discovery_calls_and_invalid_inputs(account):
                     "get_paper_portfolio": services.paper,
                     "get_news_events": services.news,
                     "get_macro_calendar": services.macro,
+                    "get_shadow_forecasts": services.shadow_forecasts,
                 }
                 for tool in discovered.tools:
                     assert tool.outputSchema["type"] == "object"
@@ -77,3 +78,10 @@ def test_shared_feature_cache_invalidates_on_market_file_change(account,monkeypa
     path.write_bytes(b"second file generation")
     second=services.feature_data()
     assert len(calls)==2 and second[0]["generation"]==2
+
+
+
+def test_forecast_api_is_read_only_and_matches_service(account):
+    with TestClient(app) as client:
+        assert client.get('/api/v1/forecasts').json()['data'] == services.shadow_forecasts()['data']
+        assert client.post('/api/v1/forecasts').status_code == 405

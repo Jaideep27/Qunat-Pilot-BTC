@@ -38,6 +38,7 @@ def initialize(engine):
     from . import operations  # register persistent worker-run evidence
     from . import news  # register versioned news and reasoning evidence
     from . import macro  # register the official macro release calendar
+    from . import forecaster  # register shadow forecasts and their scored outcomes
     with serialized(engine) as session:
         Base.metadata.create_all(session.connection())
         if engine.dialect.name == "postgresql":

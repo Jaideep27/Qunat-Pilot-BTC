@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     news_claude_command: str = 'claude'
     news_claude_effort: str = 'low'
     news_timeout_seconds: int = Field(120, ge=10, le=300)
+    # Shadow forecaster: refit the research champion on this much recent history this often.
+    forecast_refit_hours: int = Field(24, ge=1, le=720)
+    forecast_history_days: int = Field(730, ge=120, le=1825)
     cors_origins: list[str] = ['http://localhost:5173']
 
 class RiskConfig(BaseSettings):
