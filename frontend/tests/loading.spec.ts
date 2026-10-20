@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 
-test('market avoids downloading research and portfolio until their views are opened',async({page})=>{
+test('overview avoids downloading research and portfolio until their views are opened',async({page})=>{
   const requested:string[]=[];
   const data:Record<string,unknown>={candles:[],indicators:{},positioning:[],sentiment:[],
     predictions:{action:'NO_TRADE',reasons:['MODEL_RELEASE_BLOCKED']},
@@ -15,15 +15,16 @@ test('market avoids downloading research and portfolio until their views are ope
       config_version:'fixture',model_version:null}});
   });
   await page.goto('/');
-  await expect(page.getByRole('heading',{name:'The market, in context.'})).toBeVisible();
-  await expect.poll(()=>requested.includes('coverage')).toBe(true);
+  await expect(page.getByRole('heading',{name:'Overview',level:1})).toBeVisible();
+  await expect.poll(()=>requested.includes('indicators')).toBe(true);
   expect(requested).not.toContain('backtests');
   expect(requested).not.toContain('portfolio');
   await page.getByRole('button',{name:'Research',exact:true}).click();
   await expect.poll(()=>requested.includes('backtests')).toBe(true);
+  await page.getByText('Original release model (2026)').click();
   await expect(page.getByText('Research has not been released')).toBeVisible();
   expect(requested).not.toContain('portfolio');
-  await page.getByRole('button',{name:'Paper portfolio',exact:true}).click();
+  await page.getByRole('button',{name:'Paper',exact:true}).click();
   await expect.poll(()=>requested.includes('portfolio')).toBe(true);
   await expect(page.getByRole('heading',{name:'Execution ledger'})).toBeVisible();
 });

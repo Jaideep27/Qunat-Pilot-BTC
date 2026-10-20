@@ -27,7 +27,7 @@ export default function NewsPanel(){
     {d&&<><p className="panel-source">{d.scope} News reasoning does not change the released trading policy.</p>
       <div className="indicator-list">{d.feeds.map(f=><div key={f.source}><span>{f.source}</span><strong>{f.status} · {new Date(f.checked_at).toLocaleString()}</strong></div>)}</div>
       {!d.items.length&&<p>No news collected yet. Sentiment is unavailable until verified observations arrive.</p>}
-      {d.items.slice(0,12).map(i=><article key={i.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+      {d.items.slice(0,12).map(i=><article key={i.id} className='news-item'>
         <a href={/^https?:\/\//.test(i.url)?i.url:undefined} target="_blank" rel="noreferrer">{i.title}</a>
         <p>{i.excerpt}</p><small>{i.source} · Collected {new Date(i.available_at).toLocaleString()} · Publication {i.published_at?new Date(i.published_at).toLocaleString():'unknown'}</small>
       </article>)}

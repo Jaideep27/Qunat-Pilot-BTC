@@ -6,7 +6,7 @@ test('PostgreSQL workspace switches timeframes, studies and persists drawings',a
   await page.setViewportSize({width:1440,height:1000});
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/#chart');
-  await expect(page.getByRole('heading',{name:'Trading workspace.'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Chart',level:1})).toBeVisible();
   await expect(page.getByRole('img',{name:'Interactive BTCUSDT chart'})).toBeVisible();
   await expect(page.getByText('postgresql',{exact:true})).toBeVisible({timeout:60000});
   await expect(page.getByLabel('Chart market',{exact:true})).toHaveText('BTCUSDT');

@@ -54,10 +54,10 @@ check('Local Markdown document links resolve',()=>{
   if(!target.includes('://')&&!target.startsWith('#'))assert(fs.existsSync(path.resolve(path.dirname(f),target.split('#')[0])),f+': '+target);
  }
 });
-check('Four dashboard views, attribution and browser audit source exist',()=>{
- const ui=read('frontend/src/main.tsx');
- for(const tab of ['Market','Prediction','Research','Paper portfolio'])assert(ui.includes(tab));
- assert(ui.includes('https://www.tradingview.com/'));
+check('Seven dashboard views, attribution and browser audit source exist',()=>{
+ const routes=read('frontend/src/routes.ts');
+ for(const tab of ['Overview','Chart','Ask','Research','Paper','News','System'])assert(routes.includes("label:'"+tab+"'"),tab);
+ assert(read('frontend/src/main.tsx').includes('https://www.tradingview.com/'));
  assert(read('frontend/tests/dashboard.spec.ts').includes('Execution ledger'));
  assert(read('.github/workflows/paper.yml').includes('2,17,32,47 * * * *'));
 });

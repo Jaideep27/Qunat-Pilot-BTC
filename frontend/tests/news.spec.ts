@@ -30,7 +30,7 @@ async function open(page:Page,status:string,newsData?:unknown){
   await page.goto('/');await page.waitForLoadState('networkidle');
   // Record only the requests made by the News tab itself.
   requested.length=0;
-  await page.getByRole('button',{name:'News & events',exact:true}).click();
+  await page.getByRole('button',{name:'News',exact:true}).click();
   await expect(page.getByRole('region',{name:'News evidence'})).toBeVisible();
   return requested;
 }
@@ -42,7 +42,7 @@ test('usage-limited analysis is shown as delayed with the last completed evidenc
   await expect(panel).toContainText('CPI rose 0.3 percent.');
   await expect(panel).toContainText('new information');
   await expect(panel).toContainText('BLS · CPI');
-  await expect(page.getByRole('heading',{level:1})).toHaveText('What moved the market, and when.');
+  await expect(page.getByRole('heading',{level:1})).toHaveText('News & macro');
   expect(requested).not.toContain('portfolio');
 });
 

@@ -19,7 +19,7 @@ test('chat shows replies, tools used, answer cards and quant-only quick question
     if(url.pathname.endsWith('/ask')) return route.fulfill({json:{data:answer}});
     return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
   });
-  await page.goto('/');await page.getByRole('button',{name:'Chat',exact:true}).click();
+  await page.goto('/');await page.getByRole('button',{name:'Ask',exact:true}).click();
   const chat=page.getByRole('region',{name:'QuantPilot chat'});
   await chat.getByRole('textbox',{name:'Message'}).fill('up or down next 4h');
   await chat.getByRole('button',{name:'Send'}).click();
@@ -48,7 +48,7 @@ async function openChat(page:import('@playwright/test').Page,chatReply:object){
       {role:'assistant',...chatReply,answers:(chatReply as {answer_ids:string[]}).answer_ids.length?[scored]:[]}]}}});
     return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
   });
-  await page.goto('/');await page.getByRole('button',{name:'Chat',exact:true}).click();
+  await page.goto('/');await page.getByRole('button',{name:'Ask',exact:true}).click();
   const chat=page.getByRole('region',{name:'QuantPilot chat'});
   await chat.getByRole('textbox',{name:'Message'}).fill('q');await chat.getByRole('button',{name:'Send'}).click();
   return chat;

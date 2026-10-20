@@ -12,7 +12,8 @@ test('strategy research shows hit rate with call rate, the verdict and forward d
     const values:Record<string,unknown>={candles:[],indicators:{},positioning:[],sentiment:[],coverage:{release_ready:false},
       predictions:{action:'NO_TRADE',reasons:['WEAK_FORECAST']},'strategy-research':data};
     return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});});
-  await page.goto('/');await page.getByRole('button',{name:'Prediction',exact:true}).click();
+  await page.goto('/');await page.getByRole('button',{name:'Research',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Research',level:1})).toBeVisible({timeout:30000});
   const panel=page.getByRole('region',{name:'Strategy research'});
   await expect(panel).toContainText('No strategy passed');
   await expect(panel).toContainText('58.3% (52.6–63.8%)');

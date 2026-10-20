@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {post,request} from './api';
 
 type Evidence=Record<string,{value:number|null;percentile:number|null;label:string}>;
@@ -44,7 +44,7 @@ function Scoreboard({board}:{board:Board|null}){
   </section>;
 }
 
-export default function Chat(){
+export default function Chat({seed}:{seed?:{text:string;id:number}|null}={}){
   const [threads,setThreads]=useState<Thread[]>([]),[thread,setThread]=useState<string|null>(null);
   const [messages,setMessages]=useState<Message[]>([]),[text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [board,setBoard]=useState<Board|null>(null);
@@ -60,6 +60,9 @@ export default function Chat(){
     try{const r=await post<Answer>('ask',{question:q,ai:false});
       setMessages(m=>[...m,{role:'user',text:q},{role:'assistant',text:'Quant-only answer',answers:[r.data]}]);void loadBoard()}
     catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}};
+  // A question typed in the top bar arrives here and gets an instant quant-only answer.
+  const handled=useRef<number|null>(null);
+  useEffect(()=>{if(seed?.text&&handled.current!==seed.id){handled.current=seed.id;void quick(seed.text)}},[seed?.id]);// eslint-disable-line react-hooks/exhaustive-deps
   return <>
   <section className="panel chat-panel" aria-label="QuantPilot chat">
     <div className="panel-heading"><h2>Chat</h2><span className="subtle-tag">CLAUDE · QUANTPILOT TOOLS ONLY · NEVER TRADES</span></div>
