@@ -133,3 +133,34 @@ def test_interrupted_experiment_resumes_without_refitting_finished_work(account,
     assert report['resumed_results'] == len(first)
     with pytest.raises(ValueError, match='different configuration'):
         er.train_experiment(tmp_path/'run', frames=frames, macro_events=macro_events, **{**SMALL, 'folds': 2})
+
+
+
+def row(fold, group, val_skill, test_skill, horizon='1h', training='expanding'):
+    """Skill = constant Brier minus model Brier (positive is better than the base rate)."""
+    return dict(fold=fold, group=group, training=training, horizon=horizon,
+                validation_brier=.25-val_skill, validation_constant_brier=.25,
+                brier=.25-test_skill, constant_brier=.25)
+
+
+def test_champion_is_chosen_on_validation_never_on_test():
+    rows = [row(f, 'A', .004, -.002) for f in range(3)] + [row(f, 'B', .001, .009) for f in range(3)]
+    best = er.champions(rows)['1h']
+    assert (best['group'], best['training']) == ('A', 'expanding')  # B looks better only on test
+    assert best['test_skill'] == pytest.approx(-.002) and best['configurations_tried'] == 2
+    assert best['folds_beating_constant'] == 0
+
+
+def test_no_validation_skill_falls_back_to_the_constant_forecast():
+    rows = [row(f, g, -.001, .003) for f in range(3) for g in ('A', 'B')]
+    assert er.champions(rows)['1h']['group'] == 'constant'
+
+
+def test_probability_of_backtest_overfitting_counts_folds_where_the_pick_fails_out_of_sample():
+    # Fold 0: validation pick A is best on test. Folds 1-2: pick A ranks last on test.
+    rows = [row(0, 'A', .005, .004), row(0, 'B', .001, .001), row(0, 'C', .0, .0),
+            row(1, 'A', .005, -.003), row(1, 'B', .001, .002), row(1, 'C', .0, .001),
+            row(2, 'A', .005, -.001), row(2, 'B', .001, .0), row(2, 'C', .0, .002)]
+    result = er.backtest_overfitting(rows)['1h']
+    assert result['folds'] == 3
+    assert result['pbo'] == pytest.approx(2/3)

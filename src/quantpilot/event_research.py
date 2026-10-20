@@ -198,7 +198,7 @@ def _coverage(close, test, bars, variance, ok):
 def quantile_ranges(x, y, tr, te, seed):
     """Multi-quantile XGBoost versus unconditional training quantiles (pinball loss; 80% interval coverage)."""
     model = XGBRegressor(objective='reg:quantileerror', quantile_alpha=np.array(QUANTILES), n_estimators=80,
-                         max_depth=3, learning_rate=.05, reg_lambda=8, n_jobs=2, random_state=seed)
+                         max_depth=3, learning_rate=.05, reg_lambda=8, min_child_weight=50, subsample=.8, colsample_bytree=.8, n_jobs=2, random_state=seed)
     model.fit(x.loc[tr], y.loc[tr])
     predicted = np.sort(model.predict(x.loc[te]), axis=1)  # prevent crossing quantiles
     actual = y.loc[te].to_numpy()
@@ -218,7 +218,7 @@ def drop_risk(x, target, windows, seed):
     if y.loc[tr].sum() < 20 or y.loc[ca].nunique() < 2:
         return None, dict(status='skipped', reason='too few large drops to fit and calibrate',
                           train_positives=int(y.loc[tr].sum()))
-    model = XGBClassifier(n_estimators=80, max_depth=3, learning_rate=.05, reg_lambda=8, n_jobs=2,
+    model = XGBClassifier(n_estimators=80, max_depth=3, learning_rate=.05, reg_lambda=8, min_child_weight=50, subsample=.8, colsample_bytree=.8, n_jobs=2,
                           random_state=seed, eval_metric='logloss')
     model.fit(x.loc[tr], y.loc[tr])
     model = CalibratedClassifierCV(FrozenEstimator(model), method='sigmoid').fit(x.loc[ca], y.loc[ca])
@@ -316,7 +316,7 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                         continue
                     models = [make_pipeline(StandardScaler(), LogisticRegression(C=.1, max_iter=500)),
                               XGBClassifier(n_estimators=60, max_depth=3, learning_rate=.05,
-                                            reg_lambda=8, n_jobs=2, random_state=seed, eval_metric='logloss')]
+                                            reg_lambda=8, min_child_weight=50, subsample=.8, colsample_bytree=.8, n_jobs=2, random_state=seed, eval_metric='logloss')]
                     calibrated, vp, tp = [], [], []
                     for model in models:
                         model.fit(x.loc[tr], target.loc[tr])
@@ -326,7 +326,7 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                         vp.append(model.predict_proba(x.loc[va])[:, 1])
                         tp.append(model.predict_proba(x.loc[te])[:, 1])
                     weights = {}
-                    combined = np.zeros(len(te))
+                    combined, combined_val = np.zeros(len(te)), np.zeros(len(va))
                     for state in (0, 1):
                         mask = (regime.loc[va].to_numpy() == state)
                         # Small conditions shrink back to overall validation.
@@ -337,6 +337,8 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                         weights[str(state)] = w.tolist()
                         test_mask = regime.loc[te].to_numpy() == state
                         combined[test_mask] = np.array(tp)[:, test_mask].T @ w
+                        val_mask = regime.loc[va].to_numpy() == state
+                        combined_val[val_mask] = np.array(vp)[:, val_mask].T @ w
                     returns = y['return_'+horizon]
                     ridge = make_pipeline(StandardScaler(), Ridge(alpha=100.))
                     ridge.fit(x.loc[tr], returns.loc[tr])
@@ -347,6 +349,8 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
                         train_rows=len(tr), test_rows=len(te),
                         windows={k: [v.min().isoformat(), v.max().isoformat()] for k, v in windows.items()},
                         weights=weights, brier=brier(target.loc[te], combined),
+                        validation_brier=brier(target.loc[va], combined_val),
+                        validation_constant_brier=brier(target.loc[va], np.repeat(target.loc[tr].mean(), len(va))),
                         constant_brier=brier(target.loc[te], constant),
                         auc=float(roc_auc_score(target.loc[te], combined)) if target.loc[te].nunique() > 1 else None,
                         skill_vs_constant=block_bootstrap_skill(target.loc[te], combined, constant, te, seed),
@@ -385,6 +389,62 @@ def train_experiment(output, folds=4, frames=None, runs=None, macro_events=None,
     return report
 
 
+def _skills(rows, horizon, kind):
+    """Per (group, training): fold -> skill, where skill = constant Brier minus model Brier."""
+    out = {}
+    for r in rows:
+        if r['horizon'] != horizon or r.get(f'{kind}brier') is None:
+            continue
+        out.setdefault((r['group'], r['training']), {})[r['fold']] = r[f'{kind}constant_brier']-r[f'{kind}brier']
+    return out
+
+
+def champions(rows):
+    """Per horizon, the configuration with the best mean VALIDATION skill; test results are only reported.
+
+    If nothing beats the constant base rate on validation, the champion is the constant forecast.
+    """
+    result = {}
+    for horizon in dict.fromkeys(r['horizon'] for r in rows):
+        validation, test = _skills(rows, horizon, 'validation_'), _skills(rows, horizon, '')
+        if not validation:
+            continue
+        mean = {k: float(np.mean(list(v.values()))) for k, v in validation.items()}
+        best = max(mean, key=mean.get)
+        if mean[best] <= 0:
+            result[horizon] = dict(group='constant', training=None, validation_skill=0.0, test_skill=0.0,
+                                   folds_beating_constant=None, configurations_tried=len(mean),
+                                   note='No configuration beat the base rate on validation')
+            continue
+        scores = list(test.get(best, {}).values())
+        result[horizon] = dict(group=best[0], training=best[1], validation_skill=mean[best],
+                               test_skill=float(np.mean(scores)) if scores else None,
+                               folds_beating_constant=int(sum(s > 0 for s in scores)), folds=len(scores),
+                               configurations_tried=len(mean))
+    return result
+
+
+def backtest_overfitting(rows):
+    """Probability of backtest overfitting: share of folds whose validation pick ranks at or below the
+    median of that fold's test results (rank logit <= 0), after Bailey et al.'s CSCV idea."""
+    result = {}
+    for horizon in dict.fromkeys(r['horizon'] for r in rows):
+        validation, test = _skills(rows, horizon, 'validation_'), _skills(rows, horizon, '')
+        folds = sorted({f for v in validation.values() for f in v})
+        logits = []
+        for fold in folds:
+            configs = [k for k in validation if fold in validation[k] and fold in test.get(k, {})]
+            if len(configs) < 2:
+                continue
+            pick = max(configs, key=lambda k: validation[k][fold])
+            ordered = sorted(configs, key=lambda k: test[k][fold])  # rank 1 = worst out of sample
+            omega = (ordered.index(pick)+1)/(len(configs)+1)
+            logits.append(float(np.log(omega/(1-omega))))
+        result[horizon] = dict(folds=len(logits), pbo=float(np.mean([l <= 0 for l in logits])) if logits else None,
+                               rank_logits=logits)
+    return result
+
+
 def summarize(rows, risk, volatility):
     frame = pd.DataFrame(rows)
     direction = []
@@ -399,7 +459,7 @@ def summarize(rows, risk, volatility):
                                   mean_interval_coverage_80=float(part.interval_coverage_80.mean())))
     evaluated = [r for r in risk if r.get('status') == 'evaluated']
     vol = pd.DataFrame(volatility['rows'])
-    return dict(direction=direction,
+    return dict(direction=direction, champions=champions(rows), backtest_overfitting=backtest_overfitting(rows),
                 drop_risk=dict(evaluated=len(evaluated), skipped=len(risk)-len(evaluated),
                                beats_constant=sum(r['brier'] < r['constant_brier'] for r in evaluated),
                                mean_auc=float(np.nanmean([r['auc'] for r in evaluated if r['auc'] is not None]))
@@ -423,6 +483,19 @@ def render(report):
         lines.append(f"| {r['group']} | {r['horizon']} | {r['training']} | {r['folds']} | {r['mean_brier']:.4f} | "
                      f"{r['mean_constant_brier']:.4f} | {r['folds_beating_constant']}/{r['folds']} | {auc} | "
                      f"{r['mean_pinball']:.5f} / {r['mean_constant_pinball']:.5f} | {r['mean_interval_coverage_80']*100:.0f}% |")
+    lines += ['', '## Champion per horizon (selected on validation only)', '',
+              '| Horizon | Champion | Validation skill | Test skill | Test folds beating constant | Configurations tried | PBO |',
+              '|---|---|---|---|---|---|---|']
+    for horizon, c in s['champions'].items():
+        pbo = s['backtest_overfitting'].get(horizon, {}).get('pbo')
+        name = c['group'] if c['training'] is None else f"{c['group']} / {c['training']}"
+        test = '—' if c['test_skill'] is None else f"{c['test_skill']:+.5f}"
+        beat = '—' if c['folds_beating_constant'] is None else f"{c['folds_beating_constant']}/{c.get('folds', 0)}"
+        lines.append(f"| {horizon} | {name} | {c['validation_skill']:+.5f} | {test} | {beat} | "
+                     f"{c['configurations_tried']} | {'—' if pbo is None else f'{pbo:.2f}'} |")
+    lines += ['', 'Skill is the constant base-rate Brier minus the model Brier; positive means better than always '
+              'predicting the training up-rate. PBO near 0 means validation picks also do well out of sample; '
+              'near 1 means the selection is overfitting.']
     d = s['drop_risk']
     drop_auc = '—' if d['mean_auc'] is None else f"{d['mean_auc']:.3f}"
     lines += ['', '## Large-drop risk (touch -5% within 24h)', '',
