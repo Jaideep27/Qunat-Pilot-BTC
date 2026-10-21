@@ -445,10 +445,10 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 | Milestone | What | Status |
 |---|---|---|
 | M1 | Pattern features, triggers, rulebook (YAML + Excel), arbiter, outcome simulator, pre-registered historical test | **done: no playbook passed.** v1 −1.77% (50 trades); v2 −10.1% (180 trades), −0.35R per setup |
-| M2 | Live engine (1m cycle), experimental `futures-v1` account, PostgreSQL journal, diagnosis codes, API/MCP, Rules page, chart levels | **built and tested; not yet running** (needs a supervisor restart) |
-| M3 | ML filter (meta-labeling) + forecasting inputs | **done: shadow** (no playbook had the 200 earlier setups needed to train) |
+| M2 | Live engine (1m cycle), experimental `futures-v1` account, PostgreSQL journal, diagnosis codes, API/MCP, Rules page, chart levels | **running since 2026-10-21 13:23 UTC** (first decision at the 13:30 close) |
+| M3 | ML filter (meta-labeling) + forecasting inputs | **done: shadow** (no playbook had the 200 earlier setups needed to train). By the owner's decision the XGBoost/forecaster record was removed from the rule engine; each setup instead shows what happened the last times it appeared |
 | M4 | Crawl4AI (isolated `.venv-crawl`), Claude impact classification, NEWS_SHOCK triggers, veto | **built and tested: shadow** (forward-only data) |
-| M5 | Bandit learner; trade-management RL (tabular Q + PPO) | learner **done: shadow** (it learned to skip almost every setup). Management RL **interrupted by low memory**; re-run `research-manage` |
+| M5 | Bandit learner; trade-management RL (tabular Q + PPO) | learner **done: shadow**; it learned to skip almost every setup and now also learns from the live journal. Management RL **interrupted by low memory**: re-run `research-manage` with about 1 GB free |
 
 Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
 

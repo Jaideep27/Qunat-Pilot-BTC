@@ -95,7 +95,6 @@ def test_level_events():
 
 def test_squeeze_release_follows_a_compression():
     rng = np.random.default_rng(1)
-    n = 120
     close = 100+np.r_[rng.normal(0, .02, 80), np.cumsum(np.full(40, .8))]
     bars = pd.DataFrame(dict(open=close, high=close+.6, low=close-.6, close=close))
     s = patterns.squeeze(bars)

@@ -15,10 +15,10 @@ check('Bootstrap configuration uses UTF-8 without BOM',()=>{
 check('JSON configuration syntax',()=>{
  for(const p of ['frontend/package.json','frontend/tsconfig.json','frontend/vercel.json','docs/evidence/coverage-report.json','docs/evidence/expected-archives.json'])JSON.parse(read(p));
 });
-check('Sixteen unique MCP tools, shared services and loopback-only writes',()=>{
+check('Seventeen unique MCP tools, shared services and loopback-only writes',()=>{
  const mcp=read('src/quantpilot/mcp_server.py');
  const tools=[...mcp.matchAll(/@mcp\.tool\(structured_output=True\)\s+(?:async )?def (\w+)/g)].map(m=>m[1]);
- assert.equal(tools.length,16);assert.equal(new Set(tools).size,16);
+ assert.equal(tools.length,17);assert.equal(new Set(tools).size,17);
  const functions=new Set([...read('src/quantpilot/services.py').matchAll(/^def (\w+)\(/gm)].map(m=>m[1]));
  for(const m of [...mcp.matchAll(/services\.(\w+)\(/g)])assert(functions.has(m[1]),m[1]);
  const api=read('src/quantpilot/api.py');

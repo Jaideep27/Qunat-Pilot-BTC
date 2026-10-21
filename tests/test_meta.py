@@ -1,7 +1,6 @@
 """M3: the ML filter (meta-labeling) on playbook hits, its pre-registered gate and the live filter."""
 import numpy as np
 import pandas as pd
-import pytest
 
 from quantpilot import meta, rules
 

@@ -1,7 +1,6 @@
 """M5: the full-information contextual bandit over playbook hits and its pre-registered gate."""
 import numpy as np
 import pandas as pd
-import pytest
 
 from quantpilot import learner, rules
 

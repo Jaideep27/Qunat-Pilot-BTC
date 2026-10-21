@@ -125,7 +125,6 @@ def _row(pf, t):
 
 def _manage_state(p, t, pb):
     """The trade-management RL state for an open position at bar time `t` (see rl_manage.STATE)."""
-    import numpy as np
     risk = abs(p['entry']-p['initial_stop'])/p['entry']
     held = (pd.Timestamp(t)-pd.Timestamp(p['entry_time']))/pd.Timedelta(hours=pb['time_stop_hours'])
     price = p.get('last_close', p['entry'])

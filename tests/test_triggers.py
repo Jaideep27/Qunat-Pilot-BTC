@@ -1,5 +1,4 @@
 """Trigger detection, watch windows and episode facts."""
-import numpy as np
 import pandas as pd
 import pytest
 

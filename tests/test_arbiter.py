@@ -1,7 +1,6 @@
 """The arbiter: gates, layer modes, selection order, flips and position management."""
 import copy
 
-import numpy as np
 import pandas as pd
 import pytest
 

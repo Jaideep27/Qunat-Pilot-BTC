@@ -15,7 +15,7 @@ Branch `rule-engine` (from `trading-agent`). Design: `docs/superpowers/specs/202
   - news veto (M4);
   - learner (M5 bandit);
   - trade-management RL (M5);
-  - a record of the research forecaster's calls (always shadow).
+  - beside each setup, **what happened the last times it appeared** (direction after 1h and 4h, the simulated plan's win rate and mean R), from `quantpilot rule-history`. By the owner's decision (2026-10-21), the XGBoost direction model plays no part in the rule engine; it still runs only the frozen Paper account.
 - **Experimental paper account** (`futures-v1`, $10,000, 0.25% risk per trade): a supervisor thread runs one cycle per minute on 1m candles and decides only at fresh 15m closes. Every trigger, hit, skip and trade goes into a journal in PostgreSQL. Trades and skipped setups get the owner's diagnosis codes (FAIL_STOP_HUNT, PASS_CLEAN, …) four hours after their window ends.
 - **Dashboard:** a new **Rules** page with the account, live checklist, playbooks with verdicts, journal and layer modes. The Chart page gains a **Rule levels** toggle (support/resistance, VWAP ±2σ, 4h 80% band, trade markers). The API routes are `/api/v1/rules`, `/rules/journal`, `/rules/research` and `/rules/levels`; the MCP tool is `get_rule_engine`.
 
@@ -40,7 +40,7 @@ All numbers are net of fees (5 bps per side), slippage (3 bps, or 9 bps in the h
   - PB02 dump continuation: 30 trades, −0.19%.
 - **Never fired:** PB05/PB06 (funding squeezes), PB07 (squeeze breakout), PB11 (absorption) and PB12 (post-release breakout). Their conditions are too strict, or the plan never fits the band.
 - **ML filter (M3):** no model could be trained. No playbook or family had the 200 earlier setups the rule requires, so the filter keeps every hit and stays in **shadow**.
-- **Learner (M5):** walk-forward, it learned to **skip almost everything** (233 of 234 test setups). Skipping beats always-take by +0.37R per setup (95% CI 0.23–0.49). It made only 1 trade, under the registered 30, so it stays in shadow. In plain terms, the data say these setups should not be traded.
+- **Learner (M5):** it keeps learning from the live journal (each diagnosed setup updates its statistics). Walk-forward, it learned to **skip almost everything** (233 of 234 test setups). Skipping beats always-take by +0.37R per setup (95% CI 0.23–0.49). It made only 1 trade, under the registered 30, so it stays in shadow. In plain terms, the data say these setups should not be traded.
 - **Trade-management RL (M5):** not finished. Windows stopped the run for low memory after the tabular agent and a 50,000-step PPO checkpoint, before the comparison was written. Re-run with `quantpilot research-manage --output artifacts/rule-engine/research-v2-20261021` when memory allows.
 - **News layer (M4):** forward-only, since no point-in-time news archive exists. It stays in shadow until the forward record can be scored.
 
@@ -54,6 +54,9 @@ quantpilot research-manage --output DIR          # M5 tabular Q + PPO gate (need
 quantpilot rulebook-xlsx                         # Excel copy of the current rulebook
 ```
 Crawl4AI lives in its own environment: `uv venv .venv-crawl` then `uv pip install --python .venv-crawl/Scripts/python.exe crawl4ai==0.7.4`. It runs in HTTP mode, without a browser.
+
+## Status
+The live engine has been running in the experimental paper account since 2026-10-21 13:23 UTC. The Python suite passes (427 tests) and so does the browser suite (27 passed, 2 skipped).
 
 ## What this means
 The playbooks, as written, lose money after costs on four years of data. The learner's verdict ("skip") and the ML filter's lack of data agree with that. The engine is still useful as a tool:
