@@ -448,7 +448,7 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 | M2 | Live engine (1m cycle), experimental `futures-v1` account, PostgreSQL journal, diagnosis codes, API/MCP, Rules page, chart levels | **running since 2026-10-21 13:23 UTC** (first decision at the 13:30 close) |
 | M3 | ML filter (meta-labeling) + forecasting inputs | **done: shadow** (no playbook had the 200 earlier setups needed to train). By the owner's decision the XGBoost/forecaster record was removed from the rule engine; each setup instead shows what happened the last times it appeared |
 | M4 | Crawl4AI (isolated `.venv-crawl`), Claude impact classification, NEWS_SHOCK triggers, veto | **built and tested: shadow** (forward-only data) |
-| M5 | Bandit learner; trade-management RL (tabular Q + PPO) | learner **done: shadow**; it learned to skip almost every setup and now also learns from the live journal. Management RL **interrupted by low memory**: re-run `research-manage` with about 1 GB free |
+| M5 | Bandit learner; trade-management RL (tabular Q + PPO) | learner **done: shadow**; it learned to skip almost every setup and now also learns from the live journal. Management RL **done: shadow** (tabular −0.23R and PPO −0.24R vs −0.35R for break-even; 95% interval includes 0) |
 
 Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
 
