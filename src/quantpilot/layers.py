@@ -25,7 +25,7 @@ def modes():
 def live_layers():
     """The layer callables available now (each loads its own artifacts and degrades to 'none')."""
     found = {}
-    for name, factory in (('ml', _ml), ('news', _news), ('learner', _learner)):
+    for name, factory in (('ml', _ml), ('news', _news), ('learner', _learner), ('forecast', _forecast)):
         fn = factory()
         if fn is not None:
             found[name] = fn
@@ -55,6 +55,25 @@ def _news():
     except ImportError:
         return None
     return module.live_check()
+
+
+def _forecast():
+    """Shadow-only record of the research forecaster's latest calls (never acts: trained on the
+    development span, so it was not usable as a historical input; amendment A6)."""
+    from . import forecaster
+    from .store import database
+    def verdict(hit, features):
+        try:
+            rows = forecaster.forecasts(database(), limit=12)
+        except Exception:
+            return dict(verdict='none')
+        latest = {}
+        for row in rows:
+            latest.setdefault(row.get('horizon'), row)
+        pick = {h: dict(probability_up=r.get('probability_up'), return_q10=r.get('return_q10'),
+                        return_q90=r.get('return_q90'), cutoff=r.get('cutoff')) for h, r in latest.items() if h in ('1h', '4h')}
+        return dict(verdict='none', forecasts=pick)
+    return verdict
 
 
 def _learner():

@@ -26,9 +26,16 @@ def repeating_history():
 
 def news_feeds():
     # Feed collection never waits on reasoning; Codex runs at most once per analysis interval.
+    # Rule engine news layer: article text (isolated Crawl4AI) and impact classification every 15 minutes.
+    from quantpilot import news_events
+    last_events=None
     while True:
         try:news.run(reasoning=True)
         except Exception as exc:print(json.dumps(dict(news='blocked',error_type=type(exc).__name__)),flush=True)
+        if last_events is None or time.monotonic()-last_events>=900:
+            try:print(json.dumps(dict(news_events=news_events.cycle())),flush=True)
+            except Exception as exc:print(json.dumps(dict(news_events='blocked',error_type=type(exc).__name__)),flush=True)
+            last_events=time.monotonic()
         time.sleep(settings.news_poll_seconds)
 
 

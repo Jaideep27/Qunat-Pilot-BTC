@@ -509,15 +509,16 @@ def rules_research():
         return envelope(dict(status='not_run', note='Run `quantpilot research-playbooks --output DIR`.'), None,
                         'QuantPilot rule engine research', max_age=400*86400)
     folder = path.parent
-    extra = {name: json.loads((folder/f'{name}.json').read_text(encoding='utf-8'))
-             for name in ('meta-report', 'learner-report', 'manage-report') if (folder/f'{name}.json').exists()}
+    names = {'meta-report': 'ml', 'news-report': 'news', 'learner-report': 'learner', 'manage-report': 'manage_rl'}
+    extra = {layer: json.loads((folder/f'{name}.json').read_text(encoding='utf-8'))
+             for name, layer in names.items() if (folder/f'{name}.json').exists()}
     playbooks = {k: {x: v[x] for x in ('name', 'family', 'side', 'report', 'gate', 'hits', 'tradeable', 'diagnosis')
                      if x in v} for k, v in report['playbooks'].items()}
     data = dict(status='complete', run=folder.name, generated=report['generated'], rulebook=report['rulebook'],
                 development=report['development'], trials=report['trials'], hits=report['hits'],
                 passing=report['passing'], playbooks=playbooks,
                 combined={k: v for k, v in report['combined'].items() if k != 'trades'},
-                layers={k.replace('-report', ''): v for k, v in extra.items()},
+                layers={k: {x: v.get(x) for x in ('summary', 'live', 'generated')} for k, v in extra.items()},
                 holdout_evaluated=(folder/'holdout.lock').exists(), note='Pre-registered (amendment A6); nothing here trades.')
     return envelope(data, report['generated'], 'QuantPilot rule engine research', max_age=400*86400)
 

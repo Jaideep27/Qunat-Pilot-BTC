@@ -25,3 +25,4 @@ scripts/fix*.cjs
 
 frontend/tsconfig.tsbuildinfo
 .tools/
+.venv-crawl/
