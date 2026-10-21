@@ -440,6 +440,16 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 | C | RL for trade management only (hold, exit, tighten stop, pull in target), compared against fixed exits | waiting for the owner's decision: management cannot create an edge the entries lack (only 13–14% of stopped trades were ever 1R ahead) |
 | D | Experimental forward paper account ($10,000 or $1,000, 2× isolated), worker, persistence, dashboard and API/MCP inspection | after C |
 
+**Rule engine (owner request, 2026-10-21; branch `rule-engine` from `trading-agent`, not merged).** This replaces steps C and D with the owner's rulebook as event-triggered playbooks plus ML, news and RL layers, in five milestones. Full write-up: [docs/rule-engine.md](docs/rule-engine.md). Spec: `docs/superpowers/specs/2026-10-21-rule-engine-design.md`. Amendments A6 and A7.
+
+| Milestone | What | Status |
+|---|---|---|
+| M1 | Pattern features, triggers, rulebook (YAML + Excel), arbiter, outcome simulator, pre-registered historical test | **done: no playbook passed.** v1 −1.77% (50 trades); v2 −10.1% (180 trades), −0.35R per setup |
+| M2 | Live engine (1m cycle), experimental `futures-v1` account, PostgreSQL journal, diagnosis codes, API/MCP, Rules page, chart levels | **built and tested; not yet running** (needs a supervisor restart) |
+| M3 | ML filter (meta-labeling) + forecasting inputs | **done: shadow** (no playbook had the 200 earlier setups needed to train) |
+| M4 | Crawl4AI (isolated `.venv-crawl`), Claude impact classification, NEWS_SHOCK triggers, veto | **built and tested: shadow** (forward-only data) |
+| M5 | Bandit learner; trade-management RL (tabular Q + PPO) | learner **done: shadow** (it learned to skip almost every setup). Management RL **interrupted by low memory**; re-run `research-manage` |
+
 Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
 
 **Next steps:**

@@ -27,7 +27,7 @@ function run(command,args){const result=spawnSync(command,args,{cwd:root,windows
     if(!status.ready)process.exitCode=2;
     return;
   }
-  if(!fs.existsSync(python))throw new Error('Install dependencies with uv sync --locked --extra dev first.');
+  if(!fs.existsSync(python))throw new Error('Install dependencies with uv sync --locked --extra dev --extra rl first.');
   if(process.argv.includes('--restart-data')||process.argv.includes('--restart-services'))run(python,['scripts/stop_data_supervisor.py']);
   if(process.argv.includes('--restart-services'))run(python,['scripts/stop_data_supervisor.py','--api']);
   const pg='C:/Program Files/PostgreSQL/18/bin';
