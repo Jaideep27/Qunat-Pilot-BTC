@@ -24,11 +24,11 @@ export default function ShadowForecasts(){
     {!data&&!error&&<p>Loading research forecasts...</p>}
     {data&&!latest.length&&<p>No research forecast recorded yet. The forecaster runs every 15 minutes once a champion exists.</p>}
     {latest.length>0&&<><div className="table-scroll"><table><thead><tr><th>Horizon</th><th>Upward probability</th><th>Base rate</th>
-      <th>80% return range</th><th>Model</th><th>Forward record</th></tr></thead><tbody>{latest.map(f=>{const fw=data!.forward[f.horizon];
-        const c=data!.champions[f.horizon];const pbo=data!.backtest_overfitting[f.horizon]?.pbo;return <tr key={f.horizon}>
+      <th>80% return range</th><th>Model</th><th>Forward record</th></tr></thead><tbody>{latest.map(f=>{const fw=data!.forward?.[f.horizon];
+        const c=data!.champions?.[f.horizon];const pbo=data!.backtest_overfitting?.[f.horizon]?.pbo;return <tr key={f.horizon}>
         <td>{f.horizon}</td><td>{f.status==='no_validated_skill'?<>{pct(f.probability_up)} · No validated skill</>:pct(f.probability_up)}</td>
         <td>{pct(f.base_rate)}</td><td>{signed(f.return_q10)} to {signed(f.return_q90)}{f.range_status?' · '+(f.range_status==='model'?'range model':'unconditional range'):''}</td>
-        <td>{c?(c.group==='constant'?'base rate':c.group+' / '+c.training):f.champion.group}{pbo!=null?' · PBO '+pbo.toFixed(2):''}</td>
+        <td>{c?(c.group==='constant'?'base rate':c.group+' / '+c.training):f.champion?.group??'—'}{pbo!=null?' · PBO '+pbo.toFixed(2):''}</td>
         <td>{fw?`${fw.scored} scored · Brier ${fw.brier?.toFixed(4)??'—'} vs ${fw.constant_brier?.toFixed(4)??'—'}`:'Awaiting outcomes'}</td></tr>})}</tbody></table></div>
       {day&&<div className="indicator-list"><div><span>Chance of touching -5% within 24h</span><strong>{pct(day.drop5_risk)}</strong></div>
         <div><span>Volatility next 24h ({(day.volatility.model??'ewma').toUpperCase()} champion)</span><strong>{day.horizon==='24h'?pct(day.volatility.value??day.volatility.ewma,2):'—'}</strong></div>

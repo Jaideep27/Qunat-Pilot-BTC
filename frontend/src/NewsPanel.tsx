@@ -25,9 +25,9 @@ export default function NewsPanel(){
     {error&&<p role="status">{error}</p>}
     {!d&&!error&&<p>Loading news evidence...</p>}
     {d&&<><p className="panel-source">{d.scope} News reasoning does not change the released trading policy.</p>
-      <div className="indicator-list">{d.feeds.map(f=><div key={f.source}><span>{f.source}</span><strong>{f.status} · {new Date(f.checked_at).toLocaleString()}</strong></div>)}</div>
-      {!d.items.length&&<p>No news collected yet. Sentiment is unavailable until verified observations arrive.</p>}
-      {d.items.slice(0,12).map(i=><article key={i.id} className='news-item'>
+      <div className="indicator-list">{(d.feeds??[]).map(f=><div key={f.source}><span>{f.source}</span><strong>{f.status} · {new Date(f.checked_at).toLocaleString()}</strong></div>)}</div>
+      {!(d.items??[]).length&&<p>No news collected yet. Sentiment is unavailable until verified observations arrive.</p>}
+      {(d.items??[]).slice(0,12).map(i=><article key={i.id} className='news-item'>
         <a href={/^https?:\/\//.test(i.url)?i.url:undefined} target="_blank" rel="noreferrer">{i.title}</a>
         <p>{i.excerpt}</p><small>{i.source} · Collected {new Date(i.available_at).toLocaleString()} · Publication {i.published_at?new Date(i.published_at).toLocaleString():'unknown'}</small>
       </article>)}
@@ -37,13 +37,13 @@ export default function NewsPanel(){
       {/* With several reasoners, one current reasoner means analysis is not delayed overall. */}
       {d.analysis_status&&delays[d.analysis_status]&&!Object.values(d.providers??{}).some(p=>p.analysis_status==='current')
         &&<p role="status">{delays[d.analysis_status]}</p>}
-      {!d.runs.some(r=>r.status==='completed')&&<p>No completed analysis. Pending news is not classified as neutral.</p>}
-      {d.runs.filter(r=>r.status==='completed').slice(0,3).flatMap(r=>(r.result?.events??[]).map((e,n)=><article key={r.id+n}>
+      {!(d.runs??[]).some(r=>r.status==='completed')&&<p>No completed analysis. Pending news is not classified as neutral.</p>}
+      {(d.runs??[]).filter(r=>r.status==='completed').slice(0,3).flatMap(r=>(r.result?.events??[]).map((e,n)=><article key={r.id+n}>
         <strong>{e.sentiment} textual sentiment{e.novelty?' · '+(novelty[e.novelty]??e.novelty):''}</strong><p>{e.summary}</p>
         {e.entities?.length?<small>Entities: {e.entities.join(' · ')}</small>:null}<br/>
         {r.model&&<><small>Analysed by {r.model}</small><br/></>}
-        <small>Uncertainty: {e.uncertainties.join(' · ')}</small>
-        <p>{e.source_ids.map(id=>{const item=d.items.find(i=>i.id===id);return item?<a key={id} href={item.url} target="_blank" rel="noreferrer">{item.source} source </a>:<span key={id}>Source {id.slice(0,12)} </span>;})}</p>
+        <small>Uncertainty: {(e.uncertainties??[]).join(' · ')}</small>
+        <p>{(e.source_ids??[]).map(id=>{const item=(d.items??[]).find(i=>i.id===id);return item?<a key={id} href={item.url} target="_blank" rel="noreferrer">{item.source} source </a>:<span key={id}>Source {id.slice(0,12)} </span>;})}</p>
       </article>))}
       <p className="panel-source">{d.total_items} observations · {d.model} · Statements about market effects are hypotheses.</p>
     </>}

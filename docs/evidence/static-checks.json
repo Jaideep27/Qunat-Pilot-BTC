@@ -62,7 +62,7 @@
     "src/quantpilot/rl_manage.py": "d966d84cfa7e8d202aecf849f1617c380f6924944e4022ec8b6d1746e2bce71d",
     "src/quantpilot/rulebook_export.py": "19f169482491fa5d041c5387cd86951210ff74f0cbde9fbe5b789123fa4b1694",
     "src/quantpilot/rules.py": "22f1c2f4685c44a2c8a12b0c34193ba159de67c455b4bc6c8a787d7c20d6b308",
-    "src/quantpilot/rule_live.py": "077b06e510ae693cb075b567e9501d4958591966461ea4d59fa1d3a64ebe03d4",
+    "src/quantpilot/rule_live.py": "f66a5d0e82943364902314fe0ad25170ac15f15cc40d5d800325f8efd860504b",
     "src/quantpilot/selective.py": "820495d5d97d328d49f4dc8de559f3830e4bf246f9b628c7ea1ab29ad3c7e85d",
     "src/quantpilot/services.py": "7cc5606259fdf78ba52fe57f39878cf51c0c530e33cfb0b25b71ff37cd72af53",
     "src/quantpilot/setup_history.py": "64c83dd951d552428891a59779e18751d1a4040704a93afd98d8c882fd73e7a2",

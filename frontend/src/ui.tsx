@@ -1,4 +1,4 @@
-import {Component,useEffect,useId,useState,type ReactNode} from 'react';
+import {Component,useEffect,useId,useRef,useState,type ReactNode} from 'react';
 import {ChevronDown,Database,Info,RefreshCw} from 'lucide-react';
 import {request,type Envelope} from './api';
 import {glossary} from './glossary';
@@ -90,9 +90,49 @@ export function Segmented<T extends string>({options,value,onChange,label}:{opti
     <button key={o} type="button" aria-pressed={o===value} className={o===value?'on':''} onClick={()=>onChange(o)}>{o}</button>)}</div>;
 }
 
+const reduced=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+// A formatted number such as "$10,042.50", "+4.25%", "1,234" or "-8.30%": prefix, number, suffix.
+const NUMERIC=/^([+\-−]?\$?)([\d,]*\d(?:\.\d+)?)(%|x|R)?$/;
+
+/** Counts a formatted number up to its value. The final text is always exactly `text`. */
+export function CountUp({text,duration=650}:{text:string;duration?:number}){
+  const [shown,setShown]=useState(text);
+  const previous=useRef<number|null>(null);
+  useEffect(()=>{
+    const m=NUMERIC.exec(text);
+    if(!m||reduced()){setShown(text);return}
+    const [,prefix,body,suffix='']=m;
+    const target=Number(body.replaceAll(',','')),decimals=(body.split('.')[1]??'').length;
+    const from=previous.current??0;previous.current=target;
+    if(from===target){setShown(text);return}
+    const grouped=body.includes(',');let frame=0;const start=performance.now();
+    const tick=(now:number)=>{
+      const t=Math.min(1,(now-start)/duration),eased=1-Math.pow(1-t,3),v=from+(target-from)*eased;
+      setShown(t>=1?text:prefix+(grouped?v.toLocaleString('en-US',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}):v.toFixed(decimals))+suffix);
+      if(t<1)frame=requestAnimationFrame(tick);
+    };
+    frame=requestAnimationFrame(tick);
+    return()=>cancelAnimationFrame(frame);
+  },[text,duration]);
+  return <>{shown}</>;
+}
+
+/** 'flash-up' / 'flash-down' for a moment after a numeric value rises or falls. */
+export function useFlash(value:number|null|undefined){
+  const [flash,setFlash]=useState('');
+  const last=useRef(value);
+  useEffect(()=>{
+    const before=last.current;last.current=value;
+    if(value==null||before==null||value===before)return;
+    setFlash(value>before?'flash-up':'flash-down');
+    const t=setTimeout(()=>setFlash(''),900);return()=>clearTimeout(t);
+  },[value]);
+  return flash;
+}
+
 export function Stat({label,value,detail,tone,term}:{label:string;value:ReactNode;detail?:ReactNode;tone?:'up'|'down'|'warn'|'muted';term?:string}){
   return <div className="stat"><span className="stat-label">{term?<Term k={term}>{label}</Term>:label}</span>
-    <strong className={tone?'tone-'+tone:''}>{value}</strong>{detail&&<small>{detail}</small>}</div>;
+    <strong className={tone?'tone-'+tone:''}>{typeof value==='string'?<CountUp text={value}/>:value}</strong>{detail&&<small>{detail}</small>}</div>;
 }
 
 export function Pill({tone='muted',children}:{tone?:'ok'|'warn'|'bad'|'muted'|'accent';children:ReactNode}){
@@ -115,7 +155,9 @@ export function Updated({resource,label='Updated'}:{resource:Resource<unknown>;l
 
 export function Meter({value,min=0,max=100,tone}:{value:number|null|undefined;min?:number;max?:number;tone?:'up'|'down'|'warn'}){
   const ratio=value==null?0:Math.max(0,Math.min(1,(value-min)/(max-min)));
-  return <div className="meter" aria-hidden><i className={tone?'tone-bg-'+tone:''} style={{width:ratio*100+'%'}}/></div>;
+  const [grown,setGrown]=useState(false);   // grow from zero after the first paint
+  useEffect(()=>{const f=requestAnimationFrame(()=>setGrown(true));return()=>cancelAnimationFrame(f)},[]);
+  return <div className="meter" aria-hidden><i className={tone?'tone-bg-'+tone:''} style={{width:(grown?ratio*100:0)+'%'}}/></div>;
 }
 
 export function PageHead({title,description,children}:{title:string;description:string;children?:ReactNode}){
@@ -126,6 +168,7 @@ export function PageHead({title,description,children}:{title:string;description:
 export class Boundary extends Component<{children:ReactNode;name?:string},{failed:boolean}>{
   state={failed:false};
   static getDerivedStateFromError(){return {failed:true}}
+  componentDidCatch(error:unknown){console.error((this.props.name??'Section')+' failed to render:',error instanceof Error?error.message:error)}
   render(){return this.state.failed?<div className="card card-body" role="status"><p className="note">{this.props.name??'This section'} could not be displayed with the data received.{' '}
     <button type="button" className="link" onClick={()=>this.setState({failed:false})}>Try again</button></p></div>:this.props.children}
 }
