@@ -55,6 +55,7 @@ def main():
     agent.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
     playbooks=sub.add_parser('research-playbooks', help='Rule engine A6: pre-registered rulebook playbooks (never trades)')
     playbooks.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
+    playbooks.add_argument('--prior', action='append', help='Earlier trial registry to count (repeatable)')
     sub.add_parser('rulebook-xlsx', help='Write the Excel copy of the rulebook').add_argument(
         '--output', default=None, help='Default: rulebook/QuantPilot-Rulebook-v<version>.xlsx')
     experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
@@ -173,8 +174,8 @@ def main():
         report = research(args.output)
         print(json.dumps({k: report['families'][k]['gate'] for k in report['families']}, indent=2, default=str))
     elif args.command == 'research-playbooks':
-        from .playbook_research import research
-        report = research(args.output)
+        from .playbook_research import PRIORS, research
+        report = research(args.output, priors=tuple(args.prior) if args.prior else PRIORS)
         print(json.dumps(dict(passing=report['passing'], trials=report['trials'], hits=report['hits'],
                               combined=report['combined']['account']), indent=2, default=str))
     elif args.command == 'rulebook-xlsx':
