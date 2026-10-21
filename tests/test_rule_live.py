@@ -111,3 +111,19 @@ def test_fast_candles_are_fetched_into_their_own_market_key(account):
     assert set(markets) == {(rule_live.FAST, '1m')} and rule_live.FAST != PERP
     bars = rule_live.fast_bars(account, now-pd.Timedelta(hours=1), now)
     assert len(bars) == 3                                                           # the forming minute is excluded
+
+
+def test_the_rl_manager_is_recorded_in_shadow_and_acts_only_when_live(account, market):
+    b = book()
+    t15 = START+pd.Timedelta(days=41, hours=3)
+    exit_always = lambda state: 'exit'
+    data, fast = market
+    rule_live.cycle(account, t15+pd.Timedelta(seconds=20), book=b, frames=data, fast=fast, macro_events=[], news_events=[])
+    rule_live.cycle(account, t15+pd.Timedelta(minutes=6, seconds=20), book=b, frames=data, fast=fast, macro_events=[],
+                    news_events=[], manager=exit_always)
+    acct = rule_live.load_account(account)
+    assert acct['manage']['action'] == 'exit' and acct['manage']['mode'] == 'shadow' and acct['futures']['position']
+    rule_live.cycle(account, t15+pd.Timedelta(minutes=12, seconds=20), book=b, frames=data, fast=fast, macro_events=[],
+                    news_events=[], manager=exit_always, modes={('manage_rl', 'L1'): 'live'})
+    acct = rule_live.load_account(account)
+    assert acct['futures']['position'] is None and acct['futures']['trades'][-1]['reason'] == 'EXIT_ACTION'

@@ -123,7 +123,18 @@ def _row(pf, t):
     return pf.iloc[k].to_dict() if k >= 0 else {}
 
 
-def _step_bars(book, acct, bars, pf, funding):
+def _manage_state(p, t, pb):
+    """The trade-management RL state for an open position at bar time `t` (see rl_manage.STATE)."""
+    import numpy as np
+    risk = abs(p['entry']-p['initial_stop'])/p['entry']
+    held = (pd.Timestamp(t)-pd.Timestamp(p['entry_time']))/pd.Timedelta(hours=pb['time_stop_hours'])
+    price = p.get('last_close', p['entry'])
+    s = p['side']
+    return np.array([s*(price/p['entry']-1)/risk, p['max_favorable']/risk, p['max_adverse']/risk, min(1.0, held),
+                     s*(p['target']/price-1)/risk, s*(p['stop']/p['entry']-1)/risk], np.float32)
+
+
+def _step_bars(book, acct, bars, pf, funding, manager=None, modes=None):
     """Reconcile: every new 1m bar, funding settlements, break-even moves, and at 15m closes the
     position's aborts and time stop (standing management, never new entries)."""
     state, playbooks = acct['futures'], {pb['id']: pb for pb in book['playbooks']}
@@ -154,7 +165,16 @@ def _step_bars(book, acct, bars, pf, funding):
         if pb is None:
             continue
         act = None
-        if t == t.floor('15min'):
+        if manager is not None and t.minute % 5 == 0:   # the RL manager was trained on 5m bars
+            p['last_close'] = bar.close
+            choice = manager(_manage_state(p, t, pb))
+            acct['manage'] = dict(time=t.isoformat(), action=choice, mode=(modes or {}).get(('manage_rl', pb['id']), 'shadow'))
+            if acct['manage']['mode'] == 'live' and choice != 'hold':
+                level = p['entry']*(1+p['side']*arbiter.ROUND_TRIP) if choice == 'breakeven' else \
+                    (p['entry']*(1+p['side']*p['max_favorable'])-p['side']*abs(p['entry']-p['initial_stop']))
+                act = dict(action='exit') if choice == 'exit' else (
+                    dict(action='tighten_stop', price=level) if p['side']*(level-p['stop']) > 0 else None)
+        if act is None and t == t.floor('15min'):
             act = arbiter.manage(pb, _position(acct, p), _row(pf, t), t, book['defaults'])
         if act is None and pb.get('breakeven_at_r') is not None:
             risk = abs(p['entry']-p['initial_stop'])/p['entry']
@@ -236,7 +256,7 @@ def _diagnose(engine, book, frames, fast, now):
 
 
 def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None, news_events=None, layers=None,
-          modes=None, client=None, market_engine=None):
+          modes=None, client=None, market_engine=None, manager=None):
     """One minute of the live rule engine. Returns a summary of what happened."""
     now = pd.Timestamp(now or pd.Timestamp.now(tz='UTC'))
     book = book or rules.cached()
@@ -263,7 +283,7 @@ def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None
                                              for r in table[table.time > now-pd.Timedelta(days=1)].itertuples()])
     new = fast[fast.available_at > pd.Timestamp(acct['last_bar'])] if acct['last_bar'] else fast.iloc[0:0]
     before = len(acct['futures']['trades'])
-    _step_bars(book, acct, new, pf, frames.get('funding'))
+    _step_bars(book, acct, new, pf, frames.get('funding'), manager, modes)
     decision = None
     closes = pf.index[(pf.index <= now) & (pf.index == pf.index.floor('15min'))]
     t15 = closes[-1] if len(closes) else None

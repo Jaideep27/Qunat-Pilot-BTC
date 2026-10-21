@@ -58,6 +58,11 @@ def main():
     playbooks.add_argument('--prior', action='append', help='Earlier trial registry to count (repeatable)')
     sub.add_parser('research-ml', help='Rule engine M3: walk-forward ML filter on a playbook run (A6 gate)').add_argument(
         '--output', required=True, help='Playbook research run directory')
+    sub.add_parser('research-learner', help='Rule engine M5: walk-forward bandit learner on a playbook run').add_argument(
+        '--output', required=True, help='Playbook research run directory')
+    manage=sub.add_parser('research-manage', help='Rule engine M5: trade-management RL (tabular Q and PPO) on a run')
+    manage.add_argument('--output', required=True, help='Playbook research run directory')
+    manage.add_argument('--timesteps', type=int, default=150_000, help='PPO training steps')
     sub.add_parser('rulebook-xlsx', help='Write the Excel copy of the rulebook').add_argument(
         '--output', default=None, help='Default: rulebook/QuantPilot-Rulebook-v<version>.xlsx')
     experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
@@ -186,6 +191,15 @@ def main():
         print(json.dumps(dict(live=result['live'], playbooks={k: dict(filtered=v['filtered'], unfiltered=v['unfiltered'],
                                                                       difference=v['difference'], live=v['live'])
                                                            for k, v in result['playbooks'].items()}), indent=2, default=str))
+    elif args.command == 'research-learner':
+        from .learner import run
+        result = run(args.output)
+        print(json.dumps({k: result[k] for k in ('live', 'learner_trades', 'learner_mean_r', 'always_take_mean_r',
+                                                 'difference', 'actions') if k in result}, indent=2, default=str))
+    elif args.command == 'research-manage':
+        from .rl_manage import run
+        result = run(args.output, timesteps=args.timesteps)
+        print(json.dumps({k: result[k] for k in ('train', 'test', 'agents', 'policy', 'summary')}, indent=2, default=str))
     elif args.command == 'rulebook-xlsx':
         from .rulebook_export import write
         from .rules import load

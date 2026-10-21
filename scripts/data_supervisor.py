@@ -90,13 +90,14 @@ def forward_research():
 def rule_engine():
     # Rule engine: one cycle a minute (5 s past), the experimental futures-v1 paper account from rulebook v1.
     import httpx
-    from quantpilot import rule_live, layers
+    from quantpilot import rule_live, layers, rl_manage
     engine=database(settings.market_database_url)
     with httpx.Client(timeout=15) as client:
         while True:
             try:
                 out=rule_live.cycle(engine,client=client,layers=layers.live_layers(),modes=layers.modes(),
-                                    macro_events=macro.events(database()),news_events=layers.news_events())
+                                    macro_events=macro.events(database()),news_events=layers.news_events(),
+                                    manager=rl_manage.live_manager())
                 print(json.dumps(dict(rules=dict(bars=out['bars'],triggers=out['triggers'],equity=out['equity'],
                     action=(out['decision'] or {}).get('action'),diagnosed=out['diagnosed']))),flush=True)
             except Exception as exc:
