@@ -166,3 +166,36 @@ Two forward-only intraday families are registered now, before their data exists 
 - **Cause:** Binance's legacy futures websocket path (`fstream.binance.com/ws/…`) accepted the connection but delivered no messages, as a test on the trade stream confirmed. The collector now uses the all-symbol stream on the market path, `wss://fstream.binance.com/market/ws/!forceOrder@arr`, keeps BTCUSDT, and reconnects after 15 silent minutes.
 - **Effect on I6:** its data start is about 2026-10-20 19:30 UTC; the earliest evaluation date (2027-04-20) still gives about 6 months.
 - **Unaffected:** order-book depth (REST) was recorded throughout.
+
+**A6 — 2026-10-21, rule engine: event-triggered playbooks (rulebook v1). Registered before any of them was evaluated.**
+
+- **Question.** Do the playbooks in `rulebook/v1.yaml` (hash `3ea0f47e52c1`) make money after costs? They are built from the owner's rulebook: R01–R18, SR-01..SR-06, the confluence tab and the diagnostics tab. Design: `docs/superpowers/specs/2026-10-21-rule-engine-design.md`. Every threshold is in that file; changing any of them makes a new rulebook version that needs its own amendment.
+- **Data and spans.**
+  - Binance USD-M BTCUSDT 5m candles, mark, open interest and positioning, funding settlements, Fear & Greed, and the macro calendar (first-release times), from the PostgreSQL store.
+  - Development: decisions from 2021-10-20 to the last 15m close before 2025-10-20. Patterns are built in yearly chunks with 60 days of warm-up. No row at or after 2025-10-20 is read: a trade still open at the end of the data exits at the last close, marked `END_OF_DATA`.
+  - The holdout (2025-10-20 → 2026-10-19) stays untouched.
+  - Liquidations, order-book depth and classified news exist only from 2026-10. Historically, the LIQ_BURST and NEWS_SHOCK triggers and the thin-book gate never fire, and PB13L/PB13S have no hits; they are shadow-only.
+- **Decisions.**
+  - At every completed 15m close, each playbook whose trigger window is open is evaluated (conditions, regime, levels, `tradeplan.size` with rules v1 sizing and minimum reward:risk 1.5).
+  - The gates apply: cascade halt, macro blackout, funding window, 2-loss cooldown, account halts.
+- **Entries, exits and costs.**
+  - Fill at the next 5m open. Fees 5 bps per side.
+  - Slippage 3 bps per side, or **9 bps** when a DUMP or SPIKE trigger fired in the hour before the decision.
+  - Funding settlements crossed are paid or received.
+  - Stop first when a bar touches both stop and target; a gap through the stop fills at the open.
+  - The stop moves to break-even plus costs once the trade has gone `breakeven_at_r` R in its favour. A playbook's abort conditions exit at the next open after a 15m close where they hold. Each playbook has its own time stop (≤ 24h).
+- **Per-playbook scoring.**
+  - Each executable playbook (PB01–PB12, long and short variants separate: 20 configurations) is one frozen configuration and one trial.
+  - Its trades are its confirmed hits that pass the plan rules and the gates, taken one position at a time within that playbook.
+  - Net return = (price P&L − fees + funding) / entry notional; hit = net > 0.
+  - Pass rule: section 7, intraday thresholds, on all development trades. N = every intraday trial in the registry, including these. With no parameter selection, PBO is 0 by definition. "Most years positive" counts calendar years with ≥ 5 trades.
+- **Combined account (one more trial, `RE-combined`).**
+  - The arbiter over all playbooks in one `futures-v1` account: $10,000, 0.25% risk per trade, 2× isolated, one position.
+  - Flips allowed for `may_flip` playbooks. The 2% daily-loss halt applies. The 10% drawdown halt is reviewed automatically at the next UTC day, as in A4.
+  - It is scored with the same pass rule on its trades. Account return and maximum drawdown are also reported.
+- **Counterfactual record (for M3 and M5).** Every confirmed hit, taken or not, is simulated under both its normal stop and the wide stop (stop and target distances × 1.67), with MAE, MFE, R and the 4 hours after exit. These are the inputs to the ML filter and the learner. They are not separate trials.
+- **Layer gates (registered now, evaluated later on these development hits only).** The walk-forward uses 6-month blocks, as in section 5.
+  - **ML filter (M3).** Per playbook, L2 logistic regression on standardized features. It is refit at each block on hits that exited before the block, and takes a hit only if p > 1/(1 + RR). It goes live for a playbook only if the filtered test trades number ≥ 30 and their mean net return beats the unfiltered mean, with a bootstrap 95% CI of the difference above 0.
+  - **Learner (M5).** Shrinkage means (prior 0 R, 20 pseudo-observations) per playbook × regime × action (skip, take, take_wide). The policy takes the best action whose 80% lower bound is > 0, otherwise it skips. It goes live only if its pooled test mean R beats "always take", with a bootstrap 95% CI above 0.
+  - **Trade-management RL (M5).** Trained on 2021-10 → 2023-10 hits and tested on 2023-10 → 2025-10. It goes live only if its test mean R beats the fixed break-even rule, with a bootstrap 95% CI above 0.
+- **What runs live regardless.** At the owner's request, rulebook v1 drives the separate experimental paper account from the day it is deployed. That is data collection; it is not a pass. The frozen release and its paper account are unchanged.
