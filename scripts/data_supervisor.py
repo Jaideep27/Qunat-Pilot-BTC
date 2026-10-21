@@ -26,17 +26,20 @@ def repeating_history():
 
 def news_feeds():
     # Feed collection never waits on reasoning; Codex runs at most once per analysis interval.
-    # Rule engine news layer: article text (isolated Crawl4AI) and impact classification every 15 minutes.
-    from quantpilot import news_events
-    last_events=None
     while True:
         try:news.run(reasoning=True)
         except Exception as exc:print(json.dumps(dict(news='blocked',error_type=type(exc).__name__)),flush=True)
-        if last_events is None or time.monotonic()-last_events>=900:
-            try:print(json.dumps(dict(news_events=news_events.cycle())),flush=True)
-            except Exception as exc:print(json.dumps(dict(news_events='blocked',error_type=type(exc).__name__)),flush=True)
-            last_events=time.monotonic()
         time.sleep(settings.news_poll_seconds)
+
+
+def news_layer():
+    # Rule engine news layer: article text (isolated Crawl4AI) and impact classification every 15 minutes.
+    # Its own thread: news.run() above never returns.
+    from quantpilot import news_events
+    while True:
+        try:print(json.dumps(dict(news_events=news_events.cycle())),flush=True)
+        except Exception as exc:print(json.dumps(dict(news_events='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
+        time.sleep(900)
 
 
 def macro_calendar():
@@ -125,8 +128,8 @@ if __name__=='__main__':
             (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=process_started())),encoding="utf-8")
             initialize(database(settings.market_database_url))
             initialize(database())
-            with ThreadPoolExecutor(max_workers=9) as pool:
-                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts),pool.submit(outlook_cycle),pool.submit(forward_research),pool.submit(rule_engine)]
+            with ThreadPoolExecutor(max_workers=10) as pool:
+                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts),pool.submit(outlook_cycle),pool.submit(forward_research),pool.submit(rule_engine),pool.submit(news_layer)]
                 for future in futures:future.result()
     except Timeout:
         print('A data supervisor is already running.',flush=True)
