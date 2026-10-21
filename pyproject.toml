@@ -8,12 +8,27 @@ version = "0.1.0"
 description = "Auditable BTC perpetual research and paper accounting"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "pydantic-settings>=2.6,<3",
-  "sqlalchemy>=2.0,<3", "alembic>=1.14,<2", "psycopg[binary]>=3.2,<4",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+  "pydantic-settings>=2.6,<3",
+  "sqlalchemy>=2.0,<3",
+  "alembic>=1.14,<2",
+  "psycopg[binary]>=3.2,<4",
   # Keep the SHAP/Numba binary stack compatible with Python 3.11 and NumPy 2.
-  "pandas>=2.2,<3", "numpy>=2.0,<2.3", "numba>=0.61.2,<0.62", "pyarrow>=18,<24",
-  "scikit-learn>=1.6,<2", "xgboost>=2.1,<4", "shap>=0.46,<1",
-  "httpx>=0.28,<1", "joblib>=1.4,<2", "mcp>=1.12,<2", "filelock>=3.16,<4", "websockets>=13,<16"
+  "pandas>=2.2,<3",
+  "numpy>=2.0,<2.3",
+  "numba>=0.61.2,<0.62",
+  "pyarrow>=18,<24",
+  "scikit-learn>=1.6,<2",
+  "xgboost>=2.1,<4",
+  "shap>=0.46,<1",
+  "httpx>=0.28,<1",
+  "joblib>=1.4,<2",
+  "mcp>=1.12,<2",
+  "filelock>=3.16,<4",
+  "websockets>=13,<16",
+  "pyyaml>=6,<7",
+  "openpyxl>=3.1,<4",
 ]
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "ruff>=0.9,<1"]

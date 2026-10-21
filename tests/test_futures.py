@@ -168,3 +168,11 @@ def test_fill_revalidation_uses_the_plans_own_minimum_reward_risk():
     state = run(FLAT+[strict, bar(1, 100_400, 100_500, 100_300, 100_450)])
     assert state['position'] is None and state['rejections'][-1]['reason'] == 'INVALIDATED_AT_FILL'
     assert run(FLAT+[enter(0), bar(1, 100_400, 100_500, 100_300, 100_450)])['position'] is not None
+
+
+def test_a_plan_can_carry_stressed_slippage_for_both_fills():
+    e = enter(0)
+    e['plan']['slippage'] = 3*SLIP
+    state = run(FLAT+[e, bar(1, 100_000, 100_100, 99_900, 100_000), bar(2, 100_000, 103_100, 99_950, 103_000)])
+    t = state['trades'][0]
+    assert t['entry'] == pytest.approx(100_000*(1+3*SLIP)) and t['exit'] == pytest.approx(103_000*(1-3*SLIP))

@@ -49,7 +49,7 @@ def _reject(s, time, action, reason):
 
 def _close(s, price, time, reason):
     p = s['position']
-    fill = price*(1-p['side']*SLIPPAGE)
+    fill = price*(1-p['side']*p.get('slippage', SLIPPAGE))
     pnl = p['side']*p['quantity']*(fill-p['entry'])
     if reason == 'LIQUIDATION':
         pnl = -p['margin']   # isolated margin: the loss is capped at the position's margin
@@ -67,7 +67,8 @@ def _close(s, price, time, reason):
 
 def _open(s, plan, open_price, time):
     side = 1 if plan['side'] == 'long' else -1
-    fill = open_price*(1+side*SLIPPAGE)
+    slippage = float(plan.get('slippage') or SLIPPAGE)   # research may stress slippage around anomalies
+    fill = open_price*(1+side*slippage)
     ratio = reward_risk(plan['side'], fill, plan['stop'], plan['target'], plan['cost_fraction'])
     if ratio is None or ratio < plan.get('min_reward_risk', PLAN_RULES['min_reward_risk']):
         return _reject(s, time, 'enter', 'INVALIDATED_AT_FILL')
@@ -82,8 +83,9 @@ def _open(s, plan, open_price, time):
                          initial_target=float(plan['target']), leverage=leverage, margin=margin,
                          liquidation=liquidation_price(side, fill, leverage), entry_fee=fee, funding=0.0,
                          equity_at_entry=s['equity'], max_favorable=0.0, max_adverse=0.0, protection_changes=[],
+                         slippage=slippage,
                          plan={k: plan.get(k) for k in ('side', 'stop', 'target', 'reward_risk', 'rules_version',
-                                                         'context_cutoff')})
+                                                         'context_cutoff', 'playbook', 'hit_id')})
 
 
 def _modify(s, kind, price, open_price, time):

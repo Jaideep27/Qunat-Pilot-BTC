@@ -151,7 +151,21 @@ def plan(ctx, side, account, rules=PLAN_RULES):
     target = (min(opposing) if s == 1 else max(opposing)) if opposing else boundary
     if target is not None and boundary is not None and s*(target-boundary) > 1e-9*entry:
         rejections.append('TARGET_OUTSIDE_RANGE')
-    cost = costs(side, ctx.funding_rate, rules)
+    sized = size(side, entry, stop, target, account, ctx.funding_rate, rules)
+    cutoff = pd.Timestamp(ctx.cutoff)
+    return TradePlan(
+        rules_version=rules['version'], context_cutoff=cutoff.to_pydatetime(),
+        expires_at=(cutoff+pd.Timedelta(minutes=5)).to_pydatetime(), side=side, entry=entry, stop=stop,
+        target=target, quantity=sized['quantity'], notional=sized['notional'], margin=sized['margin'],
+        leverage=sized['leverage'], liquidation=sized['liquidation'], risk_amount=sized['risk_amount'],
+        reward_risk=sized['reward_risk'], cost_fraction=sized['cost_fraction'], range=window,
+        evidence=_evidence(ctx, side), rejections=list(dict.fromkeys(rejections+sized['rejections'])))
+
+
+def size(side, entry, stop, target, account, funding_rate, rules=PLAN_RULES):
+    """Net reward:risk, risk-budget sizing, exchange minimums, margin and liquidation for given levels."""
+    s, rejections = SIDES[side], []
+    cost = costs(side, funding_rate, rules)
     ratio = reward_risk(side, entry, stop, target, cost)
     if ratio is None:
         rejections.append('INVALID_LEVELS')
@@ -161,9 +175,10 @@ def plan(ctx, side, account, rules=PLAN_RULES):
     equity, step = float(account.get('equity') or 0.0), rules['qty_step']
     if stop is not None and equity > 0:
         per_unit = s*(entry-stop)+entry*cost
-        sized = equity*rules['risk_fraction']/per_unit
-        capped = min(sized, equity*rules['max_exposure']/entry)
-        quantity = math.floor(capped/step+1e-9)*step
+        if per_unit > 0:
+            sized = equity*rules['risk_fraction']/per_unit
+            capped = min(sized, equity*rules['max_exposure']/entry)
+            quantity = math.floor(capped/step+1e-9)*step
     quantity = round(quantity, 6)
     notional = quantity*entry
     margin = notional/rules['leverage']
@@ -175,13 +190,9 @@ def plan(ctx, side, account, rules=PLAN_RULES):
     liquidation = entry*(1-1/leverage)/(1-maintenance) if s == 1 else entry*(1+1/leverage)/(1+maintenance)
     if stop is not None and s*(stop-liquidation) <= 0:
         rejections.append('STOP_BEYOND_LIQUIDATION')
-    cutoff = pd.Timestamp(ctx.cutoff)
-    return TradePlan(
-        rules_version=rules['version'], context_cutoff=cutoff.to_pydatetime(),
-        expires_at=(cutoff+pd.Timedelta(minutes=5)).to_pydatetime(), side=side, entry=entry, stop=stop,
-        target=target, quantity=quantity, notional=notional, margin=margin, leverage=leverage, liquidation=liquidation,
-        risk_amount=quantity*(s*(entry-stop)+entry*cost) if stop is not None else 0.0, reward_risk=ratio,
-        cost_fraction=cost, range=window, evidence=_evidence(ctx, side), rejections=list(dict.fromkeys(rejections)))
+    return dict(quantity=quantity, notional=notional, margin=margin, leverage=leverage, liquidation=liquidation,
+                risk_amount=quantity*(s*(entry-stop)+entry*cost) if stop is not None else 0.0, reward_risk=ratio,
+                cost_fraction=cost, rejections=rejections)
 
 
 def revalidate(plan, fill_price, rules=PLAN_RULES):

@@ -122,3 +122,17 @@ def test_evidence_lists_supporting_and_opposing_factors_without_deciding():
     stances = {e['factor']: e['stance'] for e in plan.evidence}
     assert stances['trend_1h'] == 'supports' and stances['rsi_1h'] == 'opposes'
     assert plan.rejections == []
+
+
+def test_size_applies_risk_budget_costs_and_exchange_rules():
+    from quantpilot import tradeplan
+    account = dict(equity=10_000.0, cash=10_000.0)
+    out = tradeplan.size('long', 100.0, 98.0, 104.0, account, funding_rate=0.0)
+    cost = tradeplan.ROUND_TRIP
+    assert out['quantity'] == pytest.approx(int(25/(2+100*cost)/.001)*.001)
+    assert out['reward_risk'] == pytest.approx((.04-cost)/(.02+cost))
+    assert out['rejections'] == [] and out['liquidation'] < 98.0
+    tiny = tradeplan.size('long', 100.0, 98.0, 100.5, account, funding_rate=0.0)
+    assert 'REWARD_RISK_BELOW_MIN' in tiny['rejections']
+    broke = tradeplan.size('short', 100.0, 102.0, 95.0, dict(equity=10.0, cash=10.0), funding_rate=0.0)
+    assert 'BELOW_EXCHANGE_MINIMUM' in broke['rejections']
