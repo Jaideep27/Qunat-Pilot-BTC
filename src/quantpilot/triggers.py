@@ -132,10 +132,10 @@ class TriggerIndex:
 def episode(trigger, t, pf):
     """`trigger.*` features at decision time `t`: extremes and OI change since the move began."""
     t = pd.Timestamp(t)
-    window = pf.loc[(pf.index > trigger.start) & (pf.index <= t)]
-    low = float(window['low'].min()) if len(window) else np.nan
-    high = float(window['high'].max()) if len(window) else np.nan
-    oi_now = float(pf['open_interest'].loc[:t].iloc[-1]) if 'open_interest' in pf and len(pf.loc[:t]) else np.nan
+    lo, hi = pf.index.searchsorted(trigger.start, side='right'), pf.index.searchsorted(t, side='right')
+    low = float(pf['low'].to_numpy()[lo:hi].min()) if hi > lo else np.nan
+    high = float(pf['high'].to_numpy()[lo:hi].max()) if hi > lo else np.nan
+    oi_now = float(pf['open_interest'].to_numpy()[hi-1]) if 'open_interest' in pf and hi else np.nan
     oi_start = float(trigger.open_interest) if pd.notna(trigger.open_interest) else np.nan
     atr = float(trigger.atr) if pd.notna(trigger.atr) and trigger.atr > 0 else np.nan
     support, resistance = float(trigger.support), float(trigger.resistance)

@@ -8,6 +8,7 @@ Global gates block all new entries. Selection order: priority, then confluence, 
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from . import patterns, rules, tradeplan, triggers
@@ -15,7 +16,6 @@ from .context import macro_state
 
 ROUND_TRIP = tradeplan.ROUND_TRIP
 LAYERS = ('ml', 'news', 'learner')
-SETTLEMENT_HOURS = (0, 8, 16)
 
 
 def plan_rules(defaults):
@@ -26,18 +26,19 @@ def gates(book, t, row, pf, history, account, macro_events=None):
     """Global gates that block every new entry at `t` (name -> detail)."""
     g, t, out = book['gates'], pd.Timestamp(t), {}
     halt = g['cascade_halt']
-    recent = pf.loc[(pf.index > t-pd.Timedelta(minutes=halt['minutes'])) & (pf.index <= t)]
-    move = recent['move_z_15m'].abs().max() if 'move_z_15m' in recent else None
-    liq = recent['liq_z_15m'].max() if 'liq_z_15m' in recent else None
-    if (move is not None and move >= halt['move_z_15m_abs']) or (liq is not None and liq >= halt['liq_z_15m']):
-        out['cascade_halt'] = dict(move_z=move, liq_z=liq)
+    lo = pf.index.searchsorted(t-pd.Timedelta(minutes=halt['minutes']), side='right')
+    hi = pf.index.searchsorted(t, side='right')
+    window = lambda col: pf[col].to_numpy(float)[lo:hi] if col in pf and hi > lo else np.array([np.nan])
+    move, liq = np.nanmax(np.abs(window('move_z_15m')), initial=-np.inf), np.nanmax(window('liq_z_15m'), initial=-np.inf)
+    if move >= halt['move_z_15m_abs'] or liq >= halt['liq_z_15m']:
+        out['cascade_halt'] = dict(move_z=float(move), liq_z=float(liq) if np.isfinite(liq) else None)
     if macro_events and macro_state(macro_events, t)['blackout']:
         out['macro_blackout'] = True
     spread, depth = rules._number(row.get('spread_bps')), rules._number(row.get('depth_15bps_pct'))
     if (spread is not None and spread >= g['thin_book']['spread_bps']) or (depth is not None and depth <= g['thin_book']['depth_pct']):
         out['thin_book'] = dict(spread_bps=spread, depth_pct=depth)
-    settlements = [t.floor('D')+pd.Timedelta(hours=h+24*d) for d in (-1, 0, 1) for h in SETTLEMENT_HOURS]
-    if min(abs((t-s).total_seconds()) for s in settlements) <= g['funding_window_minutes']*60:
+    since = (t-t.floor('8h')).total_seconds()     # settlements at 00/08/16 UTC
+    if min(since, 8*3600-since) <= g['funding_window_minutes']*60:
         out['funding_window'] = True
     if account.get('halted') or account.get('paused'):
         out['account_halted'] = True
@@ -106,13 +107,13 @@ def candidate(book, pb, t, pf, row, trig, account):
 def decide(book, t, pf, index, account, history=(), layers=None, modes=None, macro_events=None):
     """All hits at decision time `t` and the single action taken: None, 'enter' or 'flip'."""
     t, layers, modes = pd.Timestamp(t), layers or {}, modes or {}
-    row = {k: v for k, v in pf.loc[t].items()}
+    active = [(pb, trig) for pb in book['playbooks'] if (trig := index.active(t, pb['trigger'])) is not None]
+    if not active:
+        return dict(time=t.isoformat(), action=None, chosen=None, hits=[], gates={})
+    row = pf.loc[t].to_dict()
     blocked = gates(book, t, row, pf, history, account, macro_events)
     hits, eligible = [], []
-    for pb in book['playbooks']:
-        trig = index.active(t, pb['trigger'])
-        if trig is None:
-            continue
+    for pb, trig in active:
         rec, features = candidate(book, pb, t, pf, row, trig, account)
         hits.append(rec)
         if rec['status']:
