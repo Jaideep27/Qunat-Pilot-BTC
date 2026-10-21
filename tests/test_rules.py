@@ -6,12 +6,13 @@ from quantpilot import rules
 
 @pytest.fixture(scope='module')
 def book():
-    return rules.load()
+    return rules.load(rules.RULEBOOK_V1)   # v1 behaviour (nearest target); v2 has its own tests below
 
 
 def test_rulebook_loads_with_a_stable_hash_and_unique_ids(book):
     assert book['version'] == 1 and len(book['hash']) == 12
-    assert rules.load()['hash'] == book['hash']
+    assert rules.load(rules.RULEBOOK_V1)['hash'] == book['hash']
+    assert rules.validate(rules.load()) == []
     ids = [p['id'] for p in book['playbooks']]
     assert len(ids) == len(set(ids)) >= 20
     assert {'PB01', 'PB02', 'PB12L', 'PB13S'} <= set(ids)
@@ -96,3 +97,24 @@ def test_confluence_is_signed_toward_the_side():
     assert rules.confluence(f, 'long')['score'] == 9
     assert rules.confluence(f, 'short')['score'] == -7      # volume counts for both sides
     assert rules.confluence({}, 'long')['score'] == 0
+
+
+def test_v2_targets_the_nearest_level_that_clears_the_minimum_reward_risk():
+    v2 = rules.load()
+    assert v2['version'] == 2 and v2['defaults']['target_selection'] == 'first_meeting_min_rr'
+    pb = rules.playbook(v2, 'PB01')
+    f = {'close': 100.0, 'atr_1h': 2.0, 'trigger.low': 98.0, 'vwap': 100.8, 'resistance_1h': 103.0,
+         'resistance_4h': 104.5, 'prior_day_high': None, 'band4_high': 106.0, 'funding_rate': 0.0}
+    levels = rules.levels(pb, f, v2['defaults'])
+    assert levels['stop'] == pytest.approx(97.5)
+    # 100.8 and 103.0 give less than 1.5 net reward:risk on a 2.5 risk; 104.5 is the first that clears it
+    assert levels['target'] == pytest.approx(104.5)
+    assert rules.levels(pb, dict(f, **{'resistance_4h': None}), v2['defaults'])['target'] == pytest.approx(105.0)  # 2R
+    nearest = rules.levels(pb, f, dict(v2['defaults'], target_selection='nearest'))
+    assert nearest['target'] == pytest.approx(100.8)
+
+
+def test_v1_is_kept_for_the_record():
+    v1 = rules.load(rules.RULEBOOK_V1)
+    assert v1['version'] == 1 and v1['hash'] == '3ea0f47e52c1'
+    assert v1['defaults'].get('target_selection', 'nearest') == 'nearest'

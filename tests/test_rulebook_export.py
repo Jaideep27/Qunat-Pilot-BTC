@@ -18,5 +18,5 @@ def test_workbook_mirrors_the_rulebook(tmp_path):
     conditions = playbooks.cell(row=2, column=header.index('Conditions')+1).value
     assert 'trigger.oi_change <= -0.005' in conditions and 'any of' in conditions
     about = {r[0].value: r[1].value for r in wb['About'].iter_rows()}
-    assert about['Hash'] == book['hash'] and about['Version'] == 1
+    assert about['Hash'] == book['hash'] and about['Version'] == book['version']
     assert wb['Triggers'].max_row == len(book['triggers'])+1

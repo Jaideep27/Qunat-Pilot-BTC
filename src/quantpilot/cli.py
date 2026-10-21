@@ -56,7 +56,7 @@ def main():
     playbooks=sub.add_parser('research-playbooks', help='Rule engine A6: pre-registered rulebook playbooks (never trades)')
     playbooks.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
     sub.add_parser('rulebook-xlsx', help='Write the Excel copy of the rulebook').add_argument(
-        '--output', default='rulebook/QuantPilot-Rulebook-v1.xlsx')
+        '--output', default=None, help='Default: rulebook/QuantPilot-Rulebook-v<version>.xlsx')
     experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
     experiment.add_argument('--output', required=True, help='New directory; existing directories are refused')
     experiment.add_argument('--folds', type=int, choices=range(1, 27), default=6)
@@ -180,7 +180,8 @@ def main():
     elif args.command == 'rulebook-xlsx':
         from .rulebook_export import write
         from .rules import load
-        print(write(args.output, load()))
+        book = load()
+        print(write(args.output or f"rulebook/QuantPilot-Rulebook-v{book['version']}.xlsx", book))
     elif args.command == 'research-events':
         from .event_research import train_experiment
         report = train_experiment(args.output, folds=args.folds)

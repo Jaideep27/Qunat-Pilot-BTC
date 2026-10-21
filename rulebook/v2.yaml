@@ -1,0 +1,597 @@
+# QuantPilot rulebook v2: event-triggered playbooks for BTCUSDT perpetual (paper only).
+#
+# Identical to v1 (hash 3ea0f47e52c1) except one rule, registered as amendment A7 before v2 was evaluated:
+# a target is the NEAREST CANDIDATE LEVEL THAT CLEARS min_reward_risk after costs (v1 took the nearest
+# level, which rejected 97% of confirmed setups for reward:risk below 1.5). If no candidate clears it, the
+# fallback R-multiple target is used; the band cap still applies. Changing anything below makes v3.
+#
+# Built from the owner's rulebook (R01-R18, SR-01..SR-06, confluence tab, diagnostics tab) and adjusted:
+# every threshold is fixed here BEFORE any historical evaluation (pre-registration amendment A6).
+# Changing anything below makes a new rulebook version with a new hash.
+#
+# Grammar (evaluated by quantpilot.rules with a fixed operator table; nothing here is executed as code):
+#   condition := [feature, op, value-or-feature] | {all: [condition, ...]} | {any: [condition, ...]}
+#   op        := '<' | '<=' | '>' | '>=' | '==' | '!='
+# Triggers: `at: 5m` triggers fire once per episode (the first 5m close where `when` holds);
+# `at: 15m` triggers fire at every completed 15m close where `when` holds.
+# Features come from quantpilot.patterns (row), the trigger episode (trigger.*) and the open position
+# (position.*, aborts only). ATR means the 1h ATR. A missing input makes its condition false.
+
+version: 2
+name: QuantPilot event playbooks
+
+defaults:
+  decision_timeframe: 15m          # playbooks are evaluated at completed 15m closes
+  min_reward_risk: 1.5             # net of fees, slippage and expected funding
+  min_stop_atr: 0.5                # a stop closer than this is widened to it
+  max_stop_atr: 4.0                # a stop wider than this rejects the plan
+  min_target_atr: 0.25             # target candidates closer than this are ignored
+  target_selection: first_meeting_min_rr   # v2 (A7): nearest candidate whose net reward:risk >= the minimum
+  max_hold_hours: 24
+  anomaly_slippage_multiplier: 3   # inside 1h of a DUMP/SPIKE, slippage is 3x in research
+  wide_stop_multiplier: 1.67       # the learner's "take_wide" action
+
+layers:                            # off | shadow | live; per-playbook live modes come from their gates
+  ml: shadow
+  news: shadow
+  learner: shadow
+  manage_rl: shadow
+
+triggers:
+  DUMP:
+    direction: -1
+    at: 5m
+    when: {any: [{all: [[move_z_15m, '<=', -4], [volume_z_15m, '>=', 1.5]]}, [move_z_1h, '<=', -4]]}
+  SPIKE:
+    direction: 1
+    at: 5m
+    when: {any: [{all: [[move_z_15m, '>=', 4], [volume_z_15m, '>=', 1.5]]}, [move_z_1h, '>=', 4]]}
+  OI_SHOCK_DOWN:
+    direction: 0
+    at: 5m
+    when: [oi_change_15m, '<=', -0.01]
+  OI_SHOCK_UP:
+    direction: 0
+    at: 5m
+    when: [oi_change_15m, '>=', 0.01]
+  LIQ_BURST_LONG:                  # longs liquidated (forward-only data)
+    direction: -1
+    at: 5m
+    when: {all: [[liq_long_usd_15m, '>=', 2000000], [liq_z_15m, '>=', 4]]}
+  LIQ_BURST_SHORT:
+    direction: 1
+    at: 5m
+    when: {all: [[liq_short_usd_15m, '>=', 2000000], [liq_z_15m, '>=', 4]]}
+  FUNDING_EXTREME_HIGH:
+    direction: 1
+    at: 5m
+    when: [funding_z, '>=', 2.2]
+  FUNDING_EXTREME_LOW:
+    direction: -1
+    at: 5m
+    when: [funding_z, '<=', -2.0]
+  LEVEL_BREAK_DOWN:
+    direction: -1
+    at: 15m
+    when: [break_down, '==', 1]
+  LEVEL_BREAK_UP:
+    direction: 1
+    at: 15m
+    when: [break_up, '==', 1]
+  LEVEL_SWEEP_LOW:
+    direction: -1
+    at: 15m
+    when: [sweep_low, '==', 1]
+  LEVEL_SWEEP_HIGH:
+    direction: 1
+    at: 15m
+    when: [sweep_high, '==', 1]
+  LEVEL_HOLD_SUPPORT:
+    direction: -1
+    at: 15m
+    when: [hold_support, '==', 1]
+  LEVEL_REJECT_RESISTANCE:
+    direction: 1
+    at: 15m
+    when: [reject_resistance, '==', 1]
+  SQUEEZE_RELEASE:
+    direction: 0
+    at: 15m
+    when: {all: [[squeeze_release, '==', 1], [volume_z_15m, '>=', 1.5]]}
+  TREND_PULLBACK_UP:
+    direction: 1
+    at: 15m
+    when: {all: [[ema_stack_1h, '==', 1], [adx_1h, '>=', 25], [ema21_dist_15m_atr, '>=', -0.3], [ema21_dist_15m_atr, '<=', 0.3]]}
+  TREND_PULLBACK_DOWN:
+    direction: -1
+    at: 15m
+    when: {all: [[ema_stack_1h, '==', -1], [adx_1h, '>=', 25], [ema21_dist_15m_atr, '>=', -0.3], [ema21_dist_15m_atr, '<=', 0.3]]}
+  RANGE_EDGE_UPPER:
+    direction: 1
+    at: 15m
+    when: {all: [[adx_1h, '<', 20], [range_pos_4h, '>=', 0.9]]}
+  RANGE_EDGE_LOWER:
+    direction: -1
+    at: 15m
+    when: {all: [[adx_1h, '<', 20], [range_pos_4h, '<=', 0.1]]}
+  MACRO_RELEASE:                   # first 15m bar after a CPI / jobs / FOMC release; built from the calendar
+    direction: 0
+    source: macro
+  NEWS_SHOCK_UP:                   # high-impact, high-confidence classified news (M4, forward-only)
+    direction: 1
+    source: news
+  NEWS_SHOCK_DOWN:
+    direction: -1
+    source: news
+
+gates:
+  cascade_halt: {move_z_15m_abs: 8, liq_z_15m: 6, minutes: 30}            # owner R18
+  macro_blackout: {minutes_before: 30, minutes_after: 15}
+  thin_book: {spread_bps: 3, depth_pct: 0.05}                               # live only
+  cooldown: {losses: 2, hours: 24}
+  funding_window_minutes: 5
+  one_position: true
+
+playbooks:
+  - id: PB01
+    name: Flush rebound
+    family: dump
+    side: long
+    source: [R11, R05, SR-03, R01]
+    thesis: A violent dump that closes positions (open interest falls) into support, then buyers take over.
+    trigger: {any: [DUMP, LIQ_BURST_LONG], within_bars: 6, min_bars: 1}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [trigger.oi_change, '<=', -0.005]
+      - [up_15m, '==', 1]
+      - {any: [[lower_wick_15m, '>=', 0.4], [sweep_low, '==', 1], [hold_support, '==', 1]]}
+      - [taker_share_15m, '>=', 0.5]
+      - [trigger.low_to_support_atr, '<=', 0.5]
+      - [trigger.low_to_support_atr, '>=', -2.0]
+      - [range_pos_4h, '<=', 0.35]
+    stop: {anchor: trigger.low, buffer_atr: 0.25}
+    target: {candidates: [vwap, resistance_1h, resistance_4h, prior_day_high], cap: band4_high, fallback_r: 2.0}
+    abort: [[close_15m, '<', trigger.low], [position.oi_change, '>=', 0.005]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 1
+
+  - id: PB02
+    name: Dump continuation (breakdown retest)
+    family: dump
+    side: short
+    source: [R03, SR-02]
+    thesis: A clean break of support with open interest rising (new shorts); short the weak retest from below.
+    trigger: {any: [DUMP, LEVEL_BREAK_DOWN], within_bars: 8, min_bars: 1}
+    regimes: [RANGE, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [retest_from_below, '==', 1]
+      - [trigger.oi_change, '>=', 0.002]
+      - [taker_share_15m, '<=', 0.5]
+      - [volume_z_15m, '<=', 1.5]
+      - [room_down_atr, '>=', 1.5]
+    stop: {anchor: broken_support, buffer_atr: 0.5}
+    target: {candidates: [support_1h, support_4h, prior_day_low], cap: band4_low, fallback_r: 2.0}
+    abort: [[close_15m, '>', position.anchor]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: true
+    priority: 2
+
+  - id: PB03
+    name: Spike exhaustion fade
+    family: spike
+    side: short
+    source: [R06, SR-06, R02]
+    thesis: A violent spike driven by short covering (open interest falls) into resistance, then sellers take over.
+    trigger: {any: [SPIKE, LIQ_BURST_SHORT], within_bars: 6, min_bars: 1}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [trigger.oi_change, '<=', -0.005]
+      - [up_15m, '==', 0]
+      - {any: [[upper_wick_15m, '>=', 0.4], [sweep_high, '==', 1], [reject_resistance, '==', 1]]}
+      - [taker_share_15m, '<=', 0.5]
+      - [trigger.high_to_resistance_atr, '>=', -0.5]
+      - [trigger.high_to_resistance_atr, '<=', 2.0]
+      - [range_pos_4h, '>=', 0.65]
+    stop: {anchor: trigger.high, buffer_atr: 0.25}
+    target: {candidates: [vwap, support_1h, support_4h, prior_day_low], cap: band4_low, fallback_r: 2.0}
+    abort: [[close_15m, '>', trigger.high], [position.oi_change, '>=', 0.005]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 1
+
+  - id: PB04
+    name: Spike continuation (breakout retest)
+    family: spike
+    side: long
+    source: [R04, SR-05]
+    thesis: A clean break of resistance with open interest rising (new longs); buy the shallow retest from above.
+    trigger: {any: [SPIKE, LEVEL_BREAK_UP], within_bars: 8, min_bars: 1}
+    regimes: [RANGE, TREND_UP, HIGH_VOL]
+    conditions:
+      - [retest_from_above, '==', 1]
+      - [trigger.oi_change, '>=', 0.002]
+      - [taker_share_15m, '>=', 0.5]
+      - [volume_z_15m, '<=', 1.5]
+      - [room_up_atr, '>=', 1.5]
+    stop: {anchor: broken_resistance, buffer_atr: 0.5}
+    target: {candidates: [resistance_1h, resistance_4h, prior_day_high], cap: band4_high, fallback_r: 2.0}
+    abort: [[close_15m, '<', position.anchor]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: true
+    priority: 2
+
+  - id: PB05
+    name: Short squeeze ignition
+    family: positioning
+    side: long
+    source: [R12]
+    thesis: Crowded shorts (very negative funding) forced to cover on an upside break with aggressive buying.
+    trigger: {any: [SPIKE, LEVEL_BREAK_UP, OI_SHOCK_DOWN], within_bars: 2, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [funding_z, '<=', -2.0]
+      - [volume_z_15m, '>=', 1.8]
+      - [taker_share_15m, '>=', 0.6]
+      - [close, '>', vwap]
+      - [oi_change_15m, '<=', 0]
+      - [room_up_atr, '>=', 1.0]
+    stop: {anchor: close, buffer_atr: 1.5}
+    target: {candidates: [resistance_1h, resistance_4h, prior_day_high], cap: band4_high, fallback_r: 2.5}
+    abort: [[close_15m, '<', vwap]]
+    time_stop_hours: 8
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 2
+
+  - id: PB06
+    name: Crowded long flush
+    family: positioning
+    side: short
+    source: [R13]
+    thesis: Crowded longs (very positive funding) forced out on a downside break with aggressive selling.
+    trigger: {any: [DUMP, LEVEL_BREAK_DOWN, OI_SHOCK_DOWN], within_bars: 2, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [funding_z, '>=', 2.2]
+      - [volume_z_15m, '>=', 1.8]
+      - [taker_share_15m, '<=', 0.4]
+      - [close, '<', vwap]
+      - [oi_change_15m, '<=', 0]
+      - [room_down_atr, '>=', 1.0]
+    stop: {anchor: close, buffer_atr: 1.5}
+    target: {candidates: [support_1h, support_4h, prior_day_low], cap: band4_low, fallback_r: 2.5}
+    abort: [[close_15m, '>', vwap]]
+    time_stop_hours: 8
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 2
+
+  - id: PB07L
+    name: Squeeze-release breakout (long)
+    family: technical
+    side: long
+    source: [R09]
+    thesis: Volatility compression releases upward with volume, buyers and fresh open interest.
+    trigger: {any: [SQUEEZE_RELEASE], within_bars: 1, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [close, '>', vwap]
+      - [up_15m, '==', 1]
+      - [taker_share_15m, '>=', 0.58]
+      - [volume_z_15m, '>=', 1.5]
+      - [ema_stack_15m, '>=', 0]
+      - [oi_change_1h, '>=', 0]
+      - [room_up_atr, '>=', 1.5]
+    stop: {anchor: close, buffer_atr: 1.5}
+    target: {candidates: [resistance_1h, resistance_4h], cap: band4_high, fallback_r: 2.2}
+    abort: [[close_15m, '<', ema21_15m]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 3
+
+  - id: PB07S
+    name: Squeeze-release breakout (short)
+    family: technical
+    side: short
+    source: [R10]
+    thesis: Volatility compression releases downward with volume, sellers and fresh open interest.
+    trigger: {any: [SQUEEZE_RELEASE], within_bars: 1, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [close, '<', vwap]
+      - [up_15m, '==', 0]
+      - [taker_share_15m, '<=', 0.42]
+      - [volume_z_15m, '>=', 1.5]
+      - [ema_stack_15m, '<=', 0]
+      - [oi_change_1h, '>=', 0]
+      - [room_down_atr, '>=', 1.5]
+    stop: {anchor: close, buffer_atr: 1.5}
+    target: {candidates: [support_1h, support_4h], cap: band4_low, fallback_r: 2.2}
+    abort: [[close_15m, '>', ema21_15m]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 3
+
+  - id: PB08L
+    name: Trend pullback (long)
+    family: technical
+    side: long
+    source: [R07]
+    thesis: In a strong uptrend, RSI cools to 40-56 at the 15m EMA21 and the next bar resumes upward.
+    trigger: {any: [TREND_PULLBACK_UP], within_bars: 0, min_bars: 0}
+    regimes: [TREND_UP]
+    conditions:
+      - [rsi_15m, '>=', 40]
+      - [rsi_15m, '<=', 56]
+      - [range_pos_4h, '<=', 0.6]
+      - [up_15m, '==', 1]
+      - [taker_share_15m, '>=', 0.5]
+    stop: {anchor: close, buffer_atr: 1.8}
+    target: {candidates: [resistance_1h, resistance_4h, prior_day_high], cap: band4_high, fallback_r: 2.5}
+    abort: [[ema_stack_1h, '<=', 0]]
+    time_stop_hours: 24
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 4
+
+  - id: PB08S
+    name: Trend pullback (short)
+    family: technical
+    side: short
+    source: [R08]
+    thesis: In a strong downtrend, RSI rebounds to 44-60 at the 15m EMA21 and the next bar resumes downward.
+    trigger: {any: [TREND_PULLBACK_DOWN], within_bars: 0, min_bars: 0}
+    regimes: [TREND_DOWN]
+    conditions:
+      - [rsi_15m, '>=', 44]
+      - [rsi_15m, '<=', 60]
+      - [range_pos_4h, '>=', 0.4]
+      - [up_15m, '==', 0]
+      - [taker_share_15m, '<=', 0.5]
+    stop: {anchor: close, buffer_atr: 1.8}
+    target: {candidates: [support_1h, support_4h, prior_day_low], cap: band4_low, fallback_r: 2.5}
+    abort: [[ema_stack_1h, '>=', 0]]
+    time_stop_hours: 24
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 4
+
+  - id: PB09L
+    name: Sweep and reclaim of support
+    family: technical
+    side: long
+    source: [R05, SR-03]
+    thesis: Price runs the stops below a support (swing low or prior day/week low) and closes back above it on volume.
+    trigger: {any: [LEVEL_SWEEP_LOW], within_bars: 0, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [volume_z_15m, '>=', 1.5]
+      - [lower_wick_15m, '>=', 0.4]
+      - [taker_share_15m, '>=', 0.5]
+      - [range_pos_4h, '<=', 0.5]
+    stop: {anchor: low_15m, buffer_atr: 0.25}
+    target: {candidates: [vwap, resistance_1h, resistance_4h, prior_day_high], cap: band4_high, fallback_r: 2.0}
+    abort: [[close_15m, '<', position.anchor]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: true
+    priority: 2
+
+  - id: PB09S
+    name: Sweep and reclaim of resistance
+    family: technical
+    side: short
+    source: [R06, SR-06]
+    thesis: Price runs the stops above a resistance (swing high or prior day/week high) and closes back below it on volume.
+    trigger: {any: [LEVEL_SWEEP_HIGH], within_bars: 0, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [volume_z_15m, '>=', 1.5]
+      - [upper_wick_15m, '>=', 0.4]
+      - [taker_share_15m, '<=', 0.5]
+      - [range_pos_4h, '>=', 0.5]
+    stop: {anchor: high_15m, buffer_atr: 0.25}
+    target: {candidates: [vwap, support_1h, support_4h, prior_day_low], cap: band4_low, fallback_r: 2.0}
+    abort: [[close_15m, '>', position.anchor]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: true
+    priority: 2
+
+  - id: PB10L
+    name: Range-edge / VWAP -2 SD fade (long)
+    family: range
+    side: long
+    source: [R17]
+    thesis: In a quiet range, a stretch to the bottom of the 4h 80% band and 2 SD under VWAP reverts to VWAP.
+    trigger: {any: [RANGE_EDGE_LOWER], within_bars: 1, min_bars: 0}
+    regimes: [RANGE]
+    conditions:
+      - [vwap_z, '<=', -2.0]
+      - [rsi_15m, '<=', 32]
+      - [adx_1h, '<', 20]
+      - [oi_change_15m, '<=', 0.005]
+    stop: {anchor: close, buffer_atr: 1.2}
+    target: {candidates: [vwap], cap: band4_high, fallback_r: 1.5}
+    abort: [[adx_1h, '>=', 25]]
+    time_stop_hours: 8
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 5
+
+  - id: PB10S
+    name: Range-edge / VWAP +2 SD fade (short)
+    family: range
+    side: short
+    source: [R17]
+    thesis: In a quiet range, a stretch to the top of the 4h 80% band and 2 SD over VWAP reverts to VWAP.
+    trigger: {any: [RANGE_EDGE_UPPER], within_bars: 1, min_bars: 0}
+    regimes: [RANGE]
+    conditions:
+      - [vwap_z, '>=', 2.0]
+      - [rsi_15m, '>=', 68]
+      - [adx_1h, '<', 20]
+      - [oi_change_15m, '<=', 0.005]
+    stop: {anchor: close, buffer_atr: 1.2}
+    target: {candidates: [vwap], cap: band4_low, fallback_r: 1.5}
+    abort: [[adx_1h, '>=', 25]]
+    time_stop_hours: 8
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 5
+
+  - id: PB11L
+    name: Support hold with absorption
+    family: technical
+    side: long
+    source: [R01, SR-01]
+    thesis: Price tests support, leaves a long lower wick on heavy volume and buyers win the close.
+    trigger: {any: [LEVEL_HOLD_SUPPORT], within_bars: 0, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [volume_z_15m, '>=', 2.0]
+      - [taker_share_15m, '>=', 0.52]
+      - [range_pos_4h, '<=', 0.3]
+    stop: {anchor: low_15m, buffer_atr: 1.5}
+    target: {candidates: [vwap, resistance_1h, resistance_4h], cap: band4_high, fallback_r: 2.0}
+    abort: [[close_15m, '<', position.anchor]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 3
+
+  - id: PB11S
+    name: Resistance rejection with absorption
+    family: technical
+    side: short
+    source: [R02, SR-04]
+    thesis: Price tests resistance, leaves a long upper wick on heavy volume and sellers win the close.
+    trigger: {any: [LEVEL_REJECT_RESISTANCE], within_bars: 0, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [volume_z_15m, '>=', 2.0]
+      - [taker_share_15m, '<=', 0.48]
+      - [range_pos_4h, '>=', 0.7]
+    stop: {anchor: high_15m, buffer_atr: 1.5}
+    target: {candidates: [vwap, support_1h, support_4h], cap: band4_low, fallback_r: 2.0}
+    abort: [[close_15m, '>', position.anchor]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 3
+
+  - id: PB12L
+    name: Post-release breakout (long)
+    family: event
+    side: long
+    source: [R14]
+    thesis: After a CPI / jobs / FOMC release, a 15m close above the first post-release bar's range with volume.
+    trigger: {any: [MACRO_RELEASE], within_bars: 8, min_bars: 1}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL, PANIC]
+    conditions:
+      - [close_15m, '>', trigger.range_high]
+      - [volume_z_15m, '>=', 1.5]
+      - [body_15m, '>=', 0.5]
+      - [up_15m, '==', 1]
+    stop: {anchor: trigger.range_low, buffer_atr: 0.1}
+    target: {candidates: [resistance_1h, resistance_4h], cap: band4_high, fallback_r: 2.0}
+    abort: [[close_15m, '<', trigger.range_mid]]
+    time_stop_hours: 6
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 1
+
+  - id: PB12S
+    name: Post-release breakout (short)
+    family: event
+    side: short
+    source: [R15]
+    thesis: After a CPI / jobs / FOMC release, a 15m close below the first post-release bar's range with volume.
+    trigger: {any: [MACRO_RELEASE], within_bars: 8, min_bars: 1}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL, PANIC]
+    conditions:
+      - [close_15m, '<', trigger.range_low]
+      - [volume_z_15m, '>=', 1.5]
+      - [body_15m, '>=', 0.5]
+      - [up_15m, '==', 0]
+    stop: {anchor: trigger.range_high, buffer_atr: 0.1}
+    target: {candidates: [support_1h, support_4h], cap: band4_low, fallback_r: 2.0}
+    abort: [[close_15m, '>', trigger.range_mid]]
+    time_stop_hours: 6
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 1
+
+  - id: PB13L
+    name: News-shock continuation (long)
+    family: news
+    side: long
+    source: [new]
+    thesis: High-impact bullish news confirmed by price above VWAP and aggressive buying. Shadow only (no history).
+    shadow_only: true
+    trigger: {any: [NEWS_SHOCK_UP], within_bars: 4, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL]
+    conditions:
+      - [trigger.confidence, '>=', 0.7]
+      - [close, '>', vwap]
+      - [taker_share_15m, '>=', 0.55]
+      - [volume_z_15m, '>=', 1.0]
+    stop: {anchor: close, buffer_atr: 1.5}
+    target: {candidates: [resistance_1h, resistance_4h], cap: band4_high, fallback_r: 2.0}
+    abort: [[close_15m, '<', vwap]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 2
+
+  - id: PB13S
+    name: News-shock continuation (short)
+    family: news
+    side: short
+    source: [new]
+    thesis: High-impact bearish news confirmed by price below VWAP and aggressive selling. Shadow only (no history).
+    shadow_only: true
+    trigger: {any: [NEWS_SHOCK_DOWN], within_bars: 4, min_bars: 0}
+    regimes: [RANGE, TREND_UP, TREND_DOWN, HIGH_VOL, PANIC]
+    conditions:
+      - [trigger.confidence, '>=', 0.7]
+      - [close, '<', vwap]
+      - [taker_share_15m, '<=', 0.45]
+      - [volume_z_15m, '>=', 1.0]
+    stop: {anchor: close, buffer_atr: 1.5}
+    target: {candidates: [support_1h, support_4h], cap: band4_low, fallback_r: 2.0}
+    abort: [[close_15m, '>', vwap]]
+    time_stop_hours: 12
+    breakeven_at_r: 1.0
+    may_flip: false
+    priority: 2
+
+confluence:                        # owner Tab 3: +1 / -1 / 0 per factor, signed toward the trade's side
+  - {factor: ema_stack_1h, rule: 'sign toward side'}
+  - {factor: adx_1h, rule: '>= 25 with the 1h EMA stack: +1 toward, -1 against'}
+  - {factor: rsi_15m, rule: '> 55 bullish, < 45 bearish'}
+  - {factor: volume_z_15m, rule: '>= 1.5: +1 (participation)'}
+  - {factor: taker_share_15m, rule: '>= 0.55 bullish, <= 0.45 bearish'}
+  - {factor: vwap_z, rule: 'above VWAP bullish, below bearish'}
+  - {factor: oi_price_state, rule: 'longs opening bullish; shorts opening bearish; closing states count against their side'}
+  - {factor: funding_z, rule: '<= -1.5 favours longs, >= 1.5 favours shorts'}
+  - {factor: range_pos_4h, rule: '<= 0.3 room up, >= 0.7 room down'}
+
+diagnostics:                       # owner Tab 4, measured in R after costs
+  FAIL_STOP_HUNT: 'stopped out, then the original target was reached within 4h of the exit'
+  FAIL_GREEDY_TP: 'net loss after reaching at least 75% of the way to the target'
+  FAIL_FADED_IMPULSE: 'stopped out with favourable excursion under 0.15R'
+  FAIL_CHOP_BLEED: 'time exit with |net| under the round-trip cost'
+  PASS_CLEAN: 'net win with adverse excursion under 0.5R'
+  PASS_GRIND: 'net win after adverse excursion of at least 0.75R'
+  SKIP_GOOD_AVOID: 'skipped; the simulated trade lost'
+  SKIP_MISSED_WIN: 'skipped; the simulated trade won with adverse excursion under 0.5R'
+  SKIP_NEUTRAL: 'skipped; any other simulated outcome'
+  STANDARD_VARIANCE: 'any other taken trade'

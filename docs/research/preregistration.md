@@ -199,3 +199,15 @@ Two forward-only intraday families are registered now, before their data exists 
   - **Learner (M5).** Shrinkage means (prior 0 R, 20 pseudo-observations) per playbook × regime × action (skip, take, take_wide). The policy takes the best action whose 80% lower bound is > 0, otherwise it skips. It goes live only if its pooled test mean R beats "always take", with a bootstrap 95% CI above 0.
   - **Trade-management RL (M5).** Trained on 2021-10 → 2023-10 hits and tested on 2023-10 → 2025-10. It goes live only if its test mean R beats the fixed break-even rule, with a bootstrap 95% CI above 0.
 - **What runs live regardless.** At the owner's request, rulebook v1 drives the separate experimental paper account from the day it is deployed. That is data collection; it is not a pass. The frozen release and its paper account are unchanged.
+
+**A7 — 2026-10-21, rulebook v2: target selection only. Registered before v2 was evaluated.**
+
+- **Erratum to A6.** A6 says 20 executable configurations. The rulebook has **18**: PB01–PB06 plus the long and short variants of PB07–PB12. PB13L/S are shadow-only. The A6 run registered 18 playbooks plus `RE-combined`, giving N = 132 intraday trials.
+- **A6 result (rulebook v1, hash `3ea0f47e52c1`).**
+  - 7,572 confirmed hits, of which 7,365 were rejected by the plan rules for net reward:risk below 1.5.
+  - The cause: v1's target is the *nearest* candidate level, which is usually well inside the 1–2 ATR stop (median reward:risk about 0.3).
+  - Only 106 trades were taken. No playbook passed. The combined account made 50 trades, returned −1.77% and had a 2.8% maximum drawdown.
+  - Seen before writing this amendment: v1's per-playbook trade counts, hit rates and mean net returns (development span), and first-year outcome summaries. No v2 outcome has been computed.
+- **The one change (rulebook v2, `rulebook/v2.yaml`, hash `db3d684ff71c`).** A target is the nearest candidate level whose net reward:risk (fees, slippage and expected funding included) is at least `min_reward_risk`. If none clears it, the playbook's fallback R-multiple target is used. The band cap, stops, triggers, conditions, gates, management and costs are exactly as in v1.
+- **Evaluation.** Identical to A6 in a new run directory. The trial registry carries every earlier trial, so the 18 v2 playbooks and `RE-combined` add 19 trials (N = 151). Same section 7 pass rule, same counterfactual record. The M3/M5 layer gates registered in A6 apply to the v2 hits.
+- **Live.** The experimental paper account runs v2 from deployment. That is data collection, not a pass.

@@ -14,7 +14,8 @@ from pathlib import Path
 
 import yaml
 
-RULEBOOK = Path(__file__).resolve().parents[2]/'rulebook'/'v1.yaml'
+RULEBOOK_V1 = Path(__file__).resolve().parents[2]/'rulebook'/'v1.yaml'
+RULEBOOK = RULEBOOK_V1.with_name('v2.yaml')   # current rulebook (amendment A7)
 OPS = {'<': operator.lt, '<=': operator.le, '>': operator.gt, '>=': operator.ge, '==': operator.eq,
        '!=': operator.ne}
 SIDES = {'long': 1, 'short': -1}
@@ -113,6 +114,11 @@ def levels(pb, features, defaults):
     candidates = [v for v in (resolve(c, features)[0] for c in target_spec.get('candidates', []))
                   if v is not None and s*(v-close) >= defaults['min_target_atr']*atr
                   and (cap is None or s*(v-cap) <= 0)]
+    if defaults.get('target_selection', 'nearest') == 'first_meeting_min_rr':
+        from .tradeplan import costs, reward_risk
+        cost = costs(pb['side'], _number(features.get('funding_rate')))
+        candidates = [v for v in candidates
+                      if (reward_risk(pb['side'], close, stop, v, cost) or 0) >= defaults['min_reward_risk']]
     if candidates:
         target = min(candidates, key=lambda v: s*(v-close))
     else:
