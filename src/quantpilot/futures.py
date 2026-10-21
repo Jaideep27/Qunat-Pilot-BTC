@@ -27,8 +27,8 @@ DAILY_LOSS, MAX_DRAWDOWN = _RISK.daily_loss, .10
 BAR = pd.Timedelta(minutes=5)
 
 
-def initial(balance=10_000.0):
-    return dict(version=VERSION, balance=float(balance), cash=float(balance), equity=float(balance),
+def initial(balance=10_000.0, bar_minutes=5):
+    return dict(version=VERSION, bar_minutes=bar_minutes, balance=float(balance), cash=float(balance), equity=float(balance),
                 peak=float(balance), day=None, day_start=float(balance), halted_day=False, drawdown_halt=False,
                 paused=False, mark=None, last_time=None, position=None, pending=None, trades=[], rejections=[],
                 funding=[], decisions=[])
@@ -151,7 +151,7 @@ def _bar(s, event):
     if s['last_time'] is not None and time <= pd.Timestamp(s['last_time']):
         raise ValueError('bars must be strictly increasing')
     iso = time.isoformat()
-    day = (time-BAR).strftime('%Y-%m-%d')
+    day = (time-pd.Timedelta(minutes=s.get('bar_minutes', 5))).strftime('%Y-%m-%d')   # the bar's opening day
     if s['day'] != day:
         s.update(day=day, day_start=s['equity'], halted_day=False)
     _execute_pending(s, event, iso)

@@ -55,6 +55,19 @@ def forecasts(): return services.shadow_forecasts()
 @app.get('/api/v1/strategy-research')
 def strategy_research(): return services.strategy_research()
 
+@app.get('/api/v1/rules')
+def rules_status(): return services.rules_status()
+
+@app.get('/api/v1/rules/journal')
+def rules_journal(limit: Annotated[int, Query(ge=1, le=500)] = 100, detail: bool = False):
+    return services.rules_journal(limit, detail)
+
+@app.get('/api/v1/rules/research')
+def rules_research(): return services.rules_research()
+
+@app.get('/api/v1/rules/levels')
+def rules_levels(): return services.rules_levels()
+
 @app.get('/api/v1/macro')
 def macro(): return services.macro()
 

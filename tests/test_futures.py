@@ -176,3 +176,12 @@ def test_a_plan_can_carry_stressed_slippage_for_both_fills():
     state = run(FLAT+[e, bar(1, 100_000, 100_100, 99_900, 100_000), bar(2, 100_000, 103_100, 99_950, 103_000)])
     t = state['trades'][0]
     assert t['entry'] == pytest.approx(100_000*(1+3*SLIP)) and t['exit'] == pytest.approx(103_000*(1-3*SLIP))
+
+
+def test_one_minute_bars_keep_the_utc_day_right():
+    state = futures.initial(10_000.0, bar_minutes=1)
+    midnight = pd.Timestamp('2026-01-21 00:00', tz='UTC')
+    for i, minute in enumerate((-1, 0, 1)):
+        t = midnight+pd.Timedelta(minutes=minute)
+        futures.step(state, dict(kind='bar', time=t.isoformat(), open=1, high=1, low=1, close=1), inplace=True)
+        assert state['day'] == ('2026-01-20' if minute <= 0 else '2026-01-21')

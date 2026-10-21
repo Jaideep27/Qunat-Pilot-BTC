@@ -12,6 +12,7 @@ def test_proxy_tools_return_the_same_envelopes_as_the_api(account, monkeypatch):
     monkeypatch.setattr(mcp_proxy, 'client_factory', lambda: client)
     assert asyncio.run(mcp_proxy.get_paper_portfolio())['data'] == services.paper()['data']
     assert asyncio.run(mcp_proxy.get_macro_calendar())['data'] == services.macro()['data']
+    assert asyncio.run(mcp_proxy.get_rule_engine())['data'] == services.rules_status()['data']
 
 
 def test_chat_run_identity_is_forwarded(account, monkeypatch):

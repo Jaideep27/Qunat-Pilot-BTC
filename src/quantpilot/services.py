@@ -439,3 +439,100 @@ def chat_threads():
 def chat_thread(thread_id):
     from .chat import thread
     return envelope(thread(database(), thread_id), source='In-app chat')
+
+
+# Rule engine (experimental paper account driven by rulebook v1; nothing places real orders).
+RULES_NOTE = 'Experimental paper account driven by rulebook v1. Paper only: nothing here places or sizes real orders.'
+
+
+def _rules_db():
+    return database(settings.market_database_url or settings.database_url)
+
+
+def layer_modes():
+    """Per-playbook live modes earned by the M3/M5 gates (artifacts/rule-engine/modes.json), else the rulebook's."""
+    path = settings.artifact_dir/'rule-engine'/'modes.json'
+    return json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+
+
+def _latest_rule_report():
+    runs = sorted((settings.artifact_dir/'rule-engine').glob('*/report.json'), key=lambda p: p.stat().st_mtime)
+    return (runs[-1], json.loads(runs[-1].read_text(encoding='utf-8'))) if runs else (None, None)
+
+
+def rules_status():
+    from . import journal, rule_live, rules
+    from .rulebook_export import describe
+    book = rules.cached()
+    acct = journal.load_account(_rules_db(), rule_live.ACCOUNT_ID)
+    playbooks = [dict(id=p['id'], name=p['name'], family=p.get('family'), side=p['side'], source=p.get('source', []),
+                      thesis=p.get('thesis'), trigger=p['trigger'], regimes=p['regimes'], priority=p['priority'],
+                      shadow_only=bool(p.get('shadow_only')), time_stop_hours=p['time_stop_hours'],
+                      conditions=[describe(c) for c in p.get('conditions', [])], stop=p['stop'], target=p['target'],
+                      abort=[describe(c) for c in p.get('abort', [])], breakeven_at_r=p.get('breakeven_at_r'),
+                      may_flip=bool(p.get('may_flip'))) for p in book['playbooks']]
+    account = None
+    if acct:
+        f = acct['futures']
+        position = f['position'] and {k: f['position'].get(k) for k in (
+            'side', 'quantity', 'entry', 'stop', 'target', 'entry_time', 'max_favorable', 'max_adverse', 'plan')}
+        account = dict(equity=f['equity'], cash=f['cash'], balance=f['balance'], account_return=f['equity']/f['balance']-1,
+                       position=position, pending=f['pending'], trades=len(f['trades']), halted_day=f['halted_day'],
+                       drawdown_halt=f['drawdown_halt'], paused=f['paused'], last_bar=acct.get('last_bar'),
+                       last_decision=acct.get('last_decision'), created=acct.get('created'), rulebook=acct.get('rulebook'))
+    path, report = _latest_rule_report()
+    research = None if not report else dict(run=path.parent.name, generated=report.get('generated'),
+                                            passing=report.get('passing', []), trials=report.get('trials'),
+                                            combined=report['combined']['account'])
+    data = dict(rulebook=dict(hash=book['hash'], version=book['version'], name=book.get('name')), layers=book['layers'],
+                modes=layer_modes(), gates=book['gates'], defaults=book['defaults'], playbooks=playbooks, account=account,
+                checklist=(acct or {}).get('checklist', []), research=research, provenance_note=RULES_NOTE)
+    return envelope(data, (acct or {}).get('last_bar'), 'QuantPilot rule engine (experimental paper account)', max_age=180)
+
+
+def rules_journal(limit=100, detail=False):
+    from . import journal
+    engine = _rules_db()
+    hits = journal.hits(engine, limit=limit)
+    if not detail:
+        for h in hits:
+            h['payload'] = {k: v for k, v in h['payload'].items() if k != 'checks'}
+    data = dict(hits=list(reversed(hits)), trades=list(reversed(journal.trades(engine, limit=limit))),
+                triggers=journal.triggers(engine, limit=limit))
+    observed = data['hits'][0]['time'] if data['hits'] else None
+    return envelope(data, observed, 'QuantPilot rule engine journal', max_age=86400)
+
+
+def rules_research():
+    path, report = _latest_rule_report()
+    if not report:
+        return envelope(dict(status='not_run', note='Run `quantpilot research-playbooks --output DIR`.'), None,
+                        'QuantPilot rule engine research', max_age=400*86400)
+    folder = path.parent
+    extra = {name: json.loads((folder/f'{name}.json').read_text(encoding='utf-8'))
+             for name in ('meta-report', 'learner-report', 'manage-report') if (folder/f'{name}.json').exists()}
+    playbooks = {k: {x: v[x] for x in ('name', 'family', 'side', 'report', 'gate', 'hits', 'tradeable', 'diagnosis')
+                     if x in v} for k, v in report['playbooks'].items()}
+    data = dict(status='complete', run=folder.name, generated=report['generated'], rulebook=report['rulebook'],
+                development=report['development'], trials=report['trials'], hits=report['hits'],
+                passing=report['passing'], playbooks=playbooks,
+                combined={k: v for k, v in report['combined'].items() if k != 'trades'},
+                layers={k.replace('-report', ''): v for k, v in extra.items()},
+                holdout_evaluated=(folder/'holdout.lock').exists(), note='Pre-registered (amendment A6); nothing here trades.')
+    return envelope(data, report['generated'], 'QuantPilot rule engine research', max_age=400*86400)
+
+
+def rules_levels():
+    from . import journal, rule_live
+    acct = journal.load_account(_rules_db(), rule_live.ACCOUNT_ID) or {}
+    trades = (acct.get('futures') or {}).get('trades', [])[-50:]
+    markers = [dict(time=t['entry_time'], price=t['entry'], kind='entry', side=t['side'], playbook=t['plan'].get('playbook'))
+               for t in trades]
+    markers += [dict(time=t['exit_time'], price=t['exit'], kind='exit', side=t['side'], playbook=t['plan'].get('playbook'),
+                     reason=t['reason'], net=t['net']) for t in trades]
+    position = (acct.get('futures') or {}).get('position')
+    if position:
+        markers.append(dict(time=position['entry_time'], price=position['entry'], kind='open', side=position['side'],
+                            playbook=position['plan'].get('playbook'), stop=position['stop'], target=position['target']))
+    data = dict(overlay=acct.get('overlay'), markers=sorted(markers, key=lambda m: m['time']))
+    return envelope(data, (acct.get('overlay') or {}).get('time'), 'QuantPilot rule engine levels', max_age=900)

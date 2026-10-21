@@ -41,6 +41,7 @@ def initialize(engine):
     from . import forecaster  # noqa: F401  register shadow forecasts and their scored outcomes
     from . import answers  # noqa: F401  register outlook answers and scores
     from . import chat  # noqa: F401  register in-app chat threads and messages
+    from . import journal  # noqa: F401  register the rule engine journal
     with serialized(engine) as session:
         Base.metadata.create_all(session.connection())
         if engine.dialect.name == "postgresql":

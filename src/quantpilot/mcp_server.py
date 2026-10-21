@@ -44,6 +44,11 @@ async def get_strategy_research() -> dict[str, Any]:
     return await asyncio.to_thread(services.strategy_research)
 
 @mcp.tool(structured_output=True)
+async def get_rule_engine() -> dict[str, Any]:
+    """Rule engine: rulebook playbooks, experimental paper account, live checklist and research verdict."""
+    return await asyncio.to_thread(services.rules_status)
+
+@mcp.tool(structured_output=True)
 async def get_macro_calendar() -> dict[str, Any]:
     """Upcoming CPI, jobs and FOMC releases plus recent first-release values; no consensus surprise."""
     return await asyncio.to_thread(services.macro)

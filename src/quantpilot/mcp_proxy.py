@@ -97,6 +97,12 @@ async def get_strategy_research() -> dict[str, Any]:
 
 
 @mcp.tool(structured_output=True)
+async def get_rule_engine() -> dict[str, Any]:
+    """Rule engine: rulebook playbooks, experimental paper account, live checklist and research verdict."""
+    return await _get('rules')
+
+
+@mcp.tool(structured_output=True)
 async def get_paper_portfolio() -> dict[str, Any]:
     """Virtual portfolio, fills and decisions."""
     return await _get('portfolio')
