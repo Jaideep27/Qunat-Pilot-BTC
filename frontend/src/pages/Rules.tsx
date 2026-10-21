@@ -5,7 +5,11 @@ type Playbook={id:string;name:string;family:string;side:string;source:string[];t
   trigger:{any:string[];within_bars:number;min_bars:number};regimes:string[];conditions:string[];abort:string[];
   stop:{anchor:string;buffer_atr:number};target:{candidates:string[];cap:string|null;fallback_r:number};time_stop_hours:number;
   breakeven_at_r:number|null;may_flip:boolean};
-type Check={playbook:string;status:string;passed:number;total:number;missing:string[];trigger:string;time:string};
+type Way={n:number;share:number|null;low:number|null;high:number|null};
+type History={setups:number;went_their_way_1h:Way;went_their_way_4h:Way;median_move_4h:number|null;plan:{n:number;win_rate:number|null;mean_r:number|null}}|null;
+type Check={playbook:string;status:string;passed:number;total:number;missing:string[];trigger:string;time:string;history?:History;
+  layers?:Record<string,{verdict:string;mode:string}>};
+const past=(h:History|undefined)=>!h?'—':`${pct(h.went_their_way_4h.share,0)} went its way in 4h · plan won ${pct(h.plan.win_rate,0)}, ${num(h.plan.mean_r)}R (n=${h.setups})`;
 type Position={side:number;quantity:number;entry:number;stop:number;target:number;entry_time:string;max_favorable:number;max_adverse:number;plan:{playbook?:string}};
 type Account={equity:number;cash:number;balance:number;account_return:number;position:Position|null;pending:{action:string}|null;trades:number;
   halted_day:boolean;drawdown_halt:boolean;paused:boolean;last_bar:string|null;last_decision:string|null;created:string|null};
@@ -46,9 +50,9 @@ export default function Rules(){
         <Stat label="Last decision" value={a?.last_decision?stamp(a.last_decision):'—'} detail="At completed 15m closes"/>
       </div>
       <Card title="Live checklist" label="Live checklist" className="span-2" tag="Latest 15m close">
-        {!s?<Loading/>:s.checklist.length?<div className="table-scroll"><table><thead><tr><th>Playbook</th><th>Trigger</th><th>Checks</th><th>Status</th><th>Missing inputs</th></tr></thead>
+        {!s?<Loading/>:s.checklist.length?<div className="table-scroll"><table><thead><tr><th>Playbook</th><th>Trigger</th><th>Checks</th><th>Status</th><th>Last times this setup appeared</th><th>Learner</th><th>Missing inputs</th></tr></thead>
           <tbody>{s.checklist.map(c=><tr key={c.playbook}><td><strong>{c.playbook}</strong></td><td>{words(c.trigger)}</td><td>{c.passed}/{c.total}</td>
-            <td><Pill tone={statusTone(c.status)}>{words(c.status)}</Pill></td><td className="muted">{c.missing.join(', ')||'—'}</td></tr>)}</tbody></table></div>
+            <td><Pill tone={statusTone(c.status)}>{words(c.status)}</Pill></td><td>{past(c.history)}</td><td>{c.layers?.learner?words(c.layers.learner.verdict)+' ('+c.layers.learner.mode+')':'—'}</td><td className="muted">{c.missing.join(', ')||'—'}</td></tr>)}</tbody></table></div>
           :<Empty title="No trigger active">Nothing unusual at the last 15m close. Playbooks only run when a trigger fires.</Empty>}
       </Card>
       <Card title="Open position" label="Open position" className="span-1" tag={a?.position?.plan?.playbook??'Flat'}>

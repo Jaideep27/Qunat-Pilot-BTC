@@ -95,6 +95,33 @@ def evaluate(book, hits):
                 blocks=record, actions={a: chosen.count(a) for a in ('take', 'take_wide', 'skip')})
 
 
+def _raw(cell):
+    """Count, sum and sum of squares behind a stored cell (the shrinkage mean and sd determine them)."""
+    n = cell['n']
+    total = cell['mean']*(n+PRIOR_N)
+    squares = cell['sd']**2*(n-1)+(total**2/n if n else 0.0) if n > 1 else total**2
+    return n, total, squares
+
+
+def merge(stats, rows):
+    """Add live journal outcomes (taken trades and simulated skips) to the 'take' action of their cell.
+    The wide-stop alternative is not observed live, so it keeps its historical value."""
+    out = {k: dict(v) for k, v in stats.items()}
+    for row in rows:
+        outcome, regime = row.get('outcome') or {}, (row.get('payload') or {}).get('regime')
+        r = outcome.get('r')
+        if r is None or not outcome.get('valid', True) or regime is None:
+            continue
+        key = (row['playbook'], regime)
+        cell = out.setdefault(key, dict(take=_cell([]), take_wide=_cell([])))
+        n, total, squares = _raw(cell['take'])
+        n, total, squares = n+1, total+r, squares+r*r
+        mean = total/(n+PRIOR_N)
+        sd = float(np.sqrt(max(0.0, (squares-total**2/n)/(n-1)))) if n > 1 else 1.0
+        cell['take'] = dict(n=n, mean=mean, sd=sd, low80=mean-Z80*sd/np.sqrt(n+PRIOR_N))
+    return out
+
+
 def save(stats, path=STATS):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -112,6 +139,13 @@ def live_policy():
     if not Path(STATS).exists():
         return None
     stats = load(STATS)
+    try:   # keep learning from the live journal: every diagnosed setup and trade updates its cell
+        from . import journal
+        from .store import database
+        stats = merge(stats, [h for h in journal.hits(database(settings.market_database_url or settings.database_url),
+                                                       limit=5000) if h.get('outcome')])
+    except Exception:
+        pass
     def verdict(hit, features):
         pick = choose(stats, hit.get('playbook'), hit.get('regime'))
         return dict(verdict=pick['action'], reason=pick.get('reason'),

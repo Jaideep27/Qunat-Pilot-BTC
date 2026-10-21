@@ -63,6 +63,8 @@ def main():
     manage=sub.add_parser('research-manage', help='Rule engine M5: trade-management RL (tabular Q and PPO) on a run')
     manage.add_argument('--output', required=True, help='Playbook research run directory')
     manage.add_argument('--timesteps', type=int, default=150_000, help='PPO training steps')
+    sub.add_parser('rule-history', help="Per-playbook 'what happened the last times' from a playbook run").add_argument(
+        '--output', required=True, help='Playbook research run directory')
     sub.add_parser('rulebook-xlsx', help='Write the Excel copy of the rulebook').add_argument(
         '--output', default=None, help='Default: rulebook/QuantPilot-Rulebook-v<version>.xlsx')
     experiment=sub.add_parser('research-events', help='Multi-horizon research experiment; never releases a model')
@@ -200,6 +202,9 @@ def main():
         from .rl_manage import run
         result = run(args.output, timesteps=args.timesteps)
         print(json.dumps({k: result[k] for k in ('train', 'test', 'agents', 'policy', 'summary')}, indent=2, default=str))
+    elif args.command == 'rule-history':
+        from .setup_history import write
+        print(write(args.output))
     elif args.command == 'rulebook-xlsx':
         from .rulebook_export import write
         from .rules import load

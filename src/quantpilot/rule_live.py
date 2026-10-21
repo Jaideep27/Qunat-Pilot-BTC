@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import select
 
-from . import arbiter, diagnosis, futures, journal, outcomes, patterns, rules, triggers
+from . import arbiter, diagnosis, futures, journal, outcomes, patterns, rules, setup_history, triggers
 from .market_store import PERP, MarketCandle, _upsert, feed_status
 
 ACCOUNT_ID = 'experimental-v1'
@@ -289,10 +289,13 @@ def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None
     t15 = closes[-1] if len(closes) else None
     if t15 is not None and now-t15 <= FRESH and (acct['last_decision'] is None or t15 > pd.Timestamp(acct['last_decision'])):
         decision = _decide(book, acct, pf, table, t15, layers, modes, macro_events)
+        for h in decision['hits']:
+            h['history'] = setup_history.lookup(h['playbook'])   # what happened the last times this setup appeared
         journal.add_hits(engine, [h for h in decision['hits'] if h['status'] != 'NOT_CONFIRMED'])
         acct['checklist'] = [dict(playbook=h['playbook'], status=h['status'], passed=sum(c['ok'] for c in h['checks']),
                                   total=len(h['checks']), missing=h['missing'], trigger=h['trigger']['type'],
-                                  time=h['time']) for h in decision['hits']]
+                                  time=h['time'], history=h.get('history'), layers=h.get('layers'))
+                             for h in decision['hits']]
     for i, trade in enumerate(acct['futures']['trades'][before:], start=before):
         journal.add_trade(engine, trade['plan'].get('hit_id') or f'trade-{i}', trade)
     state = acct['futures']

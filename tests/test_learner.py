@@ -55,3 +55,16 @@ def test_live_policy_round_trip(tmp_path, monkeypatch):
     fn = learner.live_policy()
     assert fn(dict(playbook='PB01', regime='TREND_UP'), {})['verdict'] == 'take'
     assert fn(dict(playbook='PB01', regime='RANGE'), {})['verdict'] == 'skip'
+
+
+def test_live_outcomes_from_the_journal_update_the_take_action():
+    stats = learner.statistics(hits(n=400))
+    before = stats[('PB01', 'RANGE')]['take']
+    rows = [dict(playbook='PB01', payload=dict(regime='RANGE'), outcome=dict(valid=True, r=3.0)) for _ in range(40)]
+    rows += [dict(playbook='PB01', payload=dict(regime='RANGE'), outcome=dict(valid=False)),
+             dict(playbook='PB02', payload=dict(regime='HIGH_VOL'), outcome=dict(valid=True, r=-1.0))]
+    merged = learner.merge(stats, rows)
+    after = merged[('PB01', 'RANGE')]['take']
+    assert after['n'] == before['n']+40 and after['mean'] > before['mean']
+    assert merged[('PB01', 'RANGE')]['take_wide'] == stats[('PB01', 'RANGE')]['take_wide']   # wide is not observed live
+    assert merged[('PB02', 'HIGH_VOL')]['take']['n'] == 1 and stats.get(('PB02', 'HIGH_VOL')) is None

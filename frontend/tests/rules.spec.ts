@@ -10,7 +10,7 @@ const status={rulebook:{hash:'3ea0f47e52c1',version:1,name:'QuantPilot event pla
   account:{equity:10042.5,cash:10042.5,balance:10000,account_return:.00425,position:{side:1,quantity:.05,entry:80000,stop:79000,target:82000,
     entry_time:'2026-10-21T10:01:00+00:00',max_favorable:.004,max_adverse:-.002,plan:{playbook:'PB01'}},pending:null,trades:3,halted_day:false,
     drawdown_halt:false,paused:false,last_bar:'2026-10-21T10:30:00+00:00',last_decision:'2026-10-21T10:30:00+00:00',created:'2026-10-21T09:00:00+00:00'},
-  checklist:[{playbook:'PB01',status:'TAKEN',passed:7,total:7,missing:[],trigger:'DUMP',time:'2026-10-21T10:00:00+00:00'},
+  checklist:[{playbook:'PB01',status:'TAKEN',passed:7,total:7,missing:[],trigger:'DUMP',time:'2026-10-21T10:00:00+00:00',history:{setups:254,went_their_way_1h:{n:254,share:.51,low:.45,high:.57},went_their_way_4h:{n:254,share:.48,low:.42,high:.54},median_move_4h:-.001,plan:{n:250,win_rate:.37,mean_r:-.42}},layers:{learner:{verdict:'skip',mode:'shadow'}}},
     {playbook:'PB02',status:'NOT_CONFIRMED',passed:3,total:5,missing:['liq_z_15m'],trigger:'DUMP',time:'2026-10-21T10:00:00+00:00'}],research:null};
 const journal={hits:[{id:'PB01:x',time:'2026-10-21T10:00:00+00:00',playbook:'PB01',side:'long',status:'TAKEN',diagnosis:'PASS_CLEAN',
     payload:{plan:{reward_risk:1.8,stop:79000,target:82000}}}],
@@ -33,6 +33,8 @@ test('the rules page shows the live checklist, playbook verdicts, the journal an
   await expect(checklist).toContainText('7/7');
   await expect(checklist).toContainText('not confirmed');
   await expect(checklist).toContainText('liq_z_15m');
+  await expect(checklist).toContainText('48% went its way in 4h · plan won 37%, -0.42R (n=254)');
+  await expect(checklist).toContainText('skip (shadow)');
   const books=page.getByRole('region',{name:'Playbooks'});
   await expect(books).toContainText('Flush rebound');
   await expect(books).toContainText('41.0%');
