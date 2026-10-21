@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,useCallback} from 'react';
-import {createChart,CandlestickSeries,BarSeries,LineSeries,AreaSeries,HistogramSeries,ColorType,
+import {createChart,createSeriesMarkers,CandlestickSeries,BarSeries,LineSeries,AreaSeries,HistogramSeries,ColorType,
   type IChartApi,type ISeriesApi,type SeriesType,type UTCTimestamp,type Logical} from 'lightweight-charts';
 import {request,preview,type Candle} from './api';
 import {subscribeKlines,type LiveTick,type LiveState} from './liveFeed';
@@ -16,6 +16,11 @@ const tools=[['cursor','Pointer'],['trend','Trend line'],['ray','Ray'],['horizon
   ['vertical','Vertical line'],['rectangle','Rectangle'],['fib','Fibonacci retracement'],['measure','Measure'],['text','Text note']];
 const symbols:Record<string,string>={cursor:'↖',trend:'╱',ray:'↗',horizontal:'─',vertical:'│',rectangle:'□',fib:'≡',measure:'↔',text:'T'};
 const colors=['#a99afa','#f1c46b','#59c5ed','#e387ba','#72d49d','#f79564'];
+type RuleLevels={overlay:Record<string,number|string|null>|null;markers:{time:string;price:number;kind:string;side:number;playbook?:string;reason?:string}[]};
+// Rule-engine levels drawn as price lines: [field, label, colour].
+const ruleLines:[string,string,string][]=[['support','Support','#4bd6ad'],['resistance','Resistance','#ed7d80'],
+  ['vwap','VWAP','#f1c46b'],['vwap_upper2','VWAP +2σ','#8d7a50'],['vwap_lower2','VWAP −2σ','#8d7a50'],
+  ['band4_high','4h 80% high','#59c5ed'],['band4_low','4h 80% low','#59c5ed']];
 const safeRead=<T,>(key:string,fallback:T):T=>{try{return JSON.parse(localStorage.getItem(key)??'null')??fallback}catch{return fallback}};
 
 export default function TradingWorkspace(){
@@ -30,6 +35,10 @@ export default function TradingWorkspace(){
   const [type,setType]=useState('Candles'),[tool,setTool]=useState('cursor'),[search,setSearch]=useState('');
   const [showStudies,setShowStudies]=useState(false),[drawings,setDrawings]=useState<Drawing[]>([]),[pending,setPending]=useState<Anchor[]>([]);
   const [engine,setEngine]=useState<'stored'|'tradingview'>('stored');
+  const [showRules,setShowRules]=useState(()=>safeRead('qp:rule-levels',true)),[rules,setRules]=useState<RuleLevels|null>(null);
+  useEffect(()=>{localStorage.setItem('qp:rule-levels',JSON.stringify(showRules));if(!showRules)return;let alive=true;
+    const get=()=>request<RuleLevels>('rules/levels').then(e=>{if(alive)setRules(e.data)}).catch(()=>{});
+    get();const timer=setInterval(get,60000);return()=>{alive=false;clearInterval(timer)}},[showRules]);
   const [storage,setStorage]=useState<Storage|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const generation=useRef(0);
   const [loadedKey,setLoadedKey]=useState('');
@@ -112,6 +121,13 @@ export default function TradingWorkspace(){
       chart.addSeries(AreaSeries,{lineColor:'#56d6ba',topColor:'#276c6044',bottomColor:'#276c6000'}):type==='Bars'?
       chart.addSeries(BarSeries,{upColor:'#4bd6ad',downColor:'#ed7d80'}):chart.addSeries(CandlestickSeries,{upColor:'#4bd6ad',downColor:'#ed7d80',borderVisible:false,wickUpColor:'#4bd6ad',wickDownColor:'#ed7d80'});
     priceRef.current=base as ISeriesApi<SeriesType>;
+    if(showRules&&rules?.overlay)for(const [key,title,color] of ruleLines){const price=rules.overlay[key];
+      if(typeof price==='number'&&Number.isFinite(price))base.createPriceLine({price,color,lineWidth:1,lineStyle:2,axisLabelVisible:true,title})}
+    if(showRules&&rules?.markers?.length){const first=Date.parse(bars[0].event_time)/1000,step=({'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400} as Record<string,number>)[timeframe]??300;
+      createSeriesMarkers(base,rules.markers.map(m=>({time:Math.floor(Date.parse(m.time)/1000/step)*step as UTCTimestamp,
+        position:(m.kind==='exit'?(m.side===1?'aboveBar':'belowBar'):(m.side===1?'belowBar':'aboveBar')) as 'aboveBar'|'belowBar',
+        color:m.kind==='exit'?'#9aa8ba':m.side===1?'#4bd6ad':'#ed7d80',shape:(m.kind==='exit'?'square':m.side===1?'arrowUp':'arrowDown') as 'square'|'arrowUp'|'arrowDown',
+        text:(m.playbook??'')+(m.kind==='exit'?' exit':'')})).filter(m=>m.time>=first).sort((a,b)=>a.time-b.time))}
     chartKey.current=viewKey;
     lastPlotted.current=Date.parse(bars.at(-1)!.event_time)/1000;
     {
@@ -142,7 +158,7 @@ export default function TradingWorkspace(){
     const observer=new ResizeObserver(()=>setRevision(n=>n+1));observer.observe(host.current);
     setRevision(n=>n+1);
     return()=>{viewRef.current={key:viewKey,range:chart.timeScale().getVisibleLogicalRange()};observer.disconnect();chart.remove();if(chartRef.current===chart){chartRef.current=null;priceRef.current=null;volumeRef.current=null;chartKey.current=''}};
-  },[bars,market,timeframe,study,selected,type,tool,saveDrawings,engine,loadedKey]);
+  },[bars,market,timeframe,study,selected,type,tool,saveDrawings,engine,loadedKey,showRules,rules]);
 
   function coordinates(point:Anchor){
     const chart=chartRef.current,price=priceRef.current;if(!chart||!price)return null;
@@ -179,7 +195,8 @@ export default function TradingWorkspace(){
     <div className="workspace-toolbar"><strong aria-label="Chart market">BTCUSDT</strong>
       <div className="timeframe-buttons">{['5m','15m','30m','1h','4h','1d','1w'].map(value=><button key={value} className={timeframe===value?'active':''} onClick={()=>setTimeframe(value)}>{value}</button>)}</div>
       <select value={type} aria-label="Chart style" onChange={e=>setType(e.target.value)}>{['Candles','Bars','Line','Area'].map(t=><option key={t}>{t}</option>)}</select>
-      <button onClick={()=>setShowStudies(!showStudies)}>Indicators ({selected.length})</button><button onClick={()=>void loadRef.current()}>Refresh</button>
+      <button onClick={()=>setShowStudies(!showStudies)}>Indicators ({selected.length})</button>
+      <button aria-pressed={showRules} onClick={()=>setShowRules(!showRules)} title="Support/resistance, VWAP bands, the 4h 80% band and rule-engine trades">Rule levels</button><button onClick={()=>void loadRef.current()}>Refresh</button>
       <button onClick={()=>void shell.current?.requestFullscreen()}>Fullscreen</button></div>
     <div className="workspace-summary"><strong>{market} / {timeframe}</strong>
       <span>O {current?.open?.toFixed(2)??'-'} H {current?.high?.toFixed(2)??'-'} L {current?.low?.toFixed(2)??'-'} C {current?.close?.toFixed(2)??'-'}</span>

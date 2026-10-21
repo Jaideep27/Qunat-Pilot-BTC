@@ -12,6 +12,7 @@ const TradingWorkspace=lazy(()=>import('./TradingWorkspace'));
 const Ask=lazy(()=>import('./pages/Ask'));
 const Research=lazy(()=>import('./pages/Research'));
 const Paper=lazy(()=>import('./pages/Paper'));
+const Rules=lazy(()=>import('./pages/Rules'));
 const News=lazy(()=>import('./pages/News'));
 const System=lazy(()=>import('./pages/System'));
 
@@ -55,7 +56,7 @@ function AskBox({onAsk}:{onAsk:(q:string)=>void}){
 }
 
 // Fetch the other pages' code once the first page is idle, so switching tabs is instant.
-const prefetch=()=>[()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/Paper'),()=>import('./pages/News'),
+const prefetch=()=>[()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/Paper'),()=>import('./pages/Rules'),()=>import('./pages/News'),
   ()=>import('./pages/System'),()=>import('./TradingWorkspace')].forEach(load=>void load().catch(()=>{}));
 
 function App(){
@@ -90,6 +91,7 @@ function App(){
           {route==='chart'&&<><div className="page-head"><div><h1>Chart</h1><p>Persistent history, 86 indicator studies, drawing tools and a live exchange stream.</p></div></div><TradingWorkspace/></>}
           {route==='ask'&&<Ask seed={seed}/>}
           {route==='research'&&<Research/>}
+          {route==='rules'&&<Rules/>}
           {route==='paper'&&<Paper/>}
           {route==='news'&&<News/>}
           {route==='system'&&<System/>}
