@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {ArrowUpRight,CalendarClock,Newspaper,ShieldCheck,Sparkles} from 'lucide-react';
 import type {Candle} from '../api';
 import MarketChart from '../MarketChart';
+import {AccountsStrip} from './Accounts';
 import type {Route} from '../routes';
 import {Card,Empty,Loading,Meter,PageHead,Pill,Segmented,Stat,Term,Updated,ago,money,num,pct,signedPct,until,useNow,useResource} from '../ui';
 
@@ -160,6 +161,7 @@ export default function Overview({go,ask}:{go:(r:Route)=>void;ask:(q:string)=>vo
     </PageHead>
     <div className="grid">
       <PriceStrip bars={bars}/>
+      <AccountsStrip go={()=>go('rules')}/>
       <Card title="Price · 5m" label="Price chart" className="span-2 chart-card" actions={<button type="button" className="link" onClick={()=>go('chart')}>Full chart <ArrowUpRight size={13}/></button>}>
         {bars.length?<MarketChart candles={bars} levels={indicators.data??{}}/>:candles.loading?<Loading lines={5}/>:<Empty title="No market observations yet">Start the data service to ingest completed candles.</Empty>}
       </Card>

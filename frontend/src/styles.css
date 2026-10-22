@@ -386,3 +386,24 @@ tbody tr:last-child td{border-bottom:0}
   .topbar{padding-top:8px;padding-bottom:8px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Four paper accounts (A8) */
+.account-card .card-body{display:flex;flex-direction:column;gap:10px}
+.account-tier{margin:0;color:var(--muted);font-size:12.5px}
+.account-figures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.account-figures div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.account-figures span{color:var(--muted);font-size:12px}
+.account-figures strong{font-size:20px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.account-progress{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-variant-numeric:tabular-nums}
+.account-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.account-actions .button{padding:7px 12px;border-radius:var(--radius-sm);background:var(--accent);color:#10131a;font-weight:600;font-size:12.5px}
+.account-flat,.account-last{margin:0;font-size:12.5px;overflow-wrap:anywhere}
+.account-rules{margin:4px 0 0;padding-left:18px;display:grid;gap:6px;font-size:12.5px;line-height:1.45}
+.account-trades{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.account-trades h4{margin:10px 0 4px;font-size:12.5px}
+.account-trades p{margin:4px 0;font-size:12.5px;overflow-wrap:anywhere}
+.account-trades .checks li{justify-content:flex-start}
+.account-trades .checks li.ok{color:var(--up)}.account-trades .checks li.bad{color:var(--down)}
+.review-summary h3,.card-body>h3{margin:14px 0 4px;font-size:13px}
+.review-summary p,.review-summary li{font-size:13px;line-height:1.5}
+@media (max-width:1100px){.account-card{grid-column:span 1}}
