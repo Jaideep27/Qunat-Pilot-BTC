@@ -66,3 +66,81 @@ def test_runner_failure_leaves_the_trade_pending_for_a_retry(account):
         raise RuntimeError('Claude Code failed')
     assert account_review.explain_trades(account, T+pd.Timedelta(hours=6), broken) == 0
     assert aj.trades(account, unexplained=True)[0]['id'] == 'acct-a:h0'
+
+
+def seed_round(engine, n=30, account='acct-a'):
+    seed(engine, n, account)
+    from quantpilot.account_journal import AccountDecision
+    from sqlalchemy.orm import Session
+    with Session(engine) as session, session.begin():
+        for row in session.query(AccountDecision).all():
+            row.payload = dict(row.payload, sizing=dict(risk_amount=100.0))   # $100 risked: R = net/100
+
+
+def summary_runner(system, prompt, schema):
+    assert 'suggestions' in schema['properties']
+    return dict(where_it_went_wrong='Most losses were longs into falling order books.', why='Sellers dominated.',
+                suggestions=['Require buy-side book imbalance.'])
+
+
+def test_review_numbers_and_separators(account):
+    seed_round(account)
+    review = account_review.build_review(account, 'acct-a', 1, dict(id='acct-a', risk=.01),
+                                         expectations=dict(win_rate=.5, mean_r=-.1), runner=summary_runner,
+                                         learner_stats={}, manager=None, bars=None)
+    n = review['numbers']
+    assert n['trades'] == 30 and n['wins'] == 10 and n['win_rate'] == pytest.approx(1/3)
+    assert n['mean_r'] == pytest.approx((10*25-20*40)/30/100)
+    assert n['by_playbook']['PB01']['n'] + n['by_playbook']['PB08L']['n'] == 30 and n['expected']['win_rate'] == .5
+    seps = {s['name']: s for s in review['separators']}
+    assert seps['watch:book_imbalance']['label'] == 'consistent' and seps['snapshot:global_ratio']['effect'] > .8
+    assert review['learner']['would_skip'] == 30            # no learner history: it skips everything
+    assert review['summary']['suggestions'] == ['Require buy-side book imbalance.']
+
+
+def test_review_is_stored_without_a_summary_when_the_runner_fails(account):
+    seed_round(account)
+
+    def broken(*_):
+        raise RuntimeError('Claude Code failed')
+    review = account_review.build_review(account, 'acct-a', 1, dict(id='acct-a', risk=.01), runner=broken,
+                                         learner_stats={}, manager=None, bars=None)
+    assert review['summary'] is None and 'failed' in review['summary_error'] and review['numbers']['trades'] == 30
+
+
+def test_manager_replay_compares_the_rl_policy_with_the_fixed_rule(account):
+    seed_round(account, n=3)
+    times = pd.date_range(T, T+pd.Timedelta(hours=12), freq='5min', tz='UTC')
+    path = 80_000+np.sin(np.arange(len(times))/6)*900
+    bars = pd.DataFrame(dict(open=path, high=path+150, low=path-150, close=path), index=times)
+    review = account_review.build_review(account, 'acct-a', 1, dict(id='acct-a', risk=.01), runner=summary_runner,
+                                         learner_stats={}, manager=lambda state: 'hold', bars=bars,
+                                         time_stops={'PB01': 1, 'PB08L': 1})
+    m = review['manager']
+    assert m['trades'] == 3 and m['policy_mean_r'] is not None and m['fixed_rule_mean_r'] is not None
+
+
+def test_resume_only_from_paused_and_starts_the_next_round(account):
+    import pytest as _p
+    with _p.raises(ValueError):
+        account_review.resume(account, 'acct-a', T)
+    journal.save_account(account, 'acct-a', dict(status='PAUSED_FOR_REVIEW', round=1, in_round=30, number=30,
+                                                 futures=dict(paused=True)), T)
+    aj.save_review(account, 'acct-a', 1, dict(numbers={}), 'ready', T)
+    out = account_review.resume(account, 'acct-a', T+pd.Timedelta(days=1))
+    state = journal.load_account(account, 'acct-a')
+    assert out['round'] == 2 and state['status'] == 'RUNNING' and state['in_round'] == 0 and not state['futures']['paused']
+    assert aj.reviews(account, 'acct-a')[0]['status'] == 'resumed'
+    with _p.raises(ValueError):
+        account_review.resume(account, 'acct-a', T)
+
+
+def test_run_pending_builds_one_review_per_paused_round(account):
+    seed_round(account)
+    journal.save_account(account, 'acct-a', dict(status='PAUSED_FOR_REVIEW', round=1, in_round=30, number=30,
+                                                 futures=dict(paused=True)), T)
+    cfg = dict(accounts=[dict(id='acct-a', risk=.01), dict(id='acct-b', risk=.015)])
+    kw = dict(runner=summary_runner, cfg=cfg, learner_stats={}, manager=None, bars=None)
+    assert account_review.run_pending(account, T, **kw)['reviews'] == ['acct-a']
+    assert account_review.run_pending(account, T, **kw)['reviews'] == []
+    assert aj.reviews(account, 'acct-a')[0]['status'] == 'ready'

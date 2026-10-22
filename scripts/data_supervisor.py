@@ -42,6 +42,17 @@ def news_layer():
         time.sleep(900)
 
 
+def account_reviews():
+    # Four paper accounts (A8): Claude explanations of diagnosed trades and the review of every account that has
+    # paused after its round, every 5 minutes. Separate from the minute cycle so a slow Claude call never delays trading.
+    from quantpilot import account_review
+    engine=database(settings.market_database_url)
+    while True:
+        try:print(json.dumps(dict(account_reviews=account_review.run_pending(engine,pd.Timestamp.now(tz='UTC')))),flush=True)
+        except Exception as exc:print(json.dumps(dict(account_reviews='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
+        time.sleep(300)
+
+
 def macro_calendar():
     # Official schedules change rarely; refresh daily and keep first-release values once stored.
     while True:
@@ -128,8 +139,8 @@ if __name__=='__main__':
             (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=process_started())),encoding="utf-8")
             initialize(database(settings.market_database_url))
             initialize(database())
-            with ThreadPoolExecutor(max_workers=10) as pool:
-                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts),pool.submit(outlook_cycle),pool.submit(forward_research),pool.submit(rule_engine),pool.submit(news_layer)]
+            with ThreadPoolExecutor(max_workers=11) as pool:
+                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts),pool.submit(outlook_cycle),pool.submit(forward_research),pool.submit(rule_engine),pool.submit(news_layer),pool.submit(account_reviews)]
                 for future in futures:future.result()
     except Timeout:
         print('A data supervisor is already running.',flush=True)
