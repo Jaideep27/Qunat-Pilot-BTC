@@ -42,6 +42,7 @@ def initialize(engine):
     from . import answers  # noqa: F401  register outlook answers and scores
     from . import chat  # noqa: F401  register in-app chat threads and messages
     from . import journal  # noqa: F401  register the rule engine journal
+    from . import account_journal  # noqa: F401  register the four paper accounts (A8)
     from . import news_events  # noqa: F401  register crawled articles and news classifications
     with serialized(engine) as session:
         Base.metadata.create_all(session.connection())
