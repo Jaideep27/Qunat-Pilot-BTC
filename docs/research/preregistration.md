@@ -211,3 +211,39 @@ Two forward-only intraday families are registered now, before their data exists 
 - **The one change (rulebook v2, `rulebook/v2.yaml`, hash `db3d684ff71c`).** A target is the nearest candidate level whose net reward:risk (fees, slippage and expected funding included) is at least `min_reward_risk`. If none clears it, the playbook's fallback R-multiple target is used. The band cap, stops, triggers, conditions, gates, management and costs are exactly as in v1.
 - **Evaluation.** Identical to A6 in a new run directory. The trial registry carries every earlier trial, so the 18 v2 playbooks and `RE-combined` add 19 trials (N = 151). Same section 7 pass rule, same counterfactual record. The M3/M5 layer gates registered in A6 apply to the v2 hits.
 - **Live.** The experimental paper account runs v2 from deployment. That is data collection, not a pass.
+
+**A8 — 2026-10-22, four paper accounts with confidence tiers (`rulebook/accounts-v1.yaml`). Registered before the score model was fitted.**
+
+- **Purpose.** Live data collection, at the owner's request, not a pass. Four separate $10,000 paper futures accounts trade the rulebook v2 setups (hash `db3d684ff71c`; playbooks, triggers, checklists, levels and management unchanged). They differ only in which setups they take and how much they risk. No account changes its own configuration. Any change is `accounts-v2` plus a new amendment.
+- **Seen before writing this amendment.** Per-playbook win rates and mean net returns of all v2 confirmed setups (development span), and a walk-forward table of playbook × regime × confluence win-rate estimates against outcomes. Estimated win chance never exceeded about 66%, and setups estimated at 50% or more won 41%. No logistic score below has been fitted or evaluated.
+- **Training set.** v2 research hits (`artifacts/rule-engine/research-v2-20261021`) that:
+  - have a plan;
+  - have a valid outcome that exited before 2025-10-20;
+  - have no rejection reason, or only `REWARD_RISK_BELOW_MIN`.
+  `INVALID_LEVELS` and `STOP_TOO_WIDE` are excluded because they are rejected live too.
+- **Score model.** One L2 logistic regression (C = 1.0, median imputation, standardization), with the feature list of the M3 filter (`meta.FEATURES`). Label: net > 0.
+  - `p` = predicted probability.
+  - `score = p·RR − (1 − p)`, where RR is the plan's net reward:risk after costs.
+  - For the cutoffs, walk-forward scores come from refits at the 6-month blocks of section 5 on hits that exited before each block. The live model is one final fit on the whole training set, then frozen. XGBoost is not used.
+- **Accounts.**
+
+  | Account | Takes setups at or above the percentile | Full risk at or above | Leverage cap | Risk per trade | Daily brake | Floor |
+  |---|---|---|---|---|---|---|
+  | `acct-a` Careful | 90th | 95th | 2× | 1% | 3% | $5,000 |
+  | `acct-b` Steady | 70th | 85th | 3× | 1.5% | 4.5% | $5,000 |
+  | `acct-c` Bold | 60th | 80th | 4× | 2% | 6% | $5,000 |
+  | `acct-d` Aggressive | 50th | 75th | 5× | 2.5% | 7.5% | $5,000 |
+
+  - Percentiles are of the walk-forward development scores and are resolved once to fixed score numbers.
+  - Below the full-risk line, half the risk is used.
+  - Quantity = risk amount ÷ (stop distance + costs), with notional capped at equity × leverage. The stop must be inside the liquidation price.
+- **Account rules.**
+  - The rulebook's reward:risk minimum does not apply; the score replaces it. Structural plan rejections still apply.
+  - Gates as in rulebook v2. The cooldown counts the account's own trades.
+  - One position per account, no flips. With several eligible setups, the highest score is taken.
+  - Market orders and v2 costs.
+  - The daily brake closes the position and blocks entries until the next UTC day. Below the floor, the account stops for review. The 10% drawdown halt does not apply to these accounts.
+  - Each account **pauses after 30 closed trades** and resumes only when the owner says so.
+- **Watch items.** Order-book imbalance, spread, liquidations against the side, the latest news stance and time to the next macro release. They have no history, so they are recorded with every decision but are not in the score.
+- **Reported, not gated.** Per-account development expectations from the walk-forward scores, one position at a time: trades per week, win rate, mean R, worst drawdown, final equity. Each 30-trade review compares the live results with them.
+- **The holdout (2025-10-20 → 2026-10-19) stays untouched.** Live trading begins on deployment.
