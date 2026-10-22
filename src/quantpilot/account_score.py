@@ -25,8 +25,16 @@ from .config import settings
 from .playbook_research import load_hits
 from .strategy_research import DEV_END, blocks
 
-MODEL = settings.artifact_dir/'rule-engine'/'accounts-score.joblib'
-REPORT = settings.artifact_dir/'rule-engine'/'accounts-report.json'
+
+
+def model_path():
+    return settings.artifact_dir/'rule-engine'/'accounts-score.joblib'
+
+
+def report_path():
+    return settings.artifact_dir/'rule-engine'/'accounts-report.json'
+
+
 CONFIG = Path(__file__).resolve().parents[2]/'rulebook'/'accounts-v1.yaml'
 ALLOWED = {'REWARD_RISK_BELOW_MIN'}
 BALANCE = 10_000.0
@@ -126,8 +134,9 @@ def write_config(accounts, model_hash, path=CONFIG):
     return path
 
 
-def run(output, model_path=MODEL, report_path=REPORT, config_path=CONFIG):
+def run(output, model_file=None, report_file=None, config_path=CONFIG):
     """Fit, resolve cutoffs, write the frozen model, `accounts-v1.yaml` and the expectations report."""
+    model_file, report_file = model_file or model_path(), report_file or report_path()
     hits = load_hits(output)
     wf = walk_forward(hits)
     cut = cutoffs(wf.score, {a['id']: a['percentile'] for a in ACCOUNTS})
@@ -135,14 +144,14 @@ def run(output, model_path=MODEL, report_path=REPORT, config_path=CONFIG):
     accounts = [dict(a, cutoff_score=round(cut[a['id']], 6), full_risk_score=round(full[a['id']], 6)) for a in ACCOUNTS]
     train = training_set(hits)
     final = fit(train)
-    Path(model_path).parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(final, model_path)
-    model_hash = _hash(model_path)
+    Path(model_file).parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(final, model_file)
+    model_hash = _hash(model_file)
     write_config(accounts, model_hash, config_path)
     report = dict(generated=pd.Timestamp.now(tz='UTC').isoformat(), run=str(output), training_setups=len(train),
                   walk_forward_setups=len(wf), trained_until=final['trained_until'], model_hash=model_hash,
                   calibration=_calibration(wf), cutoffs=cut, full_risk=full, expectations=expectations(wf, accounts))
-    Path(report_path).write_text(json.dumps(report, indent=2, default=str), encoding='utf-8')
+    Path(report_file).write_text(json.dumps(report, indent=2, default=str), encoding='utf-8')
     return report
 
 
@@ -153,9 +162,11 @@ def _calibration(wf):
     return [dict(n=int(r.n), predicted=float(r.predicted), actual=float(r.actual), mean_r=float(r.mean_r)) for r in g.itertuples()]
 
 
-def load_model(path=MODEL):
+def load_model(path=None):
+    """The frozen model with its file hash, or None when the file is missing or unreadable."""
+    path = Path(path or model_path())
     try:
-        return joblib.load(path) if Path(path).exists() else None
+        return dict(joblib.load(path), hash=_hash(path)) if path.exists() else None
     except Exception:
         return None
 

@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import select
 
-from . import arbiter, diagnosis, futures, journal, outcomes, patterns, rules, setup_history, triggers
+from . import account_live, arbiter, diagnosis, futures, journal, outcomes, patterns, rules, setup_history, triggers
 from .market_store import PERP, MarketCandle, _upsert, feed_status
 
 ACCOUNT_ID = 'experimental-v1'
@@ -255,8 +255,8 @@ def _diagnose(engine, book, frames, fast, now):
 
 
 def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None, news_events=None, layers=None,
-          modes=None, client=None, market_engine=None, manager=None):
-    """One minute of the live rule engine. Returns a summary of what happened."""
+          modes=None, client=None, market_engine=None, manager=None, accounts_cfg=None, scorer=None):
+    """One minute of the live rule engine (reference account, then the four A8 accounts). Returns a summary."""
     now = pd.Timestamp(now or pd.Timestamp.now(tz='UTC'))
     book = book or rules.cached()
     market_engine = market_engine or engine
@@ -300,9 +300,15 @@ def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None
     state = acct['futures']
     state['decisions'], state['rejections'] = state['decisions'][-500:], state['rejections'][-500:]
     journal.save_account(engine, ACCOUNT_ID, acct, now)
+    inputs = decision.pop('features', {}) if decision else {}
+    try:   # the four A8 accounts; a failure there never stops the reference account
+        accounts = account_live.step_all(engine, book, pf, table, fast, decision, inputs, now, frames, macro_events,
+                                         news_events, cfg=accounts_cfg, scorer=scorer)
+    except Exception as exc:
+        accounts = dict(error=f'{type(exc).__name__}: {exc}'[:300])
     diagnosed = _diagnose(engine, book, frames, fast, now)
     summary = dict(time=now.isoformat(), bars=len(new), triggers=recorded, decision=decision, diagnosed=diagnosed,
-                   equity=state['equity'], position=bool(state['position']), pending=bool(state['pending']))
+                   equity=state['equity'], position=bool(state['position']), pending=bool(state['pending']), accounts=accounts)
     try:
         feed_status(market_engine, 'rules:engine', dict(status='healthy', updated_at=now.isoformat(), bars=len(new),
                                                         last_bar=acct['last_bar'], last_decision=acct['last_decision'],

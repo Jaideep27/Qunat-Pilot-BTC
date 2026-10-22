@@ -109,13 +109,14 @@ def decide(book, t, pf, index, account, history=(), layers=None, modes=None, mac
     t, layers, modes = pd.Timestamp(t), layers or {}, modes or {}
     active = [(pb, trig) for pb in book['playbooks'] if (trig := index.active(t, pb['trigger'])) is not None]
     if not active:
-        return dict(time=t.isoformat(), action=None, chosen=None, hits=[], gates={})
+        return dict(time=t.isoformat(), action=None, chosen=None, hits=[], gates={}, features={})
     row = pf.loc[t].to_dict()
     blocked = gates(book, t, row, pf, history, account, macro_events)
-    hits, eligible = [], []
+    hits, eligible, inputs = [], [], {}
     for pb, trig in active:
         rec, features = candidate(book, pb, t, pf, row, trig, account)
         hits.append(rec)
+        inputs[rec['id']] = features
         if rec['status']:
             continue
         for name, fn in layers.items():
@@ -158,7 +159,7 @@ def decide(book, t, pf, index, account, history=(), layers=None, modes=None, mac
         for rec in eligible:
             rec['status'] = 'TAKEN' if rec is chosen else 'SKIPPED_LOWER_PRIORITY'
         action = 'enter'
-    return dict(time=t.isoformat(), action=action, chosen=chosen, hits=hits, gates=blocked)
+    return dict(time=t.isoformat(), action=action, chosen=chosen, hits=hits, gates=blocked, features=inputs)
 
 
 def manage(pb, position, row, t, defaults):
