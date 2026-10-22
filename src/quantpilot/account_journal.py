@@ -146,3 +146,9 @@ def mark_resumed(engine, account, round_, now):
         row = session.get(AccountReview, f'{account}:round-{round_}')
         if row is not None:
             row.status, row.resumed_at = 'resumed', _py(now)
+
+
+def decision(engine, decision_id):
+    with Session(engine) as session:
+        row = session.get(AccountDecision, decision_id)
+        return _row(row, *DECISION_FIELDS) if row else None

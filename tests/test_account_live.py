@@ -113,3 +113,12 @@ def test_live_features_match_research_columns(market):  # noqa: F811
     hit = dict(playbook='L1', side='long', regime='RANGE', confluence=dict(score=1),
                plan=dict(reward_risk=1.2, risk_fraction=.01), trigger=dict(facts=dict(oi_change=-.01)))
     assert list(meta.matrix(account_score.live_row(hit, pf.iloc[-1].to_dict())).columns) == meta.FEATURES
+
+
+def test_closed_trades_are_diagnosed_in_the_cycle_after_four_hours(account, market):  # noqa: F811
+    b = book()
+    run(account, T15+pd.Timedelta(seconds=20), market, b)
+    run(account, T15+pd.Timedelta(minutes=1, seconds=20), market, b)
+    run(account, T15+pd.Timedelta(hours=6, seconds=10), market, b)
+    trade = account_journal.trades(account, 'acct-a')[0]
+    assert trade['diagnosis'] and trade['payload']['diagnosis']['outcome']

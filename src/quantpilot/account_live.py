@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import account_journal, account_score, accounts, arbiter, futures, journal, rule_live
+from . import account_journal, account_review, account_score, accounts, arbiter, futures, journal, rule_live
 from .context import macro_state
 
 CONFIRMABLE = {'REWARD_RISK_BELOW_MIN', 'BELOW_EXCHANGE_MINIMUM', 'INSUFFICIENT_MARGIN', 'STOP_BEYOND_LIQUIDATION'}
@@ -189,4 +189,5 @@ def step_all(engine, book, pf, table, fast, decision, features, now, frames, mac
         journal.save_account(engine, account['id'], acct, now)
         out[account['id']] = dict(status=acct['status'], equity=f['equity'], trades=acct['number'], in_round=acct['in_round'],
                                   decided=len(rows), taken=sum(r['decision'] == 'TAKEN' for r in rows))
+    out['diagnosed'] = account_review.diagnose_trades(engine, fast, now)   # explanations run in their own thread
     return out
