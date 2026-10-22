@@ -313,7 +313,8 @@ def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None
     try:
         feed_status(market_engine, 'rules:engine', dict(status='healthy', updated_at=now.isoformat(), bars=len(new),
                                                         last_bar=acct['last_bar'], last_decision=acct['last_decision'],
-                                                        equity=state['equity'], rulebook=book['hash']))
+                                                        equity=state['equity'], rulebook=book['hash'],
+                                                        accounts=journal.plain(accounts)))
     except Exception:
         pass
     return json.loads(json.dumps(journal.plain(summary), default=str))

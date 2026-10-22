@@ -122,3 +122,17 @@ def test_closed_trades_are_diagnosed_in_the_cycle_after_four_hours(account, mark
     run(account, T15+pd.Timedelta(hours=6, seconds=10), market, b)
     trade = account_journal.trades(account, 'acct-a')[0]
     assert trade['diagnosis'] and trade['payload']['diagnosis']['outcome']
+
+
+def test_an_account_failure_is_reported_and_the_reference_keeps_running(account, market):  # noqa: F811
+    from sqlalchemy import select
+    from quantpilot.market_store import MarketFeed
+
+    def broken(hit, features):
+        raise RuntimeError('score model exploded')
+    out = run(account, T15+pd.Timedelta(seconds=20), market, book(), scorer=broken)
+    assert 'score model exploded' in out['accounts']['error']
+    assert rule_live.load_account(account)['futures']['pending']['action'] == 'enter'
+    with account.connect() as connection:
+        state = connection.execute(select(MarketFeed.state).where(MarketFeed.id == 'rules:engine')).scalar()
+    assert 'score model exploded' in state['accounts']['error']

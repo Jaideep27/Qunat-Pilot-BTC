@@ -113,7 +113,8 @@ def rule_engine():
                                     macro_events=macro.events(database()),news_events=layers.news_events(),
                                     manager=rl_manage.live_manager())
                 print(json.dumps(dict(rules=dict(bars=out['bars'],triggers=out['triggers'],equity=out['equity'],
-                    action=(out['decision'] or {}).get('action'),diagnosed=out['diagnosed']))),flush=True)
+                    action=(out['decision'] or {}).get('action'),diagnosed=out['diagnosed'],
+                    accounts=out.get('accounts')))),flush=True)
             except Exception as exc:
                 print(json.dumps(dict(rules='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
                 try:feed_status(engine,'rules:engine',dict(status='blocked',error=str(exc)[:500]))
