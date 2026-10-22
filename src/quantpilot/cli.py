@@ -58,6 +58,8 @@ def main():
     playbooks.add_argument('--prior', action='append', help='Earlier trial registry to count (repeatable)')
     sub.add_parser('research-ml', help='Rule engine M3: walk-forward ML filter on a playbook run (A6 gate)').add_argument(
         '--output', required=True, help='Playbook research run directory')
+    sub.add_parser('research-accounts', help='A8: fit the score model and cutoffs of the four paper accounts').add_argument(
+        '--output', required=True, help='Playbook research run directory')
     sub.add_parser('research-learner', help='Rule engine M5: walk-forward bandit learner on a playbook run').add_argument(
         '--output', required=True, help='Playbook research run directory')
     manage=sub.add_parser('research-manage', help='Rule engine M5: trade-management RL (tabular Q and PPO) on a run')
@@ -187,6 +189,10 @@ def main():
         report = research(args.output, priors=tuple(args.prior) if args.prior else PRIORS)
         print(json.dumps(dict(passing=report['passing'], trials=report['trials'], hits=report['hits'],
                               combined=report['combined']['account']), indent=2, default=str))
+    elif args.command == 'research-accounts':
+        from .account_score import run
+        result = run(args.output)
+        print(json.dumps({k: result[k] for k in ('training_setups', 'walk_forward_setups', 'model_hash', 'cutoffs', 'calibration', 'expectations')}, indent=2, default=str))
     elif args.command == 'research-ml':
         from .meta import run
         result = run(args.output)
