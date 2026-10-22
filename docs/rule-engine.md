@@ -52,11 +52,59 @@ quantpilot research-ml --output DIR              # M3 gate, writes meta-report.j
 quantpilot research-learner --output DIR         # M5 bandit gate
 quantpilot research-manage --output DIR          # M5 tabular Q + PPO gate (needs about 1 GB free RAM)
 quantpilot rulebook-xlsx                         # Excel copy of the current rulebook
+quantpilot research-accounts --output DIR        # A8: fit the accounts' score model, cutoffs and expectations
 ```
 Crawl4AI lives in its own environment: `uv venv .venv-crawl` then `uv pip install --python .venv-crawl/Scripts/python.exe crawl4ai==0.7.4`. It runs in HTTP mode, without a browser.
 
+## Four paper accounts (amendment A8, 2026-10-22)
+At the owner's request, four extra paper futures accounts ($10,000 each) trade the same rulebook v2 setups live.
+- **What they share:** playbooks, triggers, checklists, stops, targets and management.
+- **What differs:** which setups they take and how much they risk.
+- Config: `rulebook/accounts-v1.yaml`. Design: `docs/superpowers/specs/2026-10-22-four-accounts-design.md`.
+
+**How a setup is scored.**
+- Every confirmed setup gets `p`, its chance of a net profit, from one frozen L2 logistic regression on the M3 feature list. Training: 7,071 development setups, model hash `7996f4bd6a09`.
+- Its **score** is `p·RR − (1 − p)`: its expected result in R.
+- Each account takes setups whose score is at or above a fixed percentile of the 2021–2025 walk-forward scores.
+
+| Account | Takes | Leverage | Risk per trade | Daily brake | History (walk-forward, 2022–2025): trades/week · win rate · R per trade · worst drawdown |
+|---|---|---|---|---|---|
+| A Careful | best 10% (score ≥ +0.21) | 2× | 1% (0.5% below the 95th pct) | 3% | 1.4 · 49% · −0.11 · −17% |
+| B Steady | best 30% (≥ −0.07) | 3× | 1.5% | 4.5% | 3.6 · 48% · −0.12 · −54% |
+| C Bold | best 40% (≥ −0.15) | 4× | 2% | 6% | 4.5 · 46% · −0.15 · −76% |
+| D Aggressive | best 50% (≥ −0.23) | 5× | 2.5% | 7.5% | 5.3 · 46% · −0.15 · −88% |
+
+**What the history says.**
+- The score does rank setups: in the walk-forward test, the top fifth won 51% and the bottom fifth 33%.
+- But every tier still lost on average, so these accounts collect data; none is expected to make money.
+- The drawdowns above cover three years of trading. One 30-trade round is expected to cost about 3% (A) to 11% (D).
+
+**Rules every account follows.**
+- One position at a time and no flips.
+- The stop must sit inside the liquidation price.
+- The rulebook's gates apply: macro blackout, cascade halt, funding window and the per-playbook cooldown.
+- A daily brake, and a floor at $5,000.
+- **Each account pauses after 30 trades.** It resumes only when the owner presses *Resume* on the Rules page (loopback-only `POST /api/v1/rules/accounts/{id}/resume`).
+
+**What is recorded (PostgreSQL).**
+- `account_decisions`: one row per account per confirmed setup. It holds the decision, score, win chance and cutoff, every checklist item ticked or not, the live-only watch items, the sizing, and a market snapshot. The snapshot covers moves over 1h, 4h and 24h, volume, long/short ratios, funding, OI, taker share, book imbalance, spread, liquidations, Fear & Greed, the latest news and the next macro release.
+- `account_trades`: every closed trade with its round and number. Four hours after the exit it gets a diagnosis code, then a short Claude-written "why it won or lost" (subscription login, sandboxed).
+- `account_reviews`: one per finished round. It holds:
+  - the numbers;
+  - the facts that separated winners from losers;
+  - what the bandit learner would have skipped;
+  - a replay of each trade under the trade-management RL policy, the break-even rule and plain holding;
+  - a Claude summary with at most three suggestions.
+
+  Suggestions are never applied automatically; a change means `accounts-v2` and a new amendment.
+
+**Where it runs.**
+- The minute cycle (`rule_live.cycle` → `account_live.step_all`) trades and diagnoses.
+- A separate supervisor thread (`account_reviews`, every 5 minutes) writes explanations and reviews.
+- A restart resumes every account from the database. Missed minutes are stepped on real 1m bars, and trade numbers continue.
+
 ## Status
-The live engine has been running in the experimental paper account since 2026-10-21 13:23 UTC. The Python suite passes (427 tests) and so does the browser suite (27 passed, 2 skipped).
+The live engine has been running in the experimental paper account since 2026-10-21 13:23 UTC. The four A8 accounts were added on 2026-10-22. The Python suite passes (470 tests) and so does the browser suite (42 passed, 2 skipped; run with `--workers=2` when memory is tight).
 
 ## What this means
 The playbooks, as written, lose money after costs on four years of data. The learner's verdict ("skip") and the ML filter's lack of data agree with that. The engine is still useful as a tool:

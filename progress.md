@@ -450,6 +450,13 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 | M4 | Crawl4AI (isolated `.venv-crawl`), Claude impact classification, NEWS_SHOCK triggers, veto | **built and tested: shadow** (forward-only data) |
 | M5 | Bandit learner; trade-management RL (tabular Q + PPO) | learner **done: shadow**; it learned to skip almost every setup and now also learns from the live journal. Management RL **done: shadow** (tabular −0.23R and PPO −0.24R vs −0.35R for break-even; 95% interval includes 0) |
 
+**Four paper accounts (owner request, 2026-10-22; amendment A8).** Four $10,000 paper futures accounts (A Careful … D Aggressive) take the best 10/30/40/50% of confirmed v2 setups by a frozen score.
+- Leverage is 2–5× and risk is 1–2.5% per trade.
+- Every decision and trade is recorded with its checklist ticks, a market snapshot and a Claude-written reason.
+- Each account pauses after 30 trades for a review with the owner.
+- In history every tier still lost on average (A −0.11R, D −0.15R per trade), so this is data collection.
+See [docs/rule-engine.md](docs/rule-engine.md#four-paper-accounts-amendment-a8-2026-10-22).
+
 Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
 
 **Next steps:**

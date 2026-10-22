@@ -102,7 +102,7 @@ def forward_research():
 
 
 def rule_engine():
-    # Rule engine: one cycle a minute (5 s past), the experimental futures-v1 paper account from rulebook v1.
+    # Rule engine: one cycle a minute (5 s past): the reference futures-v1 paper account, then the four A8 accounts.
     import httpx
     from quantpilot import rule_live, layers, rl_manage
     engine=database(settings.market_database_url)
