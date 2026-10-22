@@ -36,3 +36,37 @@ def test_rules_endpoints_after_cycles(account):
         assert 'checks' not in journal['hits'][0]['payload']                 # compact by default
         levels = client.get('/api/v1/rules/levels').json()['data']
         assert levels['overlay']['vwap'] > 0 and levels['markers']
+
+
+def test_accounts_endpoint_lists_four_with_rules_text(account):
+    with TestClient(app) as client:
+        data = client.get('/api/v1/rules/accounts').json()['data']
+    assert [a['id'] for a in data['accounts']] == ['acct-a', 'acct-b', 'acct-c', 'acct-d']
+    a = data['accounts'][0]
+    assert a['status'] == 'NOT_STARTED' and a['equity'] == 10_000 and a['in_round'] == 0 and a['round_length'] == 30
+    assert any('Leverage 2×' in line for line in a['rules']) and a['watches'] and a['leverage'] == 2
+    assert data['config_hash'] and 'expectations' in a
+
+
+def test_decisions_and_trades_filter_by_account(account):
+    from quantpilot import account_journal as aj
+    t = pd.Timestamp('2026-10-22 10:00', tz='UTC')
+    aj.add_decisions(account, [dict(account=k, hit_id='PB01:x', time=t, decision='BELOW_CUTOFF', score=.1, confidence=.5,
+                                    cutoff=.2, payload=dict(ticks=[])) for k in ('acct-a', 'acct-b')])
+    with TestClient(app) as client:
+        rows = client.get('/api/v1/rules/decisions?account=acct-b').json()['data']['decisions']
+        assert [r['account'] for r in rows] == ['acct-b']
+        assert client.get('/api/v1/rules/account-trades?account=acct-b').json()['data']['trades'] == []
+        assert client.get('/api/v1/rules/reviews?account=acct-b').json()['data']['reviews'] == []
+
+
+def test_resume_rejects_remote_callers_and_accounts_that_are_not_paused(account):
+    from quantpilot import journal
+    with TestClient(app, client=('203.0.113.5', 5000)) as remote:
+        assert remote.post('/api/v1/rules/accounts/acct-a/resume').status_code == 403
+    with TestClient(app, client=('127.0.0.1', 5000)) as local:
+        assert local.post('/api/v1/rules/accounts/acct-a/resume').status_code == 409
+        journal.save_account(account, 'acct-a', dict(status='PAUSED_FOR_REVIEW', round=1, in_round=30, number=30,
+                                                     futures=dict(paused=True)), pd.Timestamp.now(tz='UTC'))
+        body = local.post('/api/v1/rules/accounts/acct-a/resume').json()
+        assert body['data']['round'] == 2

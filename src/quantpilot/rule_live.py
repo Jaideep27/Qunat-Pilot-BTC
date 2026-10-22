@@ -26,7 +26,8 @@ STRESS = ('DUMP', 'SPIKE')
 OVERLAY = ('close', 'support', 'resistance', 'support_1h', 'resistance_1h', 'support_4h', 'resistance_4h',
            'prior_day_high', 'prior_day_low', 'prior_week_high', 'prior_week_low', 'vwap', 'vwap_upper2', 'vwap_lower2',
            'band1_high', 'band1_low', 'band4_high', 'band4_low', 'move_z_15m', 'volume_z_15m', 'funding_z',
-           'range_pos_4h', 'atr_1h')
+           'range_pos_4h', 'atr_1h', 'global_ratio', 'top_position_ratio', 'funding_rate', 'oi_change_1h', 'taker_share_1h',
+           'imbalance_15bps', 'spread_bps', 'liq_long_usd_15m', 'liq_short_usd_15m', 'fear_greed', 'relative_volume')
 _cache = {}
 
 

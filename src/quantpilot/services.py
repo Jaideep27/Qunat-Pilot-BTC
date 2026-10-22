@@ -486,8 +486,87 @@ def rules_status():
                                             combined=report['combined']['account'])
     data = dict(rulebook=dict(hash=book['hash'], version=book['version'], name=book.get('name')), layers=book['layers'],
                 modes=layer_modes(), gates=book['gates'], defaults=book['defaults'], playbooks=playbooks, account=account,
-                checklist=(acct or {}).get('checklist', []), research=research, provenance_note=RULES_NOTE)
+                checklist=(acct or {}).get('checklist', []), research=research, provenance_note=RULES_NOTE,
+                accounts=_accounts_summary())
     return envelope(data, (acct or {}).get('last_bar'), 'QuantPilot rule engine (experimental paper account)', max_age=180)
+
+
+WATCH_NOW = (('global_ratio', 'Long/short ratio (all traders)'), ('top_position_ratio', 'Long/short ratio (top traders)'),
+             ('funding_rate', 'Funding rate'), ('oi_change_1h', 'Open interest change, 1h'),
+             ('taker_share_1h', 'Market buys share, 1h'), ('imbalance_15bps', 'Order-book imbalance'),
+             ('spread_bps', 'Spread (bps)'), ('liq_long_usd_15m', 'Longs liquidated, 15m ($)'),
+             ('liq_short_usd_15m', 'Shorts liquidated, 15m ($)'), ('fear_greed', 'Fear & Greed'))
+
+
+def _account_view(cfg, account, state, expectations, reviews):
+    from . import accounts
+    state = state or {}
+    f = state.get('futures') or {}
+    p = f.get('position')
+    extra = state.get('extra') or {}
+    position = p and dict(side='long' if p['side'] == 1 else 'short', quantity=p['quantity'], entry=p['entry'], stop=p['stop'],
+                          target=p['target'], liquidation=p.get('liquidation'), leverage=p.get('leverage'),
+                          entry_time=p['entry_time'], playbook=p['plan'].get('playbook'),
+                          score=(extra.get(p['plan'].get('hit_id')) or {}).get('score'))
+    own = [r for r in reviews if r['account'] == account['id']]
+    equity = f.get('equity', cfg['balance'])
+    return dict(id=account['id'], name=account['name'], status=state.get('status', 'NOT_STARTED'), equity=equity,
+                balance=cfg['balance'], account_return=equity/cfg['balance']-1, round=state.get('round', 1),
+                in_round=state.get('in_round', 0), round_length=cfg['round_length'], number=state.get('number', 0),
+                leverage=account['leverage'], risk=account['risk'], percentile=account['percentile'],
+                cutoff_score=account['cutoff_score'], full_risk_score=account['full_risk_score'],
+                daily_brake=account['daily_brake'], halted_day=bool(f.get('halted_day')), floor_hit=bool(f.get('floor_hit')),
+                position=position, pending=bool(f.get('pending')), last=state.get('last'),
+                expectations=expectations.get(account['id']),
+                review={k: own[0][k] for k in ('id', 'round', 'status')} if own else None,
+                **accounts.describe(account, cfg['round_length']))
+
+
+def _accounts_summary():
+    try:
+        return [dict(id=a['id'], name=a['name'], status=a['status'], equity=a['equity'], in_round=a['in_round'],
+                     round=a['round']) for a in rules_accounts()['data']['accounts']]
+    except Exception:
+        return []
+
+
+def rules_accounts():
+    from . import account_journal, account_review, accounts, journal, rule_live
+    engine, cfg = _rules_db(), accounts.load()
+    expectations, reviews = account_review._expectations(), account_journal.reviews(engine)
+    states = {a['id']: journal.load_account(engine, a['id']) for a in cfg['accounts']}
+    overlay = (journal.load_account(engine, rule_live.ACCOUNT_ID) or {}).get('overlay') or {}
+    data = dict(accounts=[_account_view(cfg, a, states[a['id']], expectations, reviews) for a in cfg['accounts']],
+                config_hash=cfg['hash'], model_hash=cfg['model']['hash'], overlay_time=overlay.get('time'),
+                watch_now=[dict(key=k, label=label, value=overlay.get(k)) for k, label in WATCH_NOW],
+                note='Paper money only. Each account pauses after its round of trades until the owner resumes it.')
+    observed = max((s['last_bar'] for s in states.values() if s and s.get('last_bar')), default=None)
+    return envelope(data, observed, 'QuantPilot four paper accounts (A8)', max_age=180)
+
+
+def rules_decisions(account=None, limit=100):
+    from . import account_journal
+    rows = account_journal.decisions(_rules_db(), account, limit)
+    return envelope(dict(decisions=rows), rows[0]['time'] if rows else None, 'QuantPilot account decisions', max_age=86400)
+
+
+def rules_account_trades(account=None, limit=100):
+    from . import account_journal
+    rows = list(reversed(account_journal.trades(_rules_db(), account, limit)))
+    return envelope(dict(trades=rows), rows[0]['exit_time'] if rows else None, 'QuantPilot account trades', max_age=86400)
+
+
+def rules_reviews(account=None):
+    from . import account_journal
+    rows = account_journal.reviews(_rules_db(), account)
+    return envelope(dict(reviews=rows), rows[0]['created_at'] if rows else None, 'QuantPilot account reviews', max_age=86400)
+
+
+def rules_resume(account_id):
+    """Owner action: start the next round of a paused account. ValueError when it is not paused."""
+    from . import account_review
+    now = pd.Timestamp.now(tz='UTC')
+    return envelope(account_review.resume(_rules_db(), account_id, now), now.isoformat(), 'QuantPilot four paper accounts (A8)')
 
 
 def rules_journal(limit=100, detail=False):

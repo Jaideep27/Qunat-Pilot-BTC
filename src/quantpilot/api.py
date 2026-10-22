@@ -65,6 +65,27 @@ def rules_journal(limit: Annotated[int, Query(ge=1, le=500)] = 100, detail: bool
 @app.get('/api/v1/rules/research')
 def rules_research(): return services.rules_research()
 
+@app.get('/api/v1/rules/accounts')
+def rules_accounts(): return services.rules_accounts()
+
+
+@app.get('/api/v1/rules/decisions')
+def rules_decisions(account: Annotated[str | None, Query(max_length=16)] = None,
+                    limit: Annotated[int, Query(ge=1, le=500)] = 100):
+    return services.rules_decisions(account, limit)
+
+
+@app.get('/api/v1/rules/account-trades')
+def rules_account_trades(account: Annotated[str | None, Query(max_length=16)] = None,
+                         limit: Annotated[int, Query(ge=1, le=500)] = 100):
+    return services.rules_account_trades(account, limit)
+
+
+@app.get('/api/v1/rules/reviews')
+def rules_reviews(account: Annotated[str | None, Query(max_length=16)] = None):
+    return services.rules_reviews(account)
+
+
 @app.get('/api/v1/rules/levels')
 def rules_levels(): return services.rules_levels()
 
@@ -146,6 +167,15 @@ class ViewBody(BaseModel):
     probability: float = Field(ge=0, le=1)
     reasons: list[str] = Field(default_factory=list, max_length=5)
     run_id: str | None = None
+
+
+@app.post('/api/v1/rules/accounts/{account_id}/resume')
+def rules_resume(account_id: str, request: Request):
+    local_only(request)
+    try:
+        return services.rules_resume(account_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
 
 
 @app.post('/api/v1/ask')
