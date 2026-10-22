@@ -27,11 +27,12 @@ DAILY_LOSS, MAX_DRAWDOWN = _RISK.daily_loss, .10
 BAR = pd.Timedelta(minutes=5)
 
 
-def initial(balance=10_000.0, bar_minutes=5):
+def initial(balance=10_000.0, bar_minutes=5, daily_loss=DAILY_LOSS, max_drawdown=MAX_DRAWDOWN, floor=None):
+    """`max_drawdown` or `floor` None switches that halt off (A8 accounts use a floor instead of the 10% halt)."""
     return dict(version=VERSION, bar_minutes=bar_minutes, balance=float(balance), cash=float(balance), equity=float(balance),
                 peak=float(balance), day=None, day_start=float(balance), halted_day=False, drawdown_halt=False,
                 paused=False, mark=None, last_time=None, position=None, pending=None, trades=[], rejections=[],
-                funding=[], decisions=[])
+                funding=[], decisions=[], daily_loss=daily_loss, max_drawdown=max_drawdown, floor=floor, floor_hit=False)
 
 
 def unrealized(s, price):
@@ -70,7 +71,11 @@ def _open(s, plan, open_price, time):
     slippage = float(plan.get('slippage') or SLIPPAGE)   # research may stress slippage around anomalies
     fill = open_price*(1+side*slippage)
     ratio = reward_risk(plan['side'], fill, plan['stop'], plan['target'], plan['cost_fraction'])
-    if ratio is None or ratio < plan.get('min_reward_risk', PLAN_RULES['min_reward_risk']):
+    minimum = plan.get('min_reward_risk', PLAN_RULES['min_reward_risk'])
+    if minimum is None:   # A8 accounts: the score replaced the minimum; the levels must still bracket the fill
+        if side*(fill-float(plan['stop'])) <= 0 or side*(float(plan['target'])-fill) <= 0:
+            return _reject(s, time, 'enter', 'INVALIDATED_AT_FILL')
+    elif ratio is None or ratio < minimum:
         return _reject(s, time, 'enter', 'INVALIDATED_AT_FILL')
     quantity, leverage = float(plan['quantity']), float(plan.get('leverage', PLAN_RULES['leverage']))
     margin = quantity*fill/leverage
@@ -111,7 +116,7 @@ def _execute_pending(s, event, time):
     if kind == 'enter':
         if s['position']:
             return _reject(s, time, kind, 'POSITION_OPEN')
-        if s['halted_day'] or s['drawdown_halt'] or s['paused']:
+        if s['halted_day'] or s['drawdown_halt'] or s['paused'] or s.get('floor_hit'):
             return _reject(s, time, kind, 'ACCOUNT_HALTED')
         return _open(s, order['plan'], o, time)
     if not s['position']:
@@ -159,16 +164,22 @@ def _bar(s, event):
     close = float(event['close'])
     s['mark'], s['last_time'] = float(event.get('mark', close)), iso
     s['equity'] = s['cash']+unrealized(s, close)   # funding is already settled into cash
-    if s['equity'] <= s['day_start']*(1-DAILY_LOSS) and not s['halted_day']:
+    if s['equity'] <= s['day_start']*(1-s.get('daily_loss', DAILY_LOSS)) and not s['halted_day']:
         if s['position']:
             _close(s, close, iso, 'DAILY_LOSS_HALT')
         s['halted_day'] = True
     s['equity'] = s['cash']+unrealized(s, close)
     s['peak'] = max(s['peak'], s['equity'])
-    if s['equity'] <= s['peak']*(1-MAX_DRAWDOWN) and not s['drawdown_halt']:
+    limit = s['max_drawdown'] if 'max_drawdown' in s else MAX_DRAWDOWN
+    if limit is not None and s['equity'] <= s['peak']*(1-limit) and not s['drawdown_halt']:
         if s['position']:
             _close(s, close, iso, 'DRAWDOWN_HALT')
         s['drawdown_halt'] = True
+        s['equity'] = s['cash']
+    if s.get('floor') is not None and s['equity'] <= s['floor'] and not s.get('floor_hit'):
+        if s['position']:
+            _close(s, close, iso, 'FLOOR_HIT')
+        s['floor_hit'] = True
         s['equity'] = s['cash']
 
 

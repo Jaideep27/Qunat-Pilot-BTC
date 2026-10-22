@@ -185,3 +185,56 @@ def test_one_minute_bars_keep_the_utc_day_right():
         t = midnight+pd.Timedelta(minutes=minute)
         futures.step(state, dict(kind='bar', time=t.isoformat(), open=1, high=1, low=1, close=1), inplace=True)
         assert state['day'] == ('2026-01-20' if minute <= 0 else '2026-01-21')
+
+
+# A8 accounts: per-state limits.
+def acct_enter(i, qty=.4, stop=80_600.0, target=110_000.0, leverage=5.0, min_rr=None):
+    plan = dict(side='long', quantity=qty, stop=stop, target=target, leverage=leverage, cost_fraction=futures.ROUND_TRIP,
+                min_reward_risk=min_rr)
+    return dict(kind='action', time=(T0+pd.Timedelta(minutes=5*i)).isoformat(), action='enter', plan=plan)
+
+
+def test_custom_daily_brake_closes_and_blocks_until_next_day():
+    state = futures.initial(10_000.0, daily_loss=.075, max_drawdown=None, floor=5000.0)
+    state = futures.replay(state, FLAT+[acct_enter(0), bar(1, 100_000, 100_050, 99_200, 99_250)])
+    assert state['position'] and not state['halted_day']                 # a 3% loss is inside the 7.5% brake
+    state = futures.replay(state, [bar(2, 99_250, 99_300, 97_900, 98_000)])
+    assert state['position'] is None and state['halted_day'] and state['trades'][-1]['reason'] == 'DAILY_LOSS_HALT'
+    state = futures.replay(state, [acct_enter(2, stop=88_000.0), bar(3, 98_000, 98_100, 97_900, 98_000)])
+    assert state['position'] is None and state['rejections'][-1]['reason'] == 'ACCOUNT_HALTED'
+    state = futures.replay(state, [bar(170, 98_000, 98_100, 97_900, 98_000)])
+    assert not state['halted_day']
+
+
+def test_floor_hit_closes_and_stops_for_good():
+    state = futures.initial(10_000.0, daily_loss=.9, max_drawdown=None, floor=5000.0)
+    state = futures.replay(state, FLAT+[acct_enter(0), bar(1, 100_000, 100_050, 99_900, 100_000),
+                                        bar(2, 100_000, 100_000, 87_000, 87_500)])
+    assert state['floor_hit'] and state['position'] is None and state['trades'][-1]['reason'] == 'FLOOR_HIT'
+    state = futures.replay(state, [acct_enter(170, stop=80_000.0), bar(171, 87_500, 87_600, 87_400, 87_500)])
+    assert state['position'] is None and state['rejections'][-1]['reason'] == 'ACCOUNT_HALTED'
+
+
+def test_max_drawdown_none_never_halts():
+    state = futures.initial(10_000.0, daily_loss=.5, max_drawdown=None, floor=None)
+    state = futures.replay(state, FLAT+[acct_enter(0), bar(1, 100_000, 100_050, 99_900, 100_000),
+                                        bar(2, 100_000, 100_000, 96_500, 97_000)])
+    assert state['equity'] < 9_000 and not state['drawdown_halt'] and state['position']
+
+
+def test_old_state_without_limit_keys_keeps_the_defaults():
+    state = futures.initial(10_000.0)
+    for key in ('daily_loss', 'max_drawdown', 'floor', 'floor_hit'):
+        state.pop(key, None)
+    state = futures.replay(state, FLAT+[acct_enter(0, qty=.1, leverage=2.0, stop=90_000.0),
+                                        bar(1, 100_000, 100_050, 97_400, 97_500)])
+    assert state['halted_day'] and state['trades'][-1]['reason'] == 'DAILY_LOSS_HALT'
+
+
+def test_open_without_min_reward_risk_still_validates_levels():
+    near = futures.replay(futures.initial(10_000.0), FLAT+[acct_enter(0, qty=.01, leverage=2.0, stop=99_000.0,
+                                                                     target=100_300.0), bar(1, 100_000, 100_050, 99_950, 100_000)])
+    assert near['position'] is not None                                  # reward:risk far below 1.5, still filled
+    bad = futures.replay(futures.initial(10_000.0), FLAT+[acct_enter(0, qty=.01, leverage=2.0, stop=100_500.0),
+                                                          bar(1, 100_000, 100_050, 99_950, 100_000)])
+    assert bad['position'] is None and bad['rejections'][-1]['reason'] == 'INVALIDATED_AT_FILL'
