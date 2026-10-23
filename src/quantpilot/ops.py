@@ -122,3 +122,79 @@ def send_email(subject, body, cfg, smtp_factory=smtplib.SMTP_SSL):
         for secret in {password, password.replace(' ', '')}:
             text = text.replace(secret, '***')
         return False, text[:300]
+
+
+def prune(folder, pattern, keep):
+    """Keep the newest `keep` files matching `pattern` (names sort by time)."""
+    files = sorted(Path(folder).glob(pattern))
+    for old in files[:-keep] if keep else files:
+        old.unlink(missing_ok=True)
+
+
+def _pg_target(db_url):
+    """A libpq URL without the password, and the password for PGPASSWORD (never on the command line)."""
+    from sqlalchemy.engine import URL, make_url
+    url = make_url(db_url)
+    bare = URL.create('postgresql', username=url.username, host=url.host, port=url.port, database=url.database)
+    return bare.render_as_string(hide_password=False), url.password
+
+
+def backup(now, pg_bin, db_url, sqlite_path, local_dir, offsite_dir, keep_local=7, keep_offsite=2, run=subprocess.run):
+    """Nightly backup: pg_dump (verified by pg_restore --list), a SQLite copy, local pruning and an offsite copy."""
+    import os
+    now, local_dir = pd.Timestamp(now), Path(local_dir)
+    local_dir.mkdir(parents=True, exist_ok=True)
+    stamp = now.tz_convert('UTC').strftime('%Y%m%d-%H%M')
+    target, password = _pg_target(db_url)
+    env = dict(os.environ, PGPASSWORD=password or '')
+    final = local_dir/f'quantpilot-pg-{stamp}.dump'
+    part = final.with_suffix('.part')
+    out = dict(ok=False, time=now.isoformat(), files=[], size_mb=None, offsite=None, error=None)
+
+    def clean(text):
+        return (text or '').replace(password, '***')[:300] if password else (text or '')[:300]
+    try:
+        dump = run([str(Path(pg_bin)/'pg_dump'), '--format=custom', '--file', str(part), '--dbname', target],
+                   capture_output=True, text=True, env=env, timeout=3600)
+        if dump.returncode != 0:
+            raise RuntimeError('pg_dump failed: '+clean(dump.stderr or dump.stdout))
+        listing = run([str(Path(pg_bin)/'pg_restore'), '--list', str(part)], capture_output=True, text=True, env=env, timeout=600)
+        if listing.returncode != 0 or 'account_decisions' not in (listing.stdout or ''):
+            raise RuntimeError('verify failed: the dump does not list the account tables')
+        part.replace(final)
+        out['files'].append(final)
+        if sqlite_path and Path(sqlite_path).exists():
+            copy = local_dir/f'quantpilot-sqlite-{stamp}.db'
+            src, dst = sqlite3.connect(sqlite_path), sqlite3.connect(copy)
+            try:
+                src.backup(dst)
+            finally:
+                src.close()
+                dst.close()
+            out['files'].append(copy)
+    except Exception as exc:
+        part.unlink(missing_ok=True)
+        out['error'] = clean(str(exc))
+        return out
+    prune(local_dir, 'quantpilot-pg-*.dump', keep_local)
+    prune(local_dir, 'quantpilot-sqlite-*.db', keep_local)
+    out['size_mb'] = round(sum(f.stat().st_size for f in out['files'])/2**20, 1)
+    out['ok'] = True
+    offsite_dir = Path(offsite_dir) if offsite_dir else None
+    if offsite_dir is None or not offsite_dir.parent.exists():
+        out['offsite'] = 'missing'
+        return out
+    try:
+        offsite_dir.mkdir(exist_ok=True)
+        for f in out['files']:
+            dest = offsite_dir/f.name
+            shutil.copy2(f, dest)
+            if dest.stat().st_size != f.stat().st_size:
+                raise OSError(f'copy of {f.name} is incomplete')
+        prune(offsite_dir, 'quantpilot-pg-*.dump', keep_offsite)
+        prune(offsite_dir, 'quantpilot-sqlite-*.db', keep_offsite)
+        out['offsite'] = 'copied'
+    except Exception as exc:
+        out['offsite'] = f'failed: {type(exc).__name__}: {exc}'[:200]
+    out['files'] = [str(f) for f in out['files']]
+    return out
