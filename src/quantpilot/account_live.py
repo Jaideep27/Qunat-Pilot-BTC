@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import account_journal, account_review, account_score, accounts, arbiter, futures, journal, rule_live
+from . import account_journal, account_review, account_score, accounts, arbiter, futures, journal, meta, model_health, rule_live
 from .context import macro_state
 
 CONFIRMABLE = {'REWARD_RISK_BELOW_MIN', 'BELOW_EXCHANGE_MINIMUM', 'INSUFFICIENT_MARGIN', 'STOP_BEYOND_LIQUIDATION'}
@@ -32,11 +32,36 @@ def default_scorer():
     if model is None:
         return None
 
+    challenger = model_health.load_challenger()
+
     def scorer(hit, features):
-        out = account_score.score(model, account_score.live_row(hit, features)).iloc[0]
-        return dict(p=float(out.p), score=float(out.score), missing=list(out.missing))
+        row = account_score.live_row(hit, features)
+        out = account_score.score(model, row).iloc[0]
+        shadow = None
+        if challenger is not None:     # recorded only; a challenger never decides
+            c = account_score.score(challenger, row).iloc[0]
+            shadow = dict(hash=challenger['hash'], p=float(c.p), score=float(c.score))
+        return dict(p=float(out.p), score=float(out.score), missing=list(out.missing), inputs=_inputs(row), challenger=shadow)
     scorer.hash = model['hash']
     return scorer
+
+
+def _inputs(row):
+    """The setup's raw model row as plain values (stored with each decision for drift and the challenger)."""
+    out = {}
+    for k, v in row.iloc[0].items():
+        out[k] = v if isinstance(v, str) or v is None else _num(v)
+    return out
+
+
+def check_inputs(sc, ref):
+    """A9 data check: a list of failures (empty passes), or a note when it could not run."""
+    inputs = (sc or {}).get('inputs')
+    if inputs is None:
+        return 'no inputs'
+    if ref is None:
+        return 'no reference'
+    return model_health.data_check(meta.matrix(pd.DataFrame([inputs])).iloc[0].to_dict(), ref)
 
 
 def new_state(cfg, account, now, last_bar):
@@ -90,7 +115,7 @@ def _record_trades(engine, account_id, acct, before, round_length):
         acct['status'], f['paused'] = 'PAUSED_FOR_REVIEW', True
 
 
-def _decide(cfg, account, acct, book, pf, table, hits, features, scores, t15, macro_events, news_events, scorer):
+def _decide(cfg, account, acct, book, pf, table, hits, features, scores, t15, macro_events, news_events, scorer, checks=None):
     state, iso = acct['futures'], pd.Timestamp(t15).isoformat()
     row = pf.loc[t15].to_dict() if t15 in pf.index else {}
     snap = snapshot(pf, t15, row, news_events, macro_events)
@@ -109,6 +134,8 @@ def _decide(cfg, account, acct, book, pf, table, hits, features, scores, t15, ma
             status = 'NO_SCORE_MODEL'
         elif acct['status'] in STOPPED or state['paused']:
             status = 'PAUSED'
+        elif isinstance(check := (checks or {}).get(hit['id']), list) and check:
+            status = 'DATA_CHECK_FAILED'
         elif not accounts.eligible(account, sc['score']):
             status = 'BELOW_CUTOFF'
         elif sized['rejections']:
@@ -128,6 +155,8 @@ def _decide(cfg, account, acct, book, pf, table, hits, features, scores, t15, ma
                           ticks=hit.get('checks', []), missing_inputs=hit.get('missing', []),
                           watch=accounts.watch_items(hit['side'], row, snap['news_latest'], minutes),
                           sizing=sized, gates=sorted(blocked), snapshot=snap, missing_features=sc and sc['missing'],
+                          inputs=sc and sc.get('inputs'), data_check=(checks or {}).get(hit['id']),
+                          challenger=sc and sc.get('challenger'),
                           model=dict(score_model=getattr(scorer, 'hash', None), config=cfg['hash'], rulebook=book['hash'])))
         rows.append(record)
         if status is None:
@@ -168,6 +197,13 @@ def step_all(engine, book, pf, table, fast, decision, features, now, frames, mac
     t15 = pd.Timestamp(decision['time']) if decision else None
     hits = _confirmed(book, decision['hits']) if decision else []
     scores = {h['id']: scorer(h, features.get(h['id'], {})) for h in hits} if scorer else {}
+    ref = None
+    if getattr(scorer, 'hash', None):
+        try:
+            ref = model_health.load_reference(scorer.hash)
+        except Exception:
+            ref = None     # monitoring never stops trading
+    checks = {h: check_inputs(sc, ref) for h, sc in scores.items()}
     out = {}
     for account in cfg['accounts']:
         acct = journal.load_account(engine, account['id'])
@@ -181,7 +217,8 @@ def step_all(engine, book, pf, table, fast, decision, features, now, frames, mac
             acct['status'] = 'RUNNING' if scorer else 'NO_SCORE_MODEL'
         rows = []
         if t15 is not None and (acct['last_decision'] is None or t15 > pd.Timestamp(acct['last_decision'])):
-            rows = _decide(cfg, account, acct, book, pf, table, hits, features, scores, t15, macro_events, news_events, scorer)
+            rows = _decide(cfg, account, acct, book, pf, table, hits, features, scores, t15, macro_events, news_events, scorer,
+                           checks)
             account_journal.add_decisions(engine, rows)
             acct['last_decision'] = t15.isoformat()
         f = acct['futures']

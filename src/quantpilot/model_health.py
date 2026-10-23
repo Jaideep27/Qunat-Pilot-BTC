@@ -173,6 +173,11 @@ def drift(rows, ref):
                           train_median=ref['inputs'][c]['median']) for c in top])
 
 
+def load_challenger():
+    """The shadow challenger model, or None (filled in by `train_challenger`)."""
+    return None
+
+
 def run_reference(output, path=None):
     """Write the reference for the frozen A8 model from its development run."""
     from . import account_score, meta

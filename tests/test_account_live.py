@@ -136,3 +136,57 @@ def test_an_account_failure_is_reported_and_the_reference_keeps_running(account,
     with account.connect() as connection:
         state = connection.execute(select(MarketFeed.state).where(MarketFeed.id == 'rules:engine')).scalar()
     assert 'score model exploded' in state['accounts']['error']
+
+
+def _hashed(inputs):
+    def scorer(hit, features):
+        return dict(stub(hit, features), inputs=dict(inputs, side=hit['side'], regime=hit.get('regime')), challenger=None)
+    scorer.hash = 'stub'
+    return scorer
+
+
+REF = dict(model_hash='stub', critical=['f_move_z_15m'], inputs={'f_move_z_15m': dict(min=-3.0, max=3.0, present=1.0)})
+
+
+def test_bad_inputs_hold_the_setup_back(account, market, monkeypatch):  # noqa: F811
+    from quantpilot import model_health
+    monkeypatch.setattr(model_health, 'load_reference', lambda h, path=None: REF if h == 'stub' else None)
+    run(account, T15+pd.Timedelta(seconds=20), market, book(), scorer=_hashed({'f_move_z_15m': float('inf')}))
+    rows = account_journal.decisions(account)
+    assert rows and {d['decision'] for d in rows} == {'DATA_CHECK_FAILED'}
+    assert all(d['payload']['data_check'] == ['inf:f_move_z_15m'] for d in rows)
+    assert state(account, 'acct-a')['futures']['pending'] is None
+
+
+def test_good_inputs_pass_and_are_recorded(account, market, monkeypatch):  # noqa: F811
+    from quantpilot import model_health
+    monkeypatch.setattr(model_health, 'load_reference', lambda h, path=None: REF if h == 'stub' else None)
+    run(account, T15+pd.Timedelta(seconds=20), market, book(), scorer=_hashed({'f_move_z_15m': .5}))
+    rows = {(d['account'], d['hit_id'].split(':')[0]): d for d in account_journal.decisions(account)}
+    taken = rows[('acct-a', 'L1')]
+    assert taken['decision'] == 'TAKEN' and taken['payload']['data_check'] == []
+    assert taken['payload']['inputs']['f_move_z_15m'] == .5 and taken['payload']['challenger'] is None
+
+
+def test_no_reference_skips_the_check(account, market, monkeypatch):  # noqa: F811
+    from quantpilot import model_health
+    monkeypatch.setattr(model_health, 'load_reference', lambda h, path=None: None)
+    run(account, T15+pd.Timedelta(seconds=20), market, book(), scorer=_hashed({'f_move_z_15m': float('inf')}))
+    rows = account_journal.decisions(account)
+    assert 'TAKEN' in {d['decision'] for d in rows}
+    assert {d['payload']['data_check'] for d in rows} == {'no reference'}
+
+
+def test_scorer_without_inputs_is_noted(account, market):  # noqa: F811
+    run(account, T15+pd.Timedelta(seconds=20), market, book())
+    assert {d['payload']['data_check'] for d in account_journal.decisions(account)} == {'no inputs'}
+
+
+def test_default_scorer_returns_inputs():
+    if account_score.load_model() is None:
+        pytest.skip('no frozen score model on this machine')
+    scorer = account_live.default_scorer()
+    hit = dict(side='short', regime='TREND_DOWN', plan=dict(reward_risk=1.5, risk_fraction=.004), trigger=dict(facts={}))
+    out = scorer(hit, {'premium': -.0004, 'rsi_15m': 40.0})
+    assert {'f_premium', 'side', 'regime'} <= set(out['inputs']) and out['inputs']['f_premium'] == -.0004
+    assert 'challenger' in out
