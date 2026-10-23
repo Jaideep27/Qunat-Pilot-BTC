@@ -466,6 +466,12 @@ See [docs/rule-engine.md](docs/rule-engine.md#four-paper-accounts-amendment-a8-2
 
 The first check found that the premium input had been missing on every live setup, because the mark and index prices arrived late. The cycle now refreshes them before deciding. The results show on the Rules page (Model health) and at `/api/v1/rules/model-health`.
 
+**Ops safety (owner request, 2026-10-23).** A watchdog runs every 5 minutes and restarts stuck services (at most 3 times in 2 hours).
+- Email alerts go out when a problem starts, every 6 hours while it lasts, and when it is resolved.
+- A nightly backup at 02:30 is checked before it counts; 7 are kept on the laptop and the latest 2 go to OneDrive (about 90 MB each).
+- The restart path and a full restore were tested live.
+See [docs/operations.md](docs/operations.md).
+
 Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
 
 **Next steps:**
