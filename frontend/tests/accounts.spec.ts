@@ -29,12 +29,21 @@ const reviews={reviews:[{id:'acct-b:round-1',account:'acct-b',round:1,status:'re
   learner:{available:true,would_skip:30},manager:{available:true,trades:30,actual_mean_r:-.12,policy_mean_r:-.1,fixed_rule_mean_r:-.11,hold_mean_r:-.14},
   summary:{where_it_went_wrong:'Most losses were longs into falling order books.',why:'Sellers dominated.',suggestions:['Require buy-side book imbalance.']}}}]};
 
+const health={overall:'WATCH',reasons:['1 setup(s) failed the data check in the last 24 hours and were held back.'],reference:'ok',checked_at:'2026-10-23T12:00:00+00:00',
+  card:{model_hash:'7996f4bd6a09',matches:true,kind:'L2 logistic regression (win chance of a confirmed setup)',inputs:67,training_setups:7071,trained_from:'2021-10-20',
+    trained_until:'2025-10-18',walk_forward:[{n:872,predicted:.22,actual:.33,mean_r:-.33}],dev_brier:.2496,held_back_in_training:.021,live_since:'2026-10-22T22:15:00+00:00',
+    scored_setups:11,holdout:'2025-10-20 → 2026-10-19, untouched'},
+  calibration:{n:42,wins:15,predicted:.41,actual:.357,lo:.23,hi:.51,brier:.24,dev_brier:.2496,verdict:'IN_LINE',bins:[{range:[0,.35],n:20,predicted:.3,actual:.25}]},
+  drift:{verdict:'TOO_FEW',n:12,window:50,top:[]},
+  data_checks:{checked_7d:12,failed_7d:1,failed_24h:1,skipped_7d:0,latest:{time:'2026-10-23T11:00:00+00:00',setup:'PB08S',reasons:['missing:f_premium']}},
+  challenger:null};
+
 async function mock(page:Page,resumed:string[]){
   await page.route('**/api/v1/**',route=>{
     const url=new URL(route.request().url());
     if(route.request().method()==='POST'){resumed.push(url.pathname);return route.fulfill({json:{data:{account:'acct-b',round:2}}});}
     const key=url.pathname.split('/').at(-1)!;
-    const values:Record<string,unknown>={accounts,'account-trades':trades,decisions,reviews,
+    const values:Record<string,unknown>={accounts,'account-trades':trades,decisions,reviews,'model-health':health,
       rules:{rulebook:{hash:'db3d684ff71c',version:2,name:'x'},layers:{},modes:{},playbooks:[],account:null,checklist:[],research:null,provenance_note:'paper',accounts:[]},
       journal:{hits:[],trades:[],triggers:[]},research:{status:'not_run'},candles:[],indicators:{}};
     return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
@@ -102,4 +111,17 @@ test('the overview shows the four accounts at a glance',async({page})=>{
   await expect(strip).toContainText('Careful');
   await expect(strip).toContainText('12/30');
   await expect(strip).toContainText('Paused');
+});
+
+test('model health shows status, calibration and data checks',async({page})=>{
+  await mock(page,[]);
+  await page.goto('/#rules');
+  const h=page.getByRole('region',{name:'Model health'});
+  await expect(h).toContainText('Watch',{timeout:30000});
+  await expect(h).toContainText('failed the data check');
+  await expect(h).toContainText('Is it still right?');
+  await h.getByText('Is the data clean?').click();
+  await expect(h).toContainText('premium');
+  await page.goto('/#overview');
+  await expect(page.getByRole('region',{name:'Paper accounts'})).toContainText('Model: Watch');
 });

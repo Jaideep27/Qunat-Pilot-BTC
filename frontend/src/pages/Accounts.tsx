@@ -23,6 +23,15 @@ type Review={id:string;account:string;round:number;status:string;created_at:stri
   learner:{available:boolean;would_skip?:number};manager:{available:boolean;actual_mean_r?:number|null;policy_mean_r?:number|null;fixed_rule_mean_r?:number|null;hold_mean_r?:number|null};
   summary:{where_it_went_wrong:string;why:string;suggestions:string[]}|null;summary_error?:string|null}};
 
+type Health={overall:'OK'|'WATCH'|'ALARM'|'UNKNOWN';reasons:string[];reference:string;checked_at:string;
+  card:{model_hash:string;matches:boolean;kind:string;inputs:number;training_setups:number|null;trained_from:string;trained_until:string|null;
+    walk_forward:{n:number;predicted:number;actual:number}[]|null;dev_brier:number|null;held_back_in_training:number|null;live_since:string|null;scored_setups:number;holdout:string};
+  calibration:{n:number;wins:number;predicted:number|null;actual:number|null;lo:number|null;hi:number|null;brier:number|null;dev_brier:number|null;verdict:string;
+    bins:{range:number[];n:number;predicted:number|null;actual:number|null}[]};
+  drift:{verdict:string;n:number;window?:number;count?:number|null;usual?:number;top:{input:string;label:string;psi:number;live_median:number|null;train_median:number|null}[]};
+  data_checks:{checked_7d:number;failed_7d:number;failed_24h:number;skipped_7d:number;latest:{time:string;setup:string;reasons:string[]}|null};
+  challenger:{hash:string;n_dev:number;n_live:number;created:string;compare:{n:number;brier:number|null;challenger_brier:number|null;verdict:string}}|null};
+
 const words=(s:string)=>s.replaceAll('_',' ').toLowerCase();
 const STATUS:Record<string,[string,'ok'|'warn'|'bad'|'muted'|'accent']>={RUNNING:['Running','ok'],PAUSED_FOR_REVIEW:['Paused for review','warn'],
   FLOOR_HIT:['Stopped: below $5,000','bad'],NO_SCORE_MODEL:['No score model','bad'],NOT_STARTED:['Starting','muted']};
@@ -31,6 +40,57 @@ const status=(a:Account):[string,'ok'|'warn'|'bad'|'muted'|'accent']=>a.status==
 const decisionTone=(d:string)=>d==='TAKEN'?'ok':d==='BELOW_CUTOFF'||d==='LOWER_SCORE'?'muted':'warn';
 const list=<T,>(v:T[]|undefined|null):T[]=>Array.isArray(v)?v:[];
 const hours=(h:number)=>h<48?`${num(h,0)} h`:`${num(h/24,1)} days`;
+const HEALTH:Record<string,[string,'ok'|'warn'|'bad'|'muted']>={OK:['OK','ok'],WATCH:['Watch','warn'],ALARM:['Alarm','bad'],UNKNOWN:['Unknown','muted']};
+const VERDICT:Record<string,string>={TOO_FEW:'too few results yet',IN_LINE:'in line with reality',OVERCONFIDENT:'too optimistic',UNDERCONFIDENT:'too cautious',
+  STABLE:'no unusual change',WATCH:'somewhat different',ALARM:'very different',NO_REFERENCE:'reference missing',CHALLENGER_BETTER:'challenger is better',NO_DIFFERENCE:'no clear difference'};
+const reason=(r:string)=>{const [kind,col='']=r.split(':');return `${kind} ${col.replace(/^(f|tf)_/,'').replaceAll('_',' ')}`};
+function ModelHealth(){
+  const res=useResource<Health>('rules/model-health',60000);
+  const h=res.data&&Array.isArray(res.data.reasons)?res.data:undefined;
+  const [label,tone]=HEALTH[h?.overall??'UNKNOWN']??HEALTH.UNKNOWN;
+  if(!h)return <Card title="Model health" label="Model health" className="span-3"><Loading lines={2}/></Card>;
+  const c=h.calibration,d=h.drift,k=h.data_checks,m=h.card,ch=h.challenger;
+  return <Card title="Model health" label="Model health" className="span-3" tag={<Pill tone={tone}>{label}</Pill>}>
+    <p className="muted">Checks on the score model that gives each setup its win chance. They only watch and warn; nothing here changes how the accounts trade.</p>
+    <ul className="reasons">{h.reasons.map(r=><li key={r}>{r}</li>)}</ul>
+    <Collapsible title="Is it still right?" summary={`${c.n} setups with a result · ${VERDICT[c.verdict]??words(c.verdict)}`}>
+      <dl className="facts">
+        <div><dt>Average predicted win chance</dt><dd>{pct(c.predicted,0)}</dd></div>
+        <div><dt>Actually won</dt><dd>{c.n?`${pct(c.actual,0)} (${c.wins} of ${c.n}; likely range ${pct(c.lo,0)}–${pct(c.hi,0)})`:'—'}</dd></div>
+        <div><dt>Accuracy score (Brier, lower is better)</dt><dd>{num(c.brier,3)} live · {num(c.dev_brier,3)} in testing</dd></div>
+      </dl>
+      <p className="source">Judged after 30 finished setups. Too optimistic raises an alarm.</p>
+    </Collapsible>
+    <Collapsible title="Has the market changed?" summary={VERDICT[d.verdict]??words(d.verdict)}>
+      {d.verdict==='TOO_FEW'?<p className="muted">{d.n} of {d.window??50} recorded setups so far; the check starts at {d.window??50}.</p>
+        :d.verdict==='NO_REFERENCE'?<p className="muted">The reference file of the model is missing.</p>
+        :<><p>{d.count} inputs look unusual; an ordinary stretch of the past had up to {num(d.usual,0)}.</p>
+          <dl className="facts">{d.top.map(t=><div key={t.input}><dt>{t.label}</dt><dd>now {num(t.live_median,4)} · usual {num(t.train_median,4)}</dd></div>)}</dl></>}
+    </Collapsible>
+    <Collapsible title="Is the data clean?" summary={`${k.failed_7d} of ${k.checked_7d} held back this week`}>
+      <p>A setup is held back when an input the model almost always had is missing, or a value is impossible.</p>
+      {k.latest?<p>Latest: {stamp(k.latest.time)} · {k.latest.setup} · {k.latest.reasons.map(reason).join(', ')}</p>:<p className="muted">No setup has been held back this week.</p>}
+      {k.skipped_7d>0&&<p className="source">{k.skipped_7d} setups this week were scored before the check existed.</p>}
+    </Collapsible>
+    <Collapsible title="Model record card" summary={m.model_hash}>
+      <dl className="facts">
+        <div><dt>Model</dt><dd>{m.kind}, {m.inputs} inputs{m.matches?'':' · file does not match the config!'}</dd></div>
+        <div><dt>Learned from</dt><dd>{num(m.training_setups,0)} setups, {m.trained_from} → {m.trained_until??'—'}</dd></div>
+        <div><dt>Untouched test year</dt><dd>{m.holdout}</dd></div>
+        <div><dt>Live since</dt><dd>{m.live_since?stamp(m.live_since):'—'} · {m.scored_setups} setups scored</dd></div>
+        <div><dt>Share of past setups the data check would hold back</dt><dd>{pct(m.held_back_in_training,1)}</dd></div>
+      </dl>
+      {m.walk_forward&&<p className="source">Testing: {m.walk_forward.map(b=>`said ${pct(b.predicted,0)} → won ${pct(b.actual,0)}`).join(' · ')}</p>}
+    </Collapsible>
+    <Collapsible title="Challenger (needs your OK to swap)" summary={ch?VERDICT[ch.compare.verdict]??words(ch.compare.verdict):'none yet'}>
+      {!ch?<p className="muted">No challenger yet. Once 200 new live setups have results, a retrained model can run beside this one in practice mode. It never trades and is only swapped in with your approval.</p>
+        :<dl className="facts">
+          <div><dt>Trained on</dt><dd>{ch.n_dev} past + {ch.n_live} live setups ({stamp(ch.created)})</dd></div>
+          <div><dt>Accuracy score (lower is better)</dt><dd>live {num(ch.compare.brier,3)} · challenger {num(ch.compare.challenger_brier,3)} on {ch.compare.n} setups</dd></div>
+        </dl>}
+    </Collapsible>
+  </Card>;
+}
 function ReportCard({r,name}:{r:Report;name:string}){
   return <Collapsible title="Report card" summary={r.trades?`${r.trades} trades`:'no trades yet'} label={name+' report card'}>
     <dl className="facts">
@@ -136,6 +196,7 @@ export default function AccountsSection(){
     {!data?<Card title="Paper accounts" className="span-3"><Loading/></Card>
       :data.accounts.map(a=><AccountCard key={a.id} a={a} watchNow={list(data.watch_now)} busy={busy} onResume={()=>resume(a)}
         onReview={()=>setOpen(a.review?.id??null)}/>)}
+    <ModelHealth/>
     {review&&<ReviewPanel review={review} name={data?.accounts.find(a=>a.id===review.account)?.name??review.account}/>}
     <Card title="Account trades" label="Account trades" className="span-3" actions={<Segmented label="Account filter" options={['All','A','B','C','D'] as const} value={filter} onChange={setFilter}/>}>
       {!trades.data?<Loading/>:<TradeList trades={list(trades.data.trades)} decisions={byTrade}/>}
@@ -145,8 +206,11 @@ export default function AccountsSection(){
 
 export function AccountsStrip({go}:{go:()=>void}){
   const res=useResource<Accounts>('rules/accounts',60000);
+  const health=useResource<Health>('rules/model-health',120000);
   const accounts=list(res.data?.accounts);
-  return <Card title="Paper accounts" label="Paper accounts" className="span-3" actions={<button type="button" className="link" onClick={go}>Details</button>}>
+  const [hl,ht]=HEALTH[health.data?.overall??'']??['…','muted'];
+  return <Card title="Paper accounts" label="Paper accounts" className="span-3" tag={health.data?.overall?<Pill tone={ht}>Model: {hl}</Pill>:undefined}
+    actions={<button type="button" className="link" onClick={go}>Details</button>}>
     {!res.data?<Loading lines={2}/>:!accounts.length?<p className="muted">The four accounts start with the next rule-engine cycle.</p>:<div className="strip">{accounts.map(a=>{const [label]=status(a);return <div className="stat" key={a.id}>
       <span className="stat-label">{a.name} · {a.leverage}×</span><strong className={a.account_return<0?'tone-down':a.account_return>0?'tone-up':''}>{money(a.equity)}</strong>
       <small>{a.in_round}/{a.round_length} trades · {label.startsWith('Paused')?'Paused':label}</small></div>})}</div>}
