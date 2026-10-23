@@ -457,6 +457,15 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 - In history every tier still lost on average (A −0.11R, D −0.15R per trade), so this is data collection.
 See [docs/rule-engine.md](docs/rule-engine.md#four-paper-accounts-amendment-a8-2026-10-22).
 
+**Model health (owner request, 2026-10-23; amendment A9).** MLOps checks on the score model behind the four accounts:
+- live accuracy: predicted against actual win chance;
+- market change (drift) against ordinary 2021–2025 stretches;
+- a data check that holds back setups with impossible or missing must-have inputs (about 2% of past setups);
+- a model record card;
+- a shadow challenger, retrained only after 200 new live setups and swapped in only with the owner's OK.
+
+The first check found that the premium input had been missing on every live setup, because the mark and index prices arrived late. The cycle now refreshes them before deciding. The results show on the Rules page (Model health) and at `/api/v1/rules/model-health`.
+
 Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
 
 **Next steps:**

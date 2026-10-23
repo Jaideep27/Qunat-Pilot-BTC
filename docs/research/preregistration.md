@@ -247,3 +247,47 @@ Two forward-only intraday families are registered now, before their data exists 
 - **Watch items.** Order-book imbalance, spread, liquidations against the side, the latest news stance and time to the next macro release. They have no history, so they are recorded with every decision but are not in the score.
 - **Reported, not gated.** Per-account development expectations from the walk-forward scores, one position at a time: trades per week, win rate, mean R, worst drawdown, final equity. Each 30-trade review compares the live results with them.
 - **The holdout (2025-10-20 → 2026-10-19) stays untouched.** Live trading begins on deployment.
+
+
+**A9 — 2026-10-23, model health for the A8 score model (`src/quantpilot/model_health.py`). Registered before deployment.**
+- **Scope.** Monitoring of the frozen score model `7996f4bd6a09`. Nothing here changes the model, the cutoffs or the account rules, with one exception: the data check below.
+- **Reference.** Built once from the A8 development training set (7,071 setups, `artifacts/rule-engine/research-v2-20261021`):
+  - per input: present share, range, quintile edges and training shares, with missing as a bin of its own;
+  - the critical inputs, present in at least 99% of training setups (56 of 67);
+  - the walk-forward Brier score: 0.2496;
+  - the drift baseline: rolling 50-setup windows of the development setups in time order, step 10, 703 windows.
+
+  A reference for any other model hash is ignored.
+- **Data check (behaviour change).** A setup is held back as `DATA_CHECK_FAILED` when any of these holds:
+  - an input is infinite;
+  - an input lies more than one full training range beyond the training minimum or maximum;
+  - a critical input is missing.
+
+  The check runs after the paused check and before the cutoff. On the training set it would have held back 2.1% of setups. Without a valid reference it is skipped and noted. It cannot make an account take a setup it would otherwise skip.
+- **Premium fix.** Before a 15m decision, stale mark and index prices are refreshed from the exchange. Every live setup since deployment had the premium missing, because those prices arrive in a later batch than the candle. The feature definitions are unchanged.
+- **Calibration.** Each scored setup is counted once and matched with its simulated plan outcome (the training label).
+
+  | Verdict | When |
+  |---|---|
+  | `TOO_FEW` | n < 30 |
+  | `OVERCONFIDENT` / `UNDERCONFIDENT` | the mean predicted win chance lies above / below the Wilson 95% interval of the actual win rate |
+  | `IN_LINE` | otherwise |
+- **Drift.** PSI of each input over the latest 50 setups, against the training bins. An input counts as shifted when its PSI exceeds its own 95th percentile across the baseline windows.
+
+  | Verdict | When |
+  |---|---|
+  | `ALARM` | the number of shifted inputs is above the baseline's 99th percentile |
+  | `WATCH` | it is above the 90th percentile |
+  | `STABLE` | otherwise |
+- **Challenger.** It needs at least 200 resolved live setups after 2026-10-20 that have recorded inputs. It is refit with the A8 recipe on development plus those live setups; the holdout is never read. It is scored in shadow only.
+
+  | Verdict | When |
+  |---|---|
+  | `TOO_FEW` | n < 50 |
+  | `CHALLENGER_BETTER` | the paired-bootstrap 95% interval of the Brier difference lies wholly below 0 |
+  | `NO_DIFFERENCE` | otherwise |
+- **Overall status.**
+  - **Alarm:** drift `ALARM`, calibration `OVERCONFIDENT`, or more than 20% of the last 7 days' setups failing the data check.
+  - **Watch:** drift `WATCH`, a missing reference, or any data-check failure in the last 24 hours.
+  - **OK:** otherwise.
+- **No automatic promotion.** A challenger, or any model change, goes live only by the owner's decision, as `accounts-v2` with a new amendment.

@@ -53,6 +53,8 @@ quantpilot research-learner --output DIR         # M5 bandit gate
 quantpilot research-manage --output DIR          # M5 tabular Q + PPO gate (needs about 1 GB free RAM)
 quantpilot rulebook-xlsx                         # Excel copy of the current rulebook
 quantpilot research-accounts --output DIR        # A8: fit the accounts' score model, cutoffs and expectations
+quantpilot model-reference --output DIR          # A9: reference statistics for model health
+quantpilot train-challenger --output DIR         # A9: shadow challenger (needs 200 new live setups)
 ```
 Crawl4AI lives in its own environment: `uv venv .venv-crawl` then `uv pip install --python .venv-crawl/Scripts/python.exe crawl4ai==0.7.4`. It runs in HTTP mode, without a browser.
 
@@ -108,6 +110,16 @@ At the owner's request, four extra paper futures accounts ($10,000 each) trade t
 There is no Sharpe ratio: over a few dozen trades it mostly measures noise.
 
 **No look-ahead, end to end.** `tests/test_lookahead.py` runs the whole live chain twice: once on real data and once with every bar after a cut-off replaced by an unrelated path. The chain covers patterns, triggers, checklists, plans, the reference account, and the four accounts' scores, decisions and trades. Everything up to the cut-off must be identical. A planted leak (a feature read three bars ahead) is caught by the same check, which proves the check works. The idea comes from the look-ahead grader in github.com/Adityak1507/BacktestingEngine.
+
+**Model health (amendment A9).** The Rules page has a **Model health** panel; the API route is `GET /api/v1/rules/model-health`. It checks four things about the score model:
+- **Is it still right?** Predicted win chance against the real outcome of every scored setup, judged from 30 results.
+- **Has the market changed?** How unusual the latest 50 setups' inputs look, compared with ordinary 50-setup stretches of 2021–2025.
+- **Is the data clean?** Before scoring, a setup with an impossible value or a missing must-have input is held back (`DATA_CHECK_FAILED`). On past data this rule would have held back about 2% of setups. The first check found that the premium input was missing on every live setup, because the mark and index prices arrived late. The cycle now refreshes them before deciding.
+- **Model record card:** what the model is and how it tested.
+
+**Challenger.** `quantpilot train-challenger` can retrain the model once 200 new live setups have results. The challenger only runs in practice mode next to the live model and is never swapped in automatically.
+
+The reference statistics come from `quantpilot model-reference --output artifacts/rule-engine/research-v2-20261021`. The overall status (OK, Watch, Alarm) is also in the `get_rule_engine` MCP summary, in the overview strip and in the feed status `rules:model-health`.
 
 **Where it runs.**
 - The minute cycle (`rule_live.cycle` → `account_live.step_all`) trades and diagnoses.
