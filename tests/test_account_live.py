@@ -190,3 +190,28 @@ def test_default_scorer_returns_inputs():
     out = scorer(hit, {'premium': -.0004, 'rsi_15m': 40.0})
     assert {'f_premium', 'side', 'regime'} <= set(out['inputs']) and out['inputs']['f_premium'] == -.0004
     assert 'challenger' in out
+
+
+def test_a_broken_challenger_never_stops_scoring(monkeypatch):
+    from quantpilot import model_health
+    if account_score.load_model() is None:
+        pytest.skip('no frozen score model on this machine')
+
+    class Broken:
+        def predict_proba(self, x):
+            raise RuntimeError('corrupt challenger')
+    monkeypatch.setattr(model_health, 'load_challenger', lambda paths=None: dict(model=Broken(), columns=['f_rsi_15m'], hash='bad'))
+    account_live._cache.clear()
+    scorer = account_live.default_scorer()
+    hit = dict(side='short', regime='TREND_DOWN', plan=dict(reward_risk=1.5, risk_fraction=.004), trigger=dict(facts={}))
+    out = scorer(hit, {'premium': -.0004})
+    assert 0 < out['p'] < 1 and out['challenger'] is None
+
+
+def test_a_failing_data_check_is_noted_not_raised(monkeypatch):
+    from quantpilot import model_health
+
+    def boom(x, ref):
+        raise ValueError('bad reference')
+    monkeypatch.setattr(model_health, 'data_check', boom)
+    assert account_live.check_inputs(dict(inputs={'side': 'long'}), dict(inputs={})) == 'check error'

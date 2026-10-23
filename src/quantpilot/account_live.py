@@ -38,9 +38,12 @@ def default_scorer():
         row = account_score.live_row(hit, features)
         out = account_score.score(model, row).iloc[0]
         shadow = None
-        if challenger is not None:     # recorded only; a challenger never decides
-            c = account_score.score(challenger, row).iloc[0]
-            shadow = dict(hash=challenger['hash'], p=float(c.p), score=float(c.score))
+        if challenger is not None:     # recorded only; a challenger never decides, and its failure never blocks scoring
+            try:
+                c = account_score.score(challenger, row).iloc[0]
+                shadow = dict(hash=challenger['hash'], p=float(c.p), score=float(c.score))
+            except Exception:
+                shadow = None
         return dict(p=float(out.p), score=float(out.score), missing=list(out.missing), inputs=_inputs(row), challenger=shadow)
     scorer.hash = model['hash']
     return scorer
@@ -61,7 +64,10 @@ def check_inputs(sc, ref):
         return 'no inputs'
     if ref is None:
         return 'no reference'
-    return model_health.data_check(meta.matrix(pd.DataFrame([inputs])).iloc[0].to_dict(), ref)
+    try:
+        return model_health.data_check(meta.matrix(pd.DataFrame([inputs])).iloc[0].to_dict(), ref)
+    except Exception:
+        return 'check error'     # a broken check is noted; monitoring never stops trading
 
 
 def new_state(cfg, account, now, last_bar):
