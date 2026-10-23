@@ -1,7 +1,7 @@
 from pathlib import Path
 import hashlib
 import json
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     artifact_dir: Path = Path('artifacts')
     database_url: str = 'sqlite:///data/quantpilot.db'
     market_database_url: str | None = None
+    # Ops safety: watchdog and backup alerts by Gmail (app password); unset means alerts go to data/ops/alerts.log only.
+    alert_email: str | None = None
+    alert_app_password: SecretStr | None = None
     market_history_years: int = Field(5,ge=1,le=15)
     market_poll_seconds: float = Field(5,ge=1,le=60)
     worker_max_age_seconds: int = Field(1800,ge=900,le=7200)
