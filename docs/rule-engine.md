@@ -98,6 +98,17 @@ At the owner's request, four extra paper futures accounts ($10,000 each) trade t
 
   Suggestions are never applied automatically; a change means `accounts-v2` and a new amendment.
 
+**Report card.** Each account card and each round review shows plain measures:
+- return against simply holding BTC since the account started (or over the round);
+- win rate and profit factor (total won ÷ total lost);
+- average win and loss;
+- worst drop and the longest time below a high;
+- the longest losing streak.
+
+There is no Sharpe ratio: over a few dozen trades it mostly measures noise.
+
+**No look-ahead, end to end.** `tests/test_lookahead.py` runs the whole live chain twice: once on real data and once with every bar after a cut-off replaced by an unrelated path. The chain covers patterns, triggers, checklists, plans, the reference account, and the four accounts' scores, decisions and trades. Everything up to the cut-off must be identical. A planted leak (a feature read three bars ahead) is caught by the same check, which proves the check works. The idea comes from the look-ahead grader in github.com/Adityak1507/BacktestingEngine.
+
 **Where it runs.**
 - The minute cycle (`rule_live.cycle` → `account_live.step_all`) trades and diagnoses.
 - A separate supervisor thread (`account_reviews`, every 5 minutes) writes explanations and reviews.

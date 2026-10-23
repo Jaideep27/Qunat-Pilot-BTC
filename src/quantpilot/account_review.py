@@ -11,7 +11,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from . import account_journal, diagnosis
+from . import account_journal, account_report, diagnosis
 from .news import claude_json
 
 POST = pd.Timedelta(hours=4)
@@ -198,7 +198,17 @@ def build_review(engine, account_id, round_, account, expectations=None, runner=
         rows.append(dict(t, r=_r(t, d), regime=payload.get('regime'), features=_features(d),
                          explanation_why=(t.get('explanation') or {}).get('why')))
     replay = manager is not None and bars is not None and len(bars)
-    review = dict(account=account_id, round=round_, numbers=_numbers(rows, expectations), separators=_separators(rows),
+    numbers = _numbers(rows, expectations)
+    held = None
+    if rows:
+        try:
+            held = account_report.hold(engine, rows[0]['entry_time'], rows[-1]['exit_time'])
+        except Exception:
+            held = None
+    card = account_report.report(rows, 10_000.0, 10_000+numbers['total_net'], held)
+    numbers.update({k: card[k] for k in ('profit_factor', 'avg_win', 'avg_loss', 'payoff', 'longest_drawdown_hours',
+                                         'longest_losing_streak', 'hold_return', 'vs_hold') if k in card}, hold=held)
+    review = dict(account=account_id, round=round_, numbers=numbers, separators=_separators(rows),
                   learner=_learner(rows, learner_stats) if learner_stats is not None else dict(available=False),
                   manager=_manager(rows, manager, bars, time_stops or {}) if replay else dict(available=False))
     facts = dict(rules=rules_text, numbers=review['numbers'], separators=review['separators'],

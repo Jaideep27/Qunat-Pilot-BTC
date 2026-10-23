@@ -46,6 +46,7 @@ def test_accounts_endpoint_lists_four_with_rules_text(account):
     assert a['status'] == 'NOT_STARTED' and a['equity'] == 10_000 and a['in_round'] == 0 and a['round_length'] == 30
     assert any('Leverage 2×' in line for line in a['rules']) and a['watches'] and a['leverage'] == 2
     assert data['config_hash'] and 'expectations' in a
+    assert a['report']['trades'] == 0 and a['report']['win_rate'] is None and 'max_drawdown' in a['report']
 
 
 def test_decisions_and_trades_filter_by_account(account):

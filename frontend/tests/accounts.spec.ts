@@ -5,6 +5,9 @@ const rules=(lev:number,risk:string)=>[`Takes a confirmed rulebook setup only wh
 const acct=(id:string,name:string,lev:number,extra:object={})=>({id,name,status:'RUNNING',equity:10000,balance:10000,account_return:0,round:1,in_round:0,
   round_length:30,number:0,leverage:lev,risk:.01,percentile:90,cutoff_score:.21,full_risk_score:.33,daily_brake:.03,halted_day:false,floor_hit:false,
   position:null,pending:false,last:null,expectations:{trades_per_week:1.4,win_rate:.49,mean_r:-.11},review:null,
+  report:{trades:12,wins:5,losses:7,win_rate:.4167,total_net:123.4,account_return:.01234,expectancy:10.3,avg_win:80,avg_loss:-40,
+    profit_factor:1.43,payoff:2,max_drawdown:-.031,longest_drawdown_hours:52,longest_losing_streak:3,hold_return:.045,vs_hold:-.0327,
+    hold:{start_price:80000,end_price:83600}},
   rules:rules(lev,'1%'),watches:['Long/short ratios (all traders and top traders), funding rate and open interest.'],...extra});
 const accounts={config_hash:'abc123def456',model_hash:'7996f4bd6a09',overlay_time:'2026-10-22T10:00:00+00:00',note:'Paper money only.',
   watch_now:[{key:'global_ratio',label:'Long/short ratio (all traders)',value:1.99},{key:'imbalance_15bps',label:'Order-book imbalance',value:.13}],
@@ -49,6 +52,11 @@ test('four account cards show rules, progress, the open position and the last de
   await expect(a).toContainText('6/6');
   await expect(a).toContainText('1.99');
   await expect(a.getByRole('button',{name:/Resume/})).toHaveCount(0);
+  const card=a.getByRole('group',{name:'Careful report card'});
+  await expect(card).toContainText('Holding BTC instead');
+  await expect(card).toContainText('+4.50%');
+  await expect(card).toContainText('1.43');
+  await expect(card).toContainText('3 in a row');
   for(const name of ['Steady','Bold','Aggressive'])await expect(page.getByRole('region',{name:'Account '+name})).toBeVisible();
 });
 

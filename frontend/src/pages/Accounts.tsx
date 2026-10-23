@@ -7,7 +7,9 @@ type Last={time:string;hit_id:string;playbook:string;side:string;decision:string
 type Account={id:string;name:string;status:string;equity:number;balance:number;account_return:number;round:number;in_round:number;round_length:number;number:number;
   leverage:number;risk:number;percentile:number;cutoff_score:number;full_risk_score:number;daily_brake:number;halted_day:boolean;floor_hit:boolean;
   position:Position|null;pending:boolean;last:Last|null;expectations:{trades_per_week:number;win_rate:number|null;mean_r:number|null}|null;
-  review:{id:string;round:number;status:string}|null;rules:string[];watches:string[]};
+  review:{id:string;round:number;status:string}|null;rules:string[];watches:string[];report?:Report|null};
+type Report={trades:number;wins:number;win_rate:number|null;account_return:number;avg_win:number|null;avg_loss:number|null;
+  profit_factor:number|null;max_drawdown:number;longest_drawdown_hours:number;longest_losing_streak:number;hold_return?:number;vs_hold?:number};
 type Accounts={accounts:Account[];config_hash:string;model_hash:string;overlay_time:string|null;note:string;watch_now:{key:string;label:string;value:number|null}[]};
 type Tick={condition?:string;text?:string;ok:boolean|null};
 type Watch={name:string;value:unknown;ok:boolean|null;note:string};
@@ -17,7 +19,7 @@ type Trade={id:string;account:string;round:number;number:number;playbook:string;
   diagnosis:string|null;payload:{entry?:number;exit?:number;diagnosis?:{why?:string}};explanation:{why:string;lesson:string}|null};
 type Separator={name:string;effect:number;label:string;winners:number;losers:number;n_winners:number;n_losers:number};
 type Review={id:string;account:string;round:number;status:string;created_at:string;payload:{
-  numbers:{trades:number;wins:number;win_rate:number|null;total_net:number;mean_r:number|null;max_drawdown:number};separators:Separator[];
+  numbers:{trades:number;wins:number;win_rate:number|null;total_net:number;mean_r:number|null;max_drawdown:number;profit_factor?:number|null;hold_return?:number|null};separators:Separator[];
   learner:{available:boolean;would_skip?:number};manager:{available:boolean;actual_mean_r?:number|null;policy_mean_r?:number|null;fixed_rule_mean_r?:number|null;hold_mean_r?:number|null};
   summary:{where_it_went_wrong:string;why:string;suggestions:string[]}|null;summary_error?:string|null}};
 
@@ -28,6 +30,19 @@ const status=(a:Account):[string,'ok'|'warn'|'bad'|'muted'|'accent']=>a.status==
   :a.status==='RUNNING'&&a.position?['In a trade','accent']:STATUS[a.status]??[words(a.status),'muted'];
 const decisionTone=(d:string)=>d==='TAKEN'?'ok':d==='BELOW_CUTOFF'||d==='LOWER_SCORE'?'muted':'warn';
 const list=<T,>(v:T[]|undefined|null):T[]=>Array.isArray(v)?v:[];
+const hours=(h:number)=>h<48?`${num(h,0)} h`:`${num(h/24,1)} days`;
+function ReportCard({r,name}:{r:Report;name:string}){
+  return <Collapsible title="Report card" summary={r.trades?`${r.trades} trades`:'no trades yet'} label={name+' report card'}>
+    <dl className="facts">
+      <div><dt>This account</dt><dd className={r.account_return<0?'tone-down':r.account_return>0?'tone-up':''}>{signedPct(r.account_return)}</dd></div>
+      <div><dt>Holding BTC instead</dt><dd>{signedPct(r.hold_return)}</dd></div>
+      <div><dt>Win rate</dt><dd>{r.trades?`${pct(r.win_rate,0)} (${r.wins} of ${r.trades})`:'—'}</dd></div>
+      <div><dt>Profit factor (won ÷ lost)</dt><dd>{num(r.profit_factor,2)}</dd></div>
+      <div><dt>Average win / loss</dt><dd>{money(r.avg_win)} / {money(r.avg_loss)}</dd></div>
+      <div><dt>Worst drop</dt><dd>{signedPct(r.max_drawdown)}{r.longest_drawdown_hours?` · longest ${hours(r.longest_drawdown_hours)} below a high`:''}</dd></div>
+      <div><dt>Longest losing streak</dt><dd>{r.longest_losing_streak} in a row</dd></div>
+    </dl></Collapsible>;
+}
 const value=(v:number|null)=>v==null?'—':Math.abs(v)>=1000?num(v,0):Math.abs(v)<.01?num(v,5):num(v,3);
 
 function AccountCard({a,watchNow,onReview,onResume,busy}:{a:Account;watchNow:Accounts['watch_now'];onReview:()=>void;onResume:()=>void;busy:boolean}){
@@ -56,6 +71,7 @@ function AccountCard({a,watchNow,onReview,onResume,busy}:{a:Account;watchNow:Acc
     <Collapsible title="What it watches" summary="live values" label={a.name+' watches'}>
       <ul className="account-rules">{list(a.watches).map(w=><li key={w}>{w}</li>)}</ul>
       <dl className="facts">{watchNow.map(w=><div key={w.key}><dt>{w.label}</dt><dd>{value(w.value)}</dd></div>)}</dl></Collapsible>
+    {a.report&&<ReportCard r={a.report} name={a.name}/>}
     {a.expectations&&<p className="source">History (2021–2025): about {num(a.expectations.trades_per_week,1)} trades a week, won {pct(a.expectations.win_rate,0)},
       {' '}{num(a.expectations.mean_r,2)} R per trade.</p>}
   </Card>;
@@ -67,7 +83,8 @@ function ReviewPanel({review,name}:{review:Review;name:string}){
     <div className="strip">
       <div className="stat"><span className="stat-label">Trades</span><strong>{n.trades}</strong><small>{n.wins} won ({pct(n.win_rate,0)})</small></div>
       <div className="stat"><span className="stat-label">Net</span><strong className={n.total_net<0?'tone-down':'tone-up'}>{money(n.total_net)}</strong><small>{num(n.mean_r,2)} R per trade</small></div>
-      <div className="stat"><span className="stat-label">Worst drawdown</span><strong>{signedPct(n.max_drawdown)}</strong></div>
+      <div className="stat"><span className="stat-label">Worst drawdown</span><strong>{signedPct(n.max_drawdown)}</strong>
+        <small>Profit factor {num(n.profit_factor,2)} · holding BTC {signedPct(n.hold_return)}</small></div>
       <div className="stat"><span className="stat-label">Trade management</span><strong>{num(m.policy_mean_r,2)} R</strong>
         <small>{m.available?`RL agent vs ${num(m.actual_mean_r,2)} R actual · break-even rule ${num(m.fixed_rule_mean_r,2)} R`:'No replay available'}</small></div>
     </div>

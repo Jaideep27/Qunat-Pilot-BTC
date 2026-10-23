@@ -92,6 +92,7 @@ def test_review_numbers_and_separators(account):
     assert n['trades'] == 30 and n['wins'] == 10 and n['win_rate'] == pytest.approx(1/3)
     assert n['mean_r'] == pytest.approx((10*25-20*40)/30/100)
     assert n['by_playbook']['PB01']['n'] + n['by_playbook']['PB08L']['n'] == 30 and n['expected']['win_rate'] == .5
+    assert n['profit_factor'] == pytest.approx(250/800) and n['longest_losing_streak'] == 2
     seps = {s['name']: s for s in review['separators']}
     assert seps['watch:book_imbalance']['label'] == 'consistent' and seps['snapshot:global_ratio']['effect'] > .8
     assert review['learner']['would_skip'] == 30            # no learner history: it skips everything

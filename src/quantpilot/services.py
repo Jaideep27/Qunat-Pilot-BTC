@@ -498,8 +498,8 @@ WATCH_NOW = (('global_ratio', 'Long/short ratio (all traders)'), ('top_position_
              ('liq_short_usd_15m', 'Shorts liquidated, 15m ($)'), ('fear_greed', 'Fear & Greed'))
 
 
-def _account_view(cfg, account, state, expectations, reviews):
-    from . import accounts
+def _account_view(cfg, account, state, expectations, reviews, engine=None):
+    from . import account_journal, account_report, accounts
     state = state or {}
     f = state.get('futures') or {}
     p = f.get('position')
@@ -510,7 +510,16 @@ def _account_view(cfg, account, state, expectations, reviews):
                           score=(extra.get(p['plan'].get('hit_id')) or {}).get('score'))
     own = [r for r in reviews if r['account'] == account['id']]
     equity = f.get('equity', cfg['balance'])
-    return dict(id=account['id'], name=account['name'], status=state.get('status', 'NOT_STARTED'), equity=equity,
+    report = None
+    if engine is not None:
+        try:
+            held = account_report.hold(engine, state['created']) if state.get('created') else None
+        except Exception:
+            held = None
+        report = account_report.report(account_journal.trades(engine, account['id'], limit=10_000), cfg['balance'],
+                                       equity, held)
+        report['hold'] = held
+    return dict(id=account['id'], report=report, name=account['name'], status=state.get('status', 'NOT_STARTED'), equity=equity,
                 balance=cfg['balance'], account_return=equity/cfg['balance']-1, round=state.get('round', 1),
                 in_round=state.get('in_round', 0), round_length=cfg['round_length'], number=state.get('number', 0),
                 leverage=account['leverage'], risk=account['risk'], percentile=account['percentile'],
@@ -536,7 +545,7 @@ def rules_accounts():
     expectations, reviews = account_review._expectations(), account_journal.reviews(engine)
     states = {a['id']: journal.load_account(engine, a['id']) for a in cfg['accounts']}
     overlay = (journal.load_account(engine, rule_live.ACCOUNT_ID) or {}).get('overlay') or {}
-    data = dict(accounts=[_account_view(cfg, a, states[a['id']], expectations, reviews) for a in cfg['accounts']],
+    data = dict(accounts=[_account_view(cfg, a, states[a['id']], expectations, reviews, engine) for a in cfg['accounts']],
                 config_hash=cfg['hash'], model_hash=cfg['model']['hash'], overlay_time=overlay.get('time'),
                 watch_now=[dict(key=k, label=label, value=overlay.get(k)) for k, label in WATCH_NOW],
                 note='Paper money only. Each account pauses after its round of trades until the owner resumes it.')
