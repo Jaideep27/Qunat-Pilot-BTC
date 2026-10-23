@@ -45,11 +45,18 @@ def news_layer():
 def account_reviews():
     # Four paper accounts (A8): Claude explanations of diagnosed trades and the review of every account that has
     # paused after its round, every 5 minutes. Separate from the minute cycle so a slow Claude call never delays trading.
-    from quantpilot import account_review
+    from quantpilot import account_review, model_health
     engine=database(settings.market_database_url)
     while True:
         try:print(json.dumps(dict(account_reviews=account_review.run_pending(engine,pd.Timestamp.now(tz='UTC')))),flush=True)
         except Exception as exc:print(json.dumps(dict(account_reviews='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
+        # A9 model health: written as a feed status so the dashboard and the logs show warnings.
+        try:
+            health=model_health.status(engine)
+            feed_status(engine,'rules:model-health',dict(status='healthy' if health['overall']=='OK' else 'degraded',
+                        overall=health['overall'],reasons=health['reasons'],checked_at=health['checked_at']))
+            print(json.dumps(dict(model_health=health['overall'])),flush=True)
+        except Exception as exc:print(json.dumps(dict(model_health='blocked',error=str(exc)[:200])),flush=True)
         time.sleep(300)
 
 

@@ -67,6 +67,8 @@ def rules_research(): return services.rules_research()
 
 @app.get('/api/v1/rules/accounts')
 def rules_accounts(): return services.rules_accounts()
+@app.get('/api/v1/rules/model-health')
+def rules_model_health(): return services.rules_model_health()
 
 
 @app.get('/api/v1/rules/decisions')

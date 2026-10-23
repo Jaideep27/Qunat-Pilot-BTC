@@ -71,3 +71,10 @@ def test_resume_rejects_remote_callers_and_accounts_that_are_not_paused(account)
                                                      futures=dict(paused=True)), pd.Timestamp.now(tz='UTC'))
         body = local.post('/api/v1/rules/accounts/acct-a/resume').json()
         assert body['data']['round'] == 2
+
+
+def test_model_health_endpoint(account):
+    with TestClient(app) as client:
+        body = client.get('/api/v1/rules/model-health').json()
+    assert body['data']['overall'] in ('OK', 'WATCH', 'ALARM') and body['data']['reasons']
+    assert {'card', 'calibration', 'drift', 'data_checks', 'challenger'} <= set(body['data'])

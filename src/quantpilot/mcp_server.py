@@ -45,7 +45,7 @@ async def get_strategy_research() -> dict[str, Any]:
 
 @mcp.tool(structured_output=True)
 async def get_rule_engine() -> dict[str, Any]:
-    """Rule engine: rulebook playbooks, reference paper account, the four A8 accounts, live checklist and research verdict."""
+    """Rule engine: rulebook playbooks, reference paper account, the four A8 accounts, model health, live checklist and research verdict."""
     return await asyncio.to_thread(services.rules_status)
 
 @mcp.tool(structured_output=True)

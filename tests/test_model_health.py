@@ -163,3 +163,34 @@ def test_compare_verdicts():
     assert mh.compare(rows.iloc[:10])['verdict'] == 'TOO_FEW'
     assert mh.compare(rows)['verdict'] == 'CHALLENGER_BETTER'
     assert mh.compare(rows.assign(cp=rows.p))['verdict'] == 'NO_DIFFERENCE'
+
+
+def test_status_overall_rules():
+    ok = dict(verdict='IN_LINE')
+    calm = dict(verdict='STABLE')
+    checks = dict(checked_7d=100, failed_7d=0, failed_24h=0)
+    assert mh.overall(ok, calm, checks, True)[0] == 'OK'
+    assert mh.overall(ok, dict(verdict='ALARM'), checks, True)[0] == 'ALARM'
+    assert mh.overall(dict(verdict='OVERCONFIDENT', predicted=.5, actual=.3, n=60), calm, checks, True)[0] == 'ALARM'
+    assert mh.overall(ok, calm, dict(checks, failed_7d=21), True)[0] == 'ALARM'
+    assert mh.overall(ok, dict(verdict='WATCH'), checks, True)[0] == 'WATCH'
+    assert mh.overall(ok, calm, checks, False)[0] == 'WATCH'
+    state, reasons = mh.overall(ok, calm, dict(checks, failed_7d=1, failed_24h=1), True)
+    assert state == 'WATCH' and any('data check' in r for r in reasons)
+    assert mh.overall(dict(verdict='TOO_FEW'), dict(verdict='TOO_FEW'), dict(checked_7d=0, failed_7d=0, failed_24h=0), True)[0] == 'OK'
+
+
+def test_status_on_journal(account):
+    _hits_and_decisions(account, 40)
+    out = mh.status(account, pd.Timestamp('2026-10-22', tz='UTC'))
+    assert out['calibration']['n'] == 40 and out['calibration']['verdict'] == 'IN_LINE'
+    assert out['reference'] == 'missing' and out['overall'] == 'WATCH'
+    assert out['data_checks']['checked_7d'] == 40 and out['data_checks']['failed_7d'] == 0
+    assert out['drift']['verdict'] == 'NO_REFERENCE' and out['challenger'] is None
+    assert out['card']['model_hash'] and out['reasons']
+
+
+def test_status_with_an_empty_journal(account):
+    out = mh.status(account)
+    assert out['calibration']['n'] == 0 and out['data_checks']['checked_7d'] == 0 and out['overall'] in ('OK', 'WATCH')
+    assert len(mh.live_training_rows(account)) == 0

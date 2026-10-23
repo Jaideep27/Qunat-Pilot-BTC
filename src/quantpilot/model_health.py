@@ -218,7 +218,7 @@ def live_training_rows(engine, frame=None):
     """Resolved live setups after the holdout with recorded inputs, filtered as the A8 training set was."""
     from .account_score import ALLOWED
     s = setups(engine) if frame is None else frame
-    s = s[(s.time >= LIVE_START) & s.inputs.notna() & s.resolved & s.reasons.map(lambda r: set(r) <= ALLOWED)]
+    s = s[((s.time >= LIVE_START) & s.inputs.notna() & s.resolved & s.reasons.map(lambda r: set(r) <= ALLOWED)).astype(bool)]
     rows = pd.DataFrame(list(s.inputs), index=s.index)
     return rows.assign(o_net=s.net.astype(float), o_exit_time=s.exit_time, time=s.time).reset_index(drop=True)
 
@@ -299,3 +299,87 @@ def run_reference(output, path=None):
     path = Path(path or reference_path())
     path.write_text(json.dumps(ref, indent=1), encoding='utf-8')
     return ref
+
+
+def overall(cal, drift_, checks, reference_ok):
+    """The single status (OK, WATCH or ALARM) and plain-English reasons."""
+    alarm, watch, info = [], [], []
+    if cal.get('verdict') == 'OVERCONFIDENT':
+        alarm.append(f"The model has been too optimistic: it gave an average win chance of {cal['predicted']:.0%}, "
+                     f"but {cal['actual']:.0%} of {cal['n']} setups actually won.")
+    elif cal.get('verdict') == 'UNDERCONFIDENT':
+        info.append(f"The model has been too cautious: average win chance {cal['predicted']:.0%}, "
+                    f"actual {cal['actual']:.0%} of {cal['n']} setups.")
+    elif cal.get('verdict') == 'TOO_FEW':
+        info.append(f"Not enough finished setups yet to judge its accuracy ({cal.get('n', 0)} of {MIN_CALIBRATION}).")
+    if drift_.get('verdict') == 'ALARM':
+        alarm.append(f"The market looks unlike what the model learned from: {drift_.get('count')} inputs are unusual "
+                     f"(an ordinary stretch has up to {drift_.get('usual') or 0:.0f}).")
+    elif drift_.get('verdict') == 'WATCH':
+        watch.append(f"The market looks somewhat different from what the model learned from: {drift_.get('count')} inputs "
+                     f"are unusual (an ordinary stretch has up to {drift_.get('usual') or 0:.0f}).")
+    elif drift_.get('verdict') == 'TOO_FEW':
+        info.append(f"Not enough recorded setups yet to check for market change ({drift_.get('n', 0)} of "
+                    f"{drift_.get('window', WINDOW)}).")
+    if checks['checked_7d'] and checks['failed_7d']/checks['checked_7d'] > .2:
+        alarm.append(f"{checks['failed_7d']} of {checks['checked_7d']} setups in the last 7 days failed the data check "
+                     'and were held back.')
+    elif checks['failed_24h']:
+        watch.append(f"{checks['failed_24h']} setup(s) failed the data check in the last 24 hours and were held back.")
+    if not reference_ok:
+        watch.append("The model's reference file is missing, so the market-change and data checks are not running.")
+    state = 'ALARM' if alarm else 'WATCH' if watch else 'OK'
+    return state, alarm+watch+(info or [])+([] if alarm or watch else ['No warning signs.'])
+
+
+def _json(path):
+    try:
+        return json.loads(Path(path).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+
+
+def status(engine, now=None):
+    """Everything the Model health panel shows."""
+    from . import account_score, accounts, meta
+    now = _utc(now or pd.Timestamp.now(tz='UTC'))
+    cfg = accounts.load()
+    model = account_score.load_model()
+    report = _json(account_score.report_path())
+    ref = load_reference(cfg['model']['hash'])
+    s = setups(engine)
+    resolved = s[(s.resolved & s.p.notna()).astype(bool)]
+    cal = calibration(pd.DataFrame(dict(p=resolved.p.astype(float), won=resolved.won)), ref)
+    with_inputs = s[s.inputs.notna()]
+    if ref is None:
+        drift_ = dict(verdict='NO_REFERENCE', n=int(len(with_inputs)), top=[])
+    else:
+        x = meta.matrix(pd.DataFrame(list(with_inputs.inputs))) if len(with_inputs) else pd.DataFrame()
+        drift_ = drift(x.reindex(columns=list(ref['inputs'])), ref)
+    checked = s[s.data_check.map(lambda c: isinstance(c, list)).astype(bool)]
+    recent = checked[checked.time > now-pd.Timedelta(days=7)]
+    failed = recent[recent.data_check.map(bool).astype(bool)]
+    latest = failed.iloc[-1] if len(failed) else None
+    checks = dict(checked_7d=int(len(recent)), failed_7d=int(len(failed)),
+                  failed_24h=int((failed.time > now-pd.Timedelta(hours=24)).sum()),
+                  skipped_7d=int(((s.time > now-pd.Timedelta(days=7)) & ~s.data_check.map(lambda c: isinstance(c, list)).astype(bool)).sum()),
+                  latest=None if latest is None else dict(time=latest.time.isoformat(), setup=latest.hit_id.split(':')[0],
+                                                          reasons=latest.data_check))
+    info = challenger_info()
+    challenger = None
+    if info:
+        shadow = s[(s.resolved & s.challenger.map(lambda c: isinstance(c, dict) and c.get('hash') == info['hash'])).astype(bool)]
+        challenger = dict(info, compare=compare(pd.DataFrame(dict(p=shadow.p.astype(float), won=shadow.won,
+                                                                  cp=[c['p'] for c in shadow.challenger]))))
+    state, reasons = overall(cal, drift_, checks, ref is not None)
+    card = dict(model_hash=cfg['model']['hash'], file_hash=(model or {}).get('hash'),
+                matches=bool(model) and model['hash'] == cfg['model']['hash'], config_hash=cfg.get('hash'),
+                kind='L2 logistic regression (win chance of a confirmed setup)', inputs=len((model or {}).get('columns', [])),
+                training_setups=report.get('training_setups'), trained_from='2021-10-20',
+                trained_until=report.get('trained_until') or (model or {}).get('trained_until'),
+                walk_forward_setups=report.get('walk_forward_setups'), walk_forward=report.get('calibration'),
+                dev_brier=(ref or {}).get('brier'), held_back_in_training=(ref or {}).get('blocked_share'),
+                live_since=s.time.min().isoformat() if len(s) else None, scored_setups=int(len(s)),
+                holdout='2025-10-20 → 2026-10-19, untouched')
+    return dict(overall=state, reasons=reasons, card=card, calibration=cal, drift=drift_, data_checks=checks,
+                challenger=challenger, reference='ok' if ref is not None else 'missing', checked_at=now.isoformat())

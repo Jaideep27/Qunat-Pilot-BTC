@@ -487,7 +487,7 @@ def rules_status():
     data = dict(rulebook=dict(hash=book['hash'], version=book['version'], name=book.get('name')), layers=book['layers'],
                 modes=layer_modes(), gates=book['gates'], defaults=book['defaults'], playbooks=playbooks, account=account,
                 checklist=(acct or {}).get('checklist', []), research=research, provenance_note=RULES_NOTE,
-                accounts=_accounts_summary())
+                accounts=_accounts_summary(), model_health=_model_health_summary())
     return envelope(data, (acct or {}).get('last_bar'), 'QuantPilot rule engine (experimental paper account)', max_age=180)
 
 
@@ -551,6 +551,20 @@ def rules_accounts():
                 note='Paper money only. Each account pauses after its round of trades until the owner resumes it.')
     observed = max((s['last_bar'] for s in states.values() if s and s.get('last_bar')), default=None)
     return envelope(data, observed, 'QuantPilot four paper accounts (A8)', max_age=180)
+
+
+def rules_model_health():
+    from . import model_health
+    data = model_health.status(_rules_db())
+    return envelope(data, data['checked_at'], 'QuantPilot model health (A9)', max_age=600)
+
+
+def _model_health_summary():
+    try:
+        data = rules_model_health()['data']
+        return dict(overall=data['overall'], reasons=data['reasons'])
+    except Exception as exc:
+        return dict(overall='UNKNOWN', reasons=[f'Model health could not be read: {type(exc).__name__}'])
 
 
 def rules_decisions(account=None, limit=100):
