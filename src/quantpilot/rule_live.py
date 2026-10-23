@@ -15,7 +15,7 @@ import pandas as pd
 from sqlalchemy import select
 
 from . import account_live, arbiter, diagnosis, futures, journal, outcomes, patterns, rules, setup_history, triggers
-from .market_store import PERP, MarketCandle, _upsert, feed_status
+from .market_store import PERP, MarketCandle, MarketObservation, _upsert, feed_status, save_frame
 
 ACCOUNT_ID = 'experimental-v1'
 FAST = PERP+'_1M'
@@ -74,13 +74,41 @@ def fast_bars(engine, start, end):
     return frame
 
 
-def _market(engine, now):
-    """The last 41 days of market families, reloaded only when a new completed 5m candle exists."""
+MARKS = (('mark', '/fapi/v1/markPriceKlines', 'symbol'), ('index', '/fapi/v1/indexPriceKlines', 'pair'))
+
+
+def _latest(engine):
+    """Latest stored 5m candle, mark and index availability times."""
     from sqlalchemy import func
-    from .event_study import load_market
     with engine.connect() as connection:
-        latest = connection.execute(select(func.max(MarketCandle.available_at)).where(
+        candle = connection.execute(select(func.max(MarketCandle.available_at)).where(
             MarketCandle.market == PERP, MarketCandle.interval == '5m', MarketCandle.complete.is_(True))).scalar()
+        marks = dict(connection.execute(select(MarketObservation.family, func.max(MarketObservation.available_at)).where(
+            MarketObservation.market == PERP, MarketObservation.family.in_([m[0] for m in MARKS]))
+            .group_by(MarketObservation.family)).all())
+    return candle, marks.get('mark'), marks.get('index')
+
+
+def fetch_marks(engine, client, now):
+    """Upsert the last hour of completed 5m mark and index klines, so the premium is current at a decision."""
+    now, count = pd.Timestamp(now), 0
+    for family, path, key in MARKS:
+        response = client.get('https://fapi.binance.com'+path, params={key: 'BTCUSDT', 'interval': '5m', 'limit': 13,
+                                                                      'startTime': int((now-pd.Timedelta(hours=1)).timestamp()*1000)})
+        response.raise_for_status()
+        rows = [{'event_time': (t := pd.to_datetime(bar[0], unit='ms', utc=True)), 'available_at': t+pd.Timedelta(minutes=5),
+                 'received_at': now, 'source': 'https://fapi.binance.com'+path, f'{family}_price': float(bar[4])}
+                for bar in response.json()]
+        frame = pd.DataFrame(rows)
+        frame = frame[frame.available_at <= now] if len(frame) else frame
+        count += save_frame(engine, family, frame) if len(frame) else 0
+    return count
+
+
+def _market(engine, now):
+    """The last 41 days of market families, reloaded when a new 5m candle, mark or index observation exists."""
+    from .event_study import load_market
+    latest = _latest(engine)
     if _cache.get('market_key') != latest or 'frames' not in _cache:
         _cache.update(market_key=latest, frames=load_market(engine, now-LOOKBACK-pd.Timedelta(days=1),
                                                             now+pd.Timedelta(minutes=1)))
@@ -261,6 +289,14 @@ def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None
     now = pd.Timestamp(now or pd.Timestamp.now(tz='UTC'))
     book = book or rules.cached()
     market_engine = market_engine or engine
+    marks_error = None
+    if frames is None and client is not None and now-now.floor('15min') <= FRESH:
+        try:    # mark and index arrive in a later batch than the candle; refresh them before a decision
+            candle, mark, index = _latest(market_engine)
+            if candle is not None and (mark is None or index is None or min(mark, index) < candle):
+                fetch_marks(market_engine, client, now)
+        except Exception as exc:
+            marks_error = f'{type(exc).__name__}: {exc}'[:200]
     if frames is None:
         frames = _market(market_engine, now)
     frames = _truncate(frames, now)
@@ -309,7 +345,8 @@ def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None
         accounts = dict(error=f'{type(exc).__name__}: {exc}'[:300])
     diagnosed = _diagnose(engine, book, frames, fast, now)
     summary = dict(time=now.isoformat(), bars=len(new), triggers=recorded, decision=decision, diagnosed=diagnosed,
-                   equity=state['equity'], position=bool(state['position']), pending=bool(state['pending']), accounts=accounts)
+                   equity=state['equity'], position=bool(state['position']), pending=bool(state['pending']), accounts=accounts,
+                   marks_error=marks_error)
     try:
         feed_status(market_engine, 'rules:engine', dict(status='healthy', updated_at=now.isoformat(), bars=len(new),
                                                         last_bar=acct['last_bar'], last_decision=acct['last_decision'],

@@ -127,3 +127,44 @@ def test_the_rl_manager_is_recorded_in_shadow_and_acts_only_when_live(account, m
                     news_events=[], manager=exit_always, modes={('manage_rl', 'L1'): 'live'})
     acct = rule_live.load_account(account)
     assert acct['futures']['position'] is None and acct['futures']['trades'][-1]['reason'] == 'EXIT_ACTION'
+
+
+def test_fetch_marks_upserts_mark_and_index(account):
+    from quantpilot.market_store import MarketObservation, PERP
+    now = pd.Timestamp('2026-03-01 12:02:30', tz='UTC')
+    seen = []
+
+    def reply(request):
+        seen.append(request.url)
+        opens = pd.date_range('2026-03-01 11:50', periods=3, freq='5min', tz='UTC')     # 12:00 is still forming
+        price = 100.0 if 'markPrice' in str(request.url) else 101.0
+        return httpx.Response(200, json=[[int(t.timestamp()*1000), price, price, price, price, 0, 0, 0, 0, 0, 0, 0]
+                                         for t in opens])
+    with httpx.Client(transport=httpx.MockTransport(reply)) as client:
+        assert rule_live.fetch_marks(account, client, now) == 4
+    assert any('pair=BTCUSDT' in str(u) and 'indexPrice' in str(u) for u in seen)
+    with account.connect() as connection:
+        rows = connection.execute(select(MarketObservation.family, MarketObservation.available_at, MarketObservation.values)
+                                  .where(MarketObservation.market == PERP).order_by(MarketObservation.family,
+                                                                                    MarketObservation.event_time)).all()
+    assert [r[0] for r in rows] == ['index', 'index', 'mark', 'mark']
+    assert pd.Timestamp(rows[-1][1]).tz_localize(None) == pd.Timestamp('2026-03-01 12:00')
+    assert rows[0][2] == {'index_price': 101.0} and rows[-1][2] == {'mark_price': 100.0}
+
+
+def test_market_cache_reloads_when_marks_arrive(account):
+    from quantpilot.market_store import save_frame
+    rule_live._cache.clear()
+    now = pd.Timestamp('2026-03-01 12:02:30', tz='UTC')
+
+    def obs(family, t):
+        return pd.DataFrame([{'event_time': t-pd.Timedelta(minutes=5), 'available_at': t, 'received_at': now,
+                              'source': 'test', f'{family}_price': 100.0}])
+    save_frame(account, 'candles', pd.DataFrame([dict(event_time=now.floor('5min')-pd.Timedelta(minutes=5),
+                                                      available_at=now.floor('5min'), received_at=now, source='test',
+                                                      open=1.0, high=1.0, low=1.0, close=1.0, volume=1.0)]))
+    save_frame(account, 'mark', obs('mark', now.floor('5min')-pd.Timedelta(minutes=5)))
+    first = rule_live._market(account, now)
+    save_frame(account, 'mark', obs('mark', now.floor('5min')))
+    second = rule_live._market(account, now)
+    assert len(first['mark']) == 1 and len(second['mark']) == 2
