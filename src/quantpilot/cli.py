@@ -60,6 +60,8 @@ def main():
         '--output', required=True, help='Playbook research run directory')
     sub.add_parser('research-accounts', help='A8: fit the score model and cutoffs of the four paper accounts').add_argument(
         '--output', required=True, help='Playbook research run directory')
+    sub.add_parser('model-reference', help='A9: reference statistics of the live score model (drift, data check)').add_argument(
+        '--output', required=True, help='The A8 playbook research run directory')
     sub.add_parser('research-learner', help='Rule engine M5: walk-forward bandit learner on a playbook run').add_argument(
         '--output', required=True, help='Playbook research run directory')
     manage=sub.add_parser('research-manage', help='Rule engine M5: trade-management RL (tabular Q and PPO) on a run')
@@ -193,6 +195,11 @@ def main():
         from .account_score import run
         result = run(args.output)
         print(json.dumps({k: result[k] for k in ('training_setups', 'walk_forward_setups', 'model_hash', 'cutoffs', 'calibration', 'expectations')}, indent=2, default=str))
+    elif args.command == 'model-reference':
+        from .model_health import run_reference
+        ref = run_reference(args.output)
+        print(json.dumps(dict(model_hash=ref['model_hash'], rows=ref['rows'], critical=len(ref['critical']),
+                              blocked_share=ref['blocked_share'], brier=ref.get('brier'), drift=ref['drift_baseline'] | dict(thresholds=None)), indent=2))
     elif args.command == 'research-ml':
         from .meta import run
         result = run(args.output)
