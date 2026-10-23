@@ -91,3 +91,75 @@ def test_wilson_interval():
     lo, hi = mh.wilson(30, 100)
     assert .21 < lo < .22 and .39 < hi < .40
     assert mh.wilson(0, 0) == (None, None)
+
+
+def _hits_and_decisions(engine, n, start='2026-10-21', inputs=True, wins=None):
+    from quantpilot import account_journal, journal
+    times = pd.date_range(start, periods=n, freq='15min', tz='UTC')
+    hits, rows = [], []
+    for i, t in enumerate(times):
+        hid = f'PB08S:{t.isoformat()}'
+        hits.append(dict(id=hid, time=t, playbook='PB08S', side='short', status='PLAN_REJECTED',
+                         reasons=['REWARD_RISK_BELOW_MIN']))
+        payload = dict(inputs=dict(f_move_z_15m=float(i % 7), f_rsi_15m=40.0+i % 11, side='short', regime='TREND_DOWN',
+                                   plan_reward_risk=1.5) if inputs else None,
+                       data_check=[] if inputs else 'no inputs', challenger=None)
+        for acct in ('acct-a', 'acct-b'):
+            rows.append(dict(account=acct, hit_id=hid, time=t, decision='BELOW_CUTOFF', score=-.3, confidence=.4, cutoff=0,
+                             payload=payload))
+    journal.add_hits(engine, hits)
+    account_journal.add_decisions(engine, rows)
+    for i, h in enumerate(hits):
+        won = (i % 5 < 2) if wins is None else wins
+        journal.diagnose_hit(engine, h['id'], dict(valid=True, net=1.0 if won else -1.0, exit_time=(h['time']+pd.Timedelta(hours=2)).isoformat()),
+                             'X', h['time']+pd.Timedelta(hours=6))
+    return hits
+
+
+def test_setups_count_each_hit_once_and_carry_outcomes(account):
+    _hits_and_decisions(account, 12)
+    s = mh.setups(account)
+    assert len(s) == 12 and s.hit_id.is_unique
+    assert s.won.sum() == sum(i % 5 < 2 for i in range(12)) and set(s.p) == {.4}
+    assert s.inputs.iloc[0]['regime'] == 'TREND_DOWN'
+
+
+def test_live_training_rows_need_inputs_and_a_valid_outcome(account):
+    _hits_and_decisions(account, 6)
+    _hits_and_decisions(account, 4, start='2026-11-01', inputs=False)
+    rows = mh.live_training_rows(account)
+    assert len(rows) == 6 and {'f_move_z_15m', 'o_net', 'o_exit_time', 'side'} <= set(rows.columns)
+
+
+def _dev(n=300, seed=1):
+    rng = np.random.default_rng(seed)
+    z = rng.normal(size=n)
+    return pd.DataFrame(dict(f_move_z_15m=z, f_rsi_15m=rng.normal(50, 10, n), side='short', regime='TREND_DOWN',
+                             plan_reward_risk=1.5, o_net=np.where(z+rng.normal(size=n) > 0, 1.0, -1.0),
+                             o_exit_time=pd.date_range('2022-01-01', periods=n, freq='D', tz='UTC').astype(str)))
+
+
+def test_train_challenger_refuses_without_enough_new_setups(tmp_path):
+    import pytest
+    with pytest.raises(ValueError, match='not enough new setups: 3 of 200'):
+        mh.train_challenger(_dev(), _dev(3), paths=(tmp_path/'c.joblib', tmp_path/'c.json'))
+
+
+def test_train_challenger_writes_files_and_scores(tmp_path):
+    from quantpilot import account_score
+    paths = (tmp_path/'c.joblib', tmp_path/'c.json')
+    info = mh.train_challenger(_dev(), _dev(20, seed=2), min_new=5, paths=paths)
+    assert info['n_dev'] == 300 and info['n_live'] == 20 and len(info['hash']) == 12
+    model = mh.load_challenger(paths)
+    assert model['hash'] == info['hash']
+    p = account_score.score(model, _dev(4, seed=3)).p
+    assert ((p > 0) & (p < 1)).all()
+
+
+def test_compare_verdicts():
+    rng = np.random.default_rng(0)
+    won = rng.random(100) < .4
+    rows = pd.DataFrame(dict(p=np.full(100, .4), cp=np.where(won, .95, .05), won=won))
+    assert mh.compare(rows.iloc[:10])['verdict'] == 'TOO_FEW'
+    assert mh.compare(rows)['verdict'] == 'CHALLENGER_BETTER'
+    assert mh.compare(rows.assign(cp=rows.p))['verdict'] == 'NO_DIFFERENCE'

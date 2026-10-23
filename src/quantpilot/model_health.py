@@ -173,9 +173,113 @@ def drift(rows, ref):
                           train_median=ref['inputs'][c]['median']) for c in top])
 
 
-def load_challenger():
-    """The shadow challenger model, or None (filled in by `train_challenger`)."""
-    return None
+LIVE_START = pd.Timestamp('2026-10-20', tz='UTC')    # after the holdout: live setups a challenger may learn from
+MIN_NEW, MIN_COMPARE = 200, 50
+_cache = {}
+
+
+def _utc(value):
+    t = pd.Timestamp(value)
+    return t.tz_localize('UTC') if t.tzinfo is None else t.tz_convert('UTC')
+
+
+def setups(engine):
+    """One row per scored live setup (the accounts share it): `p`, inputs, data check, challenger and outcome."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from .account_journal import AccountDecision
+    from .journal import RuleHit
+    with Session(engine) as session:
+        rows = session.execute(select(AccountDecision.hit_id, AccountDecision.time, AccountDecision.confidence,
+                                      AccountDecision.score, AccountDecision.decision, AccountDecision.payload)
+                               .order_by(AccountDecision.time, AccountDecision.id)).all()
+        ids = list(dict.fromkeys(r[0] for r in rows))
+        hits = {h.id: h for h in session.scalars(select(RuleHit).where(RuleHit.id.in_(ids)))} if ids else {}
+        out, seen = [], set()
+        for hit_id, time, p, score, decision, payload in rows:
+            if hit_id in seen:
+                continue
+            seen.add(hit_id)
+            hit, payload = hits.get(hit_id), payload or {}
+            outcome = (hit.outcome if hit is not None else None) or {}
+            resolved = bool(outcome.get('valid')) and outcome.get('net') is not None
+            out.append(dict(hit_id=hit_id, time=_utc(time), p=p, score=score, decision=decision,
+                            inputs=payload.get('inputs'), data_check=payload.get('data_check'),
+                            challenger=payload.get('challenger'), resolved=resolved,
+                            won=bool(resolved and outcome['net'] > 0), net=outcome.get('net'),
+                            exit_time=outcome.get('exit_time'),
+                            reasons=list(((hit.payload if hit is not None else None) or {}).get('reasons') or [])))
+    columns = ['hit_id', 'time', 'p', 'score', 'decision', 'inputs', 'data_check', 'challenger', 'resolved', 'won', 'net',
+               'exit_time', 'reasons']
+    return pd.DataFrame(out, columns=columns)
+
+
+def live_training_rows(engine, frame=None):
+    """Resolved live setups after the holdout with recorded inputs, filtered as the A8 training set was."""
+    from .account_score import ALLOWED
+    s = setups(engine) if frame is None else frame
+    s = s[(s.time >= LIVE_START) & s.inputs.notna() & s.resolved & s.reasons.map(lambda r: set(r) <= ALLOWED)]
+    rows = pd.DataFrame(list(s.inputs), index=s.index)
+    return rows.assign(o_net=s.net.astype(float), o_exit_time=s.exit_time, time=s.time).reset_index(drop=True)
+
+
+def challenger_paths():
+    base = settings.artifact_dir/'rule-engine'
+    return base/'challenger.joblib', base/'challenger.json'
+
+
+def train_challenger(dev_train, live_rows, min_new=MIN_NEW, now=None, paths=None):
+    """Refit the A8 recipe on development setups plus new live setups. Shadow only: it never decides."""
+    import joblib
+    from . import account_score
+    if len(live_rows) < min_new:
+        raise ValueError(f'not enough new setups: {len(live_rows)} of {min_new}')
+    model_file, meta_file = paths or challenger_paths()
+    fitted = account_score.fit(pd.concat([dev_train, live_rows], ignore_index=True))
+    Path(model_file).parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(fitted, model_file)
+    info = dict(hash=account_score._hash(model_file), n_dev=int(len(dev_train)), n_live=int(len(live_rows)),
+                trained_until=fitted['trained_until'], created=_utc(now or pd.Timestamp.now(tz='UTC')).isoformat())
+    Path(meta_file).write_text(json.dumps(info, indent=1), encoding='utf-8')
+    return info
+
+
+def challenger_info(paths=None):
+    try:
+        return json.loads(Path((paths or challenger_paths())[1]).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+
+
+def load_challenger(paths=None):
+    """The shadow challenger model with its file hash (reloaded when the file changes), or None."""
+    from . import account_score
+    model_file = Path((paths or challenger_paths())[0])
+    try:
+        key = (str(model_file), model_file.stat().st_mtime) if model_file.exists() else None
+        if key is None:
+            return None
+        if _cache.get('challenger_key') != key:
+            import joblib
+            _cache.update(challenger_key=key, challenger=dict(joblib.load(model_file), hash=account_score._hash(model_file)))
+        return _cache['challenger']
+    except Exception:
+        return None
+
+
+def compare(rows, reps=2000, seed=0):
+    """Live model against the challenger on the same resolved setups: Brier scores and a paired bootstrap."""
+    won = rows.won.astype(float).to_numpy()
+    a, b = (rows.p.to_numpy(float)-won)**2, (rows.cp.to_numpy(float)-won)**2
+    n = int(len(rows))
+    out = dict(n=n, brier=float(a.mean()) if n else None, challenger_brier=float(b.mean()) if n else None,
+               diff_lo=None, diff_hi=None)
+    if n < MIN_COMPARE:
+        return dict(out, verdict='TOO_FEW')
+    d = b-a
+    idx = np.random.default_rng(seed).integers(0, n, size=(reps, n))
+    lo, hi = np.percentile(d[idx].mean(axis=1), [2.5, 97.5])
+    return dict(out, diff_lo=float(lo), diff_hi=float(hi), verdict='CHALLENGER_BETTER' if hi < 0 else 'NO_DIFFERENCE')
 
 
 def run_reference(output, path=None):

@@ -62,6 +62,9 @@ def main():
         '--output', required=True, help='Playbook research run directory')
     sub.add_parser('model-reference', help='A9: reference statistics of the live score model (drift, data check)').add_argument(
         '--output', required=True, help='The A8 playbook research run directory')
+    challenger = sub.add_parser('train-challenger', help='A9: fit a shadow challenger score model (never trades)')
+    challenger.add_argument('--output', required=True, help='The A8 playbook research run directory')
+    challenger.add_argument('--min-new', type=int, default=200, help='Resolved live setups required')
     sub.add_parser('research-learner', help='Rule engine M5: walk-forward bandit learner on a playbook run').add_argument(
         '--output', required=True, help='Playbook research run directory')
     manage=sub.add_parser('research-manage', help='Rule engine M5: trade-management RL (tabular Q and PPO) on a run')
@@ -200,6 +203,12 @@ def main():
         ref = run_reference(args.output)
         print(json.dumps(dict(model_hash=ref['model_hash'], rows=ref['rows'], critical=len(ref['critical']),
                               blocked_share=ref['blocked_share'], brier=ref.get('brier'), drift=ref['drift_baseline'] | dict(thresholds=None)), indent=2))
+    elif args.command == 'train-challenger':
+        from . import account_score, model_health, services
+        from .playbook_research import load_hits
+        dev = account_score.training_set(load_hits(args.output))
+        info = model_health.train_challenger(dev, model_health.live_training_rows(services._rules_db()), args.min_new)
+        print(json.dumps(info, indent=2))
     elif args.command == 'research-ml':
         from .meta import run
         result = run(args.output)
