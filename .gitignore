@@ -26,3 +26,6 @@ scripts/fix*.cjs
 frontend/tsconfig.tsbuildinfo
 .tools/
 .venv-crawl/
+
+# Office lock files
+~$*
