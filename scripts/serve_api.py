@@ -1,6 +1,6 @@
 """Warm trusted native model libraries before starting Windows' async HTTP loop."""
-from quantpilot import services
-from quantpilot.process import process_started
+from quantpilot.api import services
+from quantpilot.monitoring.process import process_started
 import uvicorn
 import json
 import os
@@ -17,4 +17,4 @@ if path.exists():
     # Build the immutable feature snapshot before accepting concurrent browser reads.
     # This avoids a cold history calculation competing with chart/API requests.
     services.feature_data()
-uvicorn.run('quantpilot.api:app',host='127.0.0.1',port=8000)
+uvicorn.run('quantpilot.api.app:app',host='127.0.0.1',port=8000)

@@ -1,7 +1,7 @@
 """Back up actual configured PostgreSQL data and verify it in isolated restore DBs."""
 import json
 from pathlib import Path
-from quantpilot.recovery import backup,restore_check,sha256
+from quantpilot.storage.recovery import backup,restore_check,sha256
 
 
 def main():

@@ -1,6 +1,6 @@
-import MacroCalendar from '../MacroCalendar';
-import NewsPanel from '../NewsPanel';
-import {PageHead} from '../ui';
+import MacroCalendar from '../components/MacroCalendar';
+import NewsPanel from '../components/NewsPanel';
+import {PageHead} from '../components/ui';
 
 export default function News(){
   return <>

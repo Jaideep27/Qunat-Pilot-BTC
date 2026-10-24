@@ -1,7 +1,7 @@
 import {Database} from 'lucide-react';
-import type {Coverage} from '../api';
-import PaperOperations from '../PaperOperations';
-import {Card,Collapsible,Loading,PageHead,Pill,Term,Updated,ago,num,stamp,until,useResource} from '../ui';
+import type {Coverage} from '../lib/api';
+import PaperOperations from '../components/PaperOperations';
+import {Card,Collapsible,Loading,PageHead,Pill,Term,Updated,ago,num,stamp,until,useResource} from '../components/ui';
 
 type Ready={ready:boolean;checked_at:string;checks:Record<string,{ok:boolean;status:string;age_seconds?:number}>;
   collector:{status:string;age_seconds:number|null;poll_interval_seconds:number};worker:{status:string;next_scheduled_at:string}};

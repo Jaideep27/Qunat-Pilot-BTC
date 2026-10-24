@@ -9,7 +9,7 @@ import time
 from fastapi.testclient import TestClient
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from quantpilot.api import app
+from quantpilot.api.app import app
 from quantpilot.config import settings
 
 ROUTES = {
@@ -50,7 +50,7 @@ def main():
              "QUANTPILOT_ARTIFACT_DIR":str(settings.artifact_dir.resolve()),
              "QUANTPILOT_DATABASE_URL":settings.database_url,
              "QUANTPILOT_MARKET_DATABASE_URL":settings.market_database_url or ''}
-        args=["-m","quantpilot.mcp_server"]
+        args=["-m","quantpilot.api.mcp_server"]
         if os.environ.get("QUANTPILOT_SMOKE_DEBUG"):
             args=["-c","import faulthandler; faulthandler.dump_traceback_later(20, repeat=True); from quantpilot.mcp_server import main; main()"]
         params=StdioServerParameters(command=sys.executable,args=args,env=env)

@@ -1,14 +1,14 @@
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,lazy,Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Activity,ChevronsLeft,ChevronsRight,Command,CornerDownLeft,Search} from 'lucide-react';
-import {routes,fromHash,type Route} from './routes';
-import {preview,type Candle} from './api';
-import {subscribeKlines} from './liveFeed';
-import {Boundary,Loading,money,signedPct,useFlash,useResource} from './ui';
-import './styles.css';
+import {routes,fromHash,type Route} from './app/routes';
+import {preview,type Candle} from './lib/api';
+import {subscribeKlines} from './lib/liveFeed';
+import {Boundary,Loading,money,signedPct,useFlash,useResource} from './components/ui';
+import './styles/styles.css';
 
 const Overview=lazy(()=>import('./pages/Overview'));
-const TradingWorkspace=lazy(()=>import('./TradingWorkspace'));
+const TradingWorkspace=lazy(()=>import('./components/TradingWorkspace'));
 const Ask=lazy(()=>import('./pages/Ask'));
 const Research=lazy(()=>import('./pages/Research'));
 const Paper=lazy(()=>import('./pages/Paper'));
@@ -117,7 +117,7 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
 
 // Fetch the other pages' code once the first page is idle, so switching tabs is instant.
 const prefetch=()=>[()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/Paper'),()=>import('./pages/Rules'),()=>import('./pages/News'),
-  ()=>import('./pages/System'),()=>import('./TradingWorkspace')].forEach(load=>void load().catch(()=>{}));
+  ()=>import('./pages/System'),()=>import('./components/TradingWorkspace')].forEach(load=>void load().catch(()=>{}));
 
 function App(){
   const [route,setRoute]=useState<Route>(fromHash);

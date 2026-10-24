@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from quantpilot import analogs
+from quantpilot.outlook import analogs
 
 
 def panel(n=24*400, seed=1):
@@ -15,7 +15,7 @@ def panel(n=24*400, seed=1):
 
 
 def ctx(report=None, **kw):
-    from quantpilot import outlook
+    from quantpilot.outlook import engine as outlook
     p = panel(n=24*200)
     p['volume'] = 100.0
     for col in ('taker_buy_share_24h', 'volume_ratio_24h', 'top_position_ratio', 'premium', 'fear_greed',

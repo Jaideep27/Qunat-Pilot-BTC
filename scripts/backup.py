@@ -11,7 +11,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'src'))
 
-from quantpilot import ops  # noqa: E402
+from quantpilot.monitoring import ops  # noqa: E402
 from quantpilot.config import settings  # noqa: E402
 
 PG_BIN = Path('C:/Program Files/PostgreSQL/18/bin')

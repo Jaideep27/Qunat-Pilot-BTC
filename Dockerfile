@@ -11,5 +11,5 @@ COPY migrations ./migrations
 RUN mkdir -p data artifacts && useradd -m pilot && chown -R pilot:pilot /app
 USER pilot
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn quantpilot.api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn quantpilot.api.app:app --host 0.0.0.0 --port ${PORT:-8000}"]
 

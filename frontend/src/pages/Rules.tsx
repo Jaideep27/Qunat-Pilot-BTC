@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Card,Collapsible,Empty,Loading,PageHead,Pill,Segmented,Stat,Updated,money,num,pct,signedPct,stamp,useResource} from '../ui';
+import {Card,Collapsible,Empty,Loading,PageHead,Pill,Segmented,Stat,Updated,money,num,pct,signedPct,stamp,useResource} from '../components/ui';
 import AccountsSection from './Accounts';
 
 type Playbook={id:string;name:string;family:string;side:string;source:string[];thesis:string;priority:number;shadow_only:boolean;

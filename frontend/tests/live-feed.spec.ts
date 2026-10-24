@@ -1,5 +1,5 @@
 import {test,expect,type Page,type WebSocketRoute} from '@playwright/test';
-import {parseKline} from '../src/liveFeed';
+import {parseKline} from '../src/lib/liveFeed';
 
 const seconds:Record<string,number>={'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400,'1w':604800};
 function message(timeframe='5m',close=101,eventAt=Date.now(),closed=false){

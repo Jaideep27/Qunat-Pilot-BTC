@@ -1,5 +1,5 @@
-import Chat from '../Chat';
-import {PageHead} from '../ui';
+import Chat from '../components/Chat';
+import {PageHead} from '../components/ui';
 
 export default function Ask({seed}:{seed:{text:string;id:number}|null}){
   return <>

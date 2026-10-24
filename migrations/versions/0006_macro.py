@@ -1,6 +1,6 @@
 """Official macro release calendar and first-release values."""
 from alembic import op
-from quantpilot.macro import MacroEvent
+from quantpilot.data.macro import MacroEvent
 
 revision = '0006_macro'
 down_revision = '0005_news'

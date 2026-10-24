@@ -1,7 +1,10 @@
 from alembic import context
 from quantpilot.config import settings
-from quantpilot.store import Base, database
-from quantpilot import market_store, snapshots, operations, news  # register all migration metadata
+from quantpilot.storage.database import Base, database
+from quantpilot.storage import market as market_store  # register all migration metadata
+from quantpilot.storage import snapshots
+from quantpilot.monitoring import operations
+from quantpilot.ai import news
 
 target_metadata = Base.metadata
 if context.is_offline_mode():

@@ -4,7 +4,7 @@ Revision ID: 0003_market_history
 Revises: 0002
 """
 from alembic import op
-from quantpilot.market_store import MarketCandle, MarketObservation, MarketFeed
+from quantpilot.storage.market import MarketCandle, MarketObservation, MarketFeed
 revision='0003_market_history'
 down_revision='0002'
 branch_labels=None

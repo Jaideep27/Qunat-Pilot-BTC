@@ -1,6 +1,6 @@
 """Persistent worker-run monitoring, separate from accounting events."""
 from alembic import op
-from quantpilot.operations import WorkerRun
+from quantpilot.monitoring.operations import WorkerRun
 
 revision='0004_worker_runs'
 down_revision='0003_market_history'

@@ -1,10 +1,10 @@
 import {useState} from 'react';
 import {ArrowUpRight,CalendarClock,Newspaper,ShieldCheck,Sparkles} from 'lucide-react';
-import type {Candle} from '../api';
-import MarketChart from '../MarketChart';
+import type {Candle} from '../lib/api';
+import MarketChart from '../components/MarketChart';
 import {AccountsStrip} from './Accounts';
-import type {Route} from '../routes';
-import {Card,Empty,Loading,Meter,PageHead,Pill,Segmented,Stat,Term,Updated,ago,money,num,pct,signedPct,until,useNow,useResource} from '../ui';
+import type {Route} from '../app/routes';
+import {Card,Empty,Loading,Meter,PageHead,Pill,Segmented,Stat,Term,Updated,ago,money,num,pct,signedPct,until,useNow,useResource} from '../components/ui';
 
 type Forecast={horizon:string;cutoff:string;status:string;probability_up:number|null;base_rate:number;return_q10:number|null;
   return_q90:number|null;range_status?:string;drop5_risk:number;regime:string;volatility:{model?:string;value?:number;ewma:number}};

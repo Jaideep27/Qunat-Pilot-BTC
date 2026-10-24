@@ -12,9 +12,9 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.frozen import FrozenEstimator
 from sklearn.metrics import balanced_accuracy_score,brier_score_loss,roc_auc_score
 from quantpilot.config import settings
-from quantpilot.data import load_frames,dataset_hashes,utc
-from quantpilot.features import build_features,feature_groups
-from quantpilot.research import PURGE
+from quantpilot.data.archives import load_frames,dataset_hashes,utc
+from quantpilot.features.core import build_features,feature_groups
+from quantpilot.research.walkforward import PURGE
 
 
 def digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()

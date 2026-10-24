@@ -39,12 +39,12 @@ rl = [
 ]
 [project.scripts]
 quantpilot = "quantpilot.cli:main"
-quantpilot-mcp = "quantpilot.mcp_server:main"
+quantpilot-mcp = "quantpilot.api.mcp_server:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/quantpilot"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 [tool.ruff]
 line-length = 110
 

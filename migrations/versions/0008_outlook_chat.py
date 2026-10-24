@@ -1,7 +1,7 @@
 """Outlook answers and in-app chat."""
 from alembic import op
-from quantpilot.answers import OutlookAnswer
-from quantpilot.chat import ChatMessage, ChatThread
+from quantpilot.outlook.answers import OutlookAnswer
+from quantpilot.ai.chat import ChatMessage, ChatThread
 
 revision = '0008_outlook_chat'
 down_revision = '0007_shadow_forecasts'

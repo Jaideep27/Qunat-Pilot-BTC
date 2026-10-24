@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import httpx
 from fastapi.testclient import TestClient
-from quantpilot.api import app
+from quantpilot.api.app import app
 
 
 def main():

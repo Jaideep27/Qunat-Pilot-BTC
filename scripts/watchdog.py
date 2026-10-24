@@ -15,7 +15,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'src'))
 
-from quantpilot import ops  # noqa: E402
+from quantpilot.monitoring import ops  # noqa: E402
 from quantpilot.config import settings  # noqa: E402
 
 OPS = ROOT/'data'/'ops'
@@ -49,8 +49,8 @@ def probes(state, now):
         pass
     try:
         from sqlalchemy import select
-        from quantpilot.market_store import MarketFeed
-        from quantpilot.store import database
+        from quantpilot.storage.market import MarketFeed
+        from quantpilot.storage.database import database
         engine = database(settings.market_database_url)
         with engine.connect() as connection:
             feeds = dict(connection.execute(select(MarketFeed.id, MarketFeed.updated_at)

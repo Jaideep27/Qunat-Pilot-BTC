@@ -1,6 +1,6 @@
 import {useMemo,useState} from 'react';
-import {post} from '../api';
-import {Card,Collapsible,Empty,Loading,Meter,Pill,Segmented,money,num,pct,signedPct,stamp,useResource} from '../ui';
+import {post} from '../lib/api';
+import {Card,Collapsible,Empty,Loading,Meter,Pill,Segmented,money,num,pct,signedPct,stamp,useResource} from '../components/ui';
 
 type Position={side:string;quantity:number;entry:number;stop:number;target:number;liquidation:number|null;leverage:number|null;entry_time:string;playbook:string;score:number|null};
 type Last={time:string;hit_id:string;playbook:string;side:string;decision:string;score:number|null;cutoff:number;confidence:number|null;passed:number;total:number};

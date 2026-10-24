@@ -1,6 +1,6 @@
 """Versioned web-news observations and bounded reasoning jobs."""
 from alembic import op
-from quantpilot.news import NewsItem, NewsRun, NewsFeed
+from quantpilot.ai.news import NewsItem, NewsRun, NewsFeed
 
 revision = '0005_news'
 down_revision = '0004_worker_runs'

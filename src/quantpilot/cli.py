@@ -1,8 +1,8 @@
 import argparse
 import json
-from .config import settings
-from .data import acquire, audit_cached, manifest
-from .store import initialize, database
+from quantpilot.config import settings
+from quantpilot.data.archives import acquire, audit_cached, manifest
+from quantpilot.storage.database import initialize, database
 
 def main():
     parser = argparse.ArgumentParser(prog="quantpilot")
@@ -99,21 +99,21 @@ def main():
         print(json.dumps({k:v for k,v in r.items() if k != "archives"}, indent=2))
         if not r["release_ready"]: raise SystemExit(2)
     elif args.command == "repair-data":
-        from .repair import repair
+        from quantpilot.data.repair import repair
         result = repair(settings.data_dir, args.as_of)
         print(json.dumps(result, indent=2))
         if not result["release_ready"]: raise SystemExit(2)
     elif args.command == "train":
-        from .research import train
+        from quantpilot.research.walkforward import train
         result = train(settings.data_dir, settings.artifact_dir, args.as_of)
         print(json.dumps(result["metadata"], indent=2))
     elif args.command == "backtest":
-        from .replay import replay
+        from quantpilot.research.replay import replay
         result = replay(settings.data_dir, settings.artifact_dir, args.group)
         print(json.dumps({k:v for k,v in result["trading"].items() if k not in ("curve","fills")}, indent=2))
     elif args.command == "publish-research":
-        from . import services
-        from .snapshots import write
+        from quantpilot.api import services
+        from quantpilot.storage.snapshots import write
         initialize(database())
         if not services.coverage()["data"].get("release_ready"):
             raise ValueError("Cannot publish research without passing coverage")
@@ -122,63 +122,63 @@ def main():
         initialize(database())
         if settings.market_database_url:initialize(database(settings.market_database_url))
     elif args.command == 'import-market':
-        from .market_store import import_parquet
+        from quantpilot.storage.market import import_parquet
         initialize(database(settings.market_database_url))
         import_parquet(settings.data_dir,database(settings.market_database_url))
     elif args.command == 'backfill-history':
-        from .history import backfill
+        from quantpilot.data.history import backfill
         backfill(years=args.years,all_history=args.all_history)
     elif args.command == 'market-coverage':
-        from .market_store import window_coverage
+        from quantpilot.storage.market import window_coverage
         print(json.dumps(window_coverage(),indent=2))
     elif args.command == 'doctor':
-        from .diagnostics import doctor
+        from quantpilot.monitoring.diagnostics import doctor
         result=doctor()
         print(json.dumps(result,indent=2,default=str))
         if not result['ready']:raise SystemExit(2)
     elif args.command == 'collect-news':
-        from .news import run
+        from quantpilot.ai.news import run
         run(once=args.once, reasoning=args.reasoning)
     elif args.command == 'ask':
-        from . import services
+        from quantpilot.api import services
         initialize(database())
         result = services.ask(args.question, ai=not args.no_ai, source='cli')
         head = result['headline']
         print(json.dumps(dict(question=result['question'], headline=head, range=result['range'], ai=result['ai'],
                               warnings=result['warnings']), indent=2, default=str))
     elif args.command == 'outlook-refresh':
-        from .outlook import refresh_panel
+        from quantpilot.outlook.engine import refresh_panel
         print(json.dumps(refresh_panel(full=args.full), indent=2))
     elif args.command == 'validate-outlook':
-        from .outlook import validate_outlook
+        from quantpilot.outlook.engine import validate_outlook
         report = validate_outlook()
         touch = {k: v for k, v in report['touch'].items() if not k.startswith('calibration')}
         print(json.dumps({**{k: v for k, v in report.items() if k != 'touch'}, 'touch': touch}, indent=2, default=str))
     elif args.command == 'shadow-forecast':
-        from .forecaster import run_cycle
+        from quantpilot.research.forecaster import run_cycle
         initialize(database())
         print(json.dumps(run_cycle(), indent=2, default=str))
     elif args.command == 'macro-calendar':
-        from .macro import run as macro_run
+        from quantpilot.data.macro import run as macro_run
         result = macro_run(once=True)
         print(json.dumps(result, indent=2, default=str))
     elif args.command == 'event-study':
-        from .event_study import run as study_run
+        from quantpilot.research.event_study import run as study_run
         report = study_run(args.output, args.years)
         print(json.dumps(dict(hours=report['hours'], episodes=report['episodes'], controls=report['controls'],
                               start=report['start'], end=report['end']), indent=2))
     elif args.command == 'research-risk':
-        from .event_research import risk_experiment
+        from quantpilot.research.events import risk_experiment
         report = risk_experiment(args.output, folds=args.folds)
         print(json.dumps(report['summary'], indent=2, default=str))
     elif args.command == 'research-data':
-        from .research_data import build_panels, refresh
+        from quantpilot.data.panels import build_panels, refresh
         fetched = refresh()
         hourly, daily = build_panels()
         print(json.dumps(dict(fetched=fetched, hourly=dict(rows=len(hourly), first=str(hourly.index.min())),
                               daily=dict(rows=len(daily), first=str(daily.index.min()))), indent=2))
     elif args.command == 'research-strategies':
-        from .strategy_research import holdout, load_panels, output_dir, run
+        from quantpilot.research.strategies import holdout, load_panels, output_dir, run
         if args.holdout:
             report = json.loads((output_dir(args.output)/'report.json').read_text(encoding='utf-8'))
             print(json.dumps(holdout(report, load_panels(), args.output), indent=2, default=str))
@@ -186,64 +186,66 @@ def main():
             report = run(args.output)
             print(json.dumps(dict(passing=report['passing'], trials=report['trials']), indent=2))
     elif args.command == 'research-agent':
-        from .agent_research import research
+        from quantpilot.research.agent import research
         report = research(args.output)
         print(json.dumps({k: report['families'][k]['gate'] for k in report['families']}, indent=2, default=str))
     elif args.command == 'research-playbooks':
-        from .playbook_research import PRIORS, research
+        from quantpilot.research.playbooks import PRIORS, research
         report = research(args.output, priors=tuple(args.prior) if args.prior else PRIORS)
         print(json.dumps(dict(passing=report['passing'], trials=report['trials'], hits=report['hits'],
                               combined=report['combined']['account']), indent=2, default=str))
     elif args.command == 'research-accounts':
-        from .account_score import run
+        from quantpilot.accounts.score import run
         result = run(args.output)
         print(json.dumps({k: result[k] for k in ('training_setups', 'walk_forward_setups', 'model_hash', 'cutoffs', 'calibration', 'expectations')}, indent=2, default=str))
     elif args.command == 'model-reference':
-        from .model_health import run_reference
+        from quantpilot.monitoring.model_health import run_reference
         ref = run_reference(args.output)
         print(json.dumps(dict(model_hash=ref['model_hash'], rows=ref['rows'], critical=len(ref['critical']),
                               blocked_share=ref['blocked_share'], brier=ref.get('brier'), drift=ref['drift_baseline'] | dict(thresholds=None)), indent=2))
     elif args.command == 'train-challenger':
-        from . import account_score, model_health, services
-        from .playbook_research import load_hits
+        from quantpilot.accounts import score as account_score
+        from quantpilot.monitoring import model_health
+        from quantpilot.api import services
+        from quantpilot.research.playbooks import load_hits
         dev = account_score.training_set(load_hits(args.output))
         info = model_health.train_challenger(dev, model_health.live_training_rows(services._rules_db()), args.min_new)
         print(json.dumps(info, indent=2))
     elif args.command == 'research-ml':
-        from .meta import run
+        from quantpilot.rules.meta import run
         result = run(args.output)
         print(json.dumps(dict(live=result['live'], playbooks={k: dict(filtered=v['filtered'], unfiltered=v['unfiltered'],
                                                                       difference=v['difference'], live=v['live'])
                                                            for k, v in result['playbooks'].items()}), indent=2, default=str))
     elif args.command == 'research-learner':
-        from .learner import run
+        from quantpilot.rules.learner import run
         result = run(args.output)
         print(json.dumps({k: result[k] for k in ('live', 'learner_trades', 'learner_mean_r', 'always_take_mean_r',
                                                  'difference', 'actions') if k in result}, indent=2, default=str))
     elif args.command == 'research-manage':
-        from .rl_manage import run
+        from quantpilot.rules.rl_manage import run
         result = run(args.output, timesteps=args.timesteps)
         print(json.dumps({k: result[k] for k in ('train', 'test', 'agents', 'policy', 'summary')}, indent=2, default=str))
     elif args.command == 'rule-history':
-        from .setup_history import write
+        from quantpilot.research.setup_history import write
         print(write(args.output))
     elif args.command == 'rulebook-xlsx':
-        from .rulebook_export import write
-        from .rules import load
+        from quantpilot.rules.export import write
+        from quantpilot.rules.rulebook import load
         book = load()
         print(write(args.output or f"rulebook/QuantPilot-Rulebook-v{book['version']}.xlsx", book))
     elif args.command == 'research-events':
-        from .event_research import train_experiment
+        from quantpilot.research.events import train_experiment
         report = train_experiment(args.output, folds=args.folds)
         print(json.dumps(report['summary'], indent=2, default=str))
     elif args.command in ('analyze-news', 'news-status'):
-        from .news import analyze, snapshot, codex_status, claude_status
+        from quantpilot.ai.news import analyze, snapshot, codex_status, claude_status
         initialize(database())
         result = ({p: analyze(provider=p) for p in settings.news_reasoners} if args.command == 'analyze-news'
                   else {**snapshot(), 'codex': codex_status(), 'claude': claude_status()})
         print(json.dumps(result, indent=2, default=str))
     elif args.command in ('backup-db','restore-check'):
-        from .recovery import backup,restore_check,RecoveryError
+        from quantpilot.storage.recovery import backup,restore_check,RecoveryError
         try:
             result=backup(args.database,args.output) if args.command=='backup-db' else restore_check(args.manifest)
         except Exception as exc:
@@ -252,15 +254,15 @@ def main():
             raise SystemExit(2) from None
         print(json.dumps(result,indent=2,default=str))
     elif args.command == 'status':
-        from . import services
+        from quantpilot.api import services
         result=services.operations(args.limit)
         print(json.dumps(result,indent=2,default=str))
         if not result['data']['ready']:raise SystemExit(2)
     elif args.command == 'collect-live':
-        from .collector import run
+        from quantpilot.data.collector import run
         run(once=args.once)
     else:
-        from .worker import run_worker, control
+        from quantpilot.simulation.worker import run_worker, control
         r = run_worker() if args.command == "worker" else control(args.command == "pause")
         print(json.dumps(dict(equity=r["equity"], position=r["position"], paused=r["paused"],
                               last_worker=r["last_worker"]), indent=2))

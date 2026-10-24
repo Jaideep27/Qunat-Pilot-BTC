@@ -1,6 +1,6 @@
 import {ShieldCheck} from 'lucide-react';
-import type {Decision,Portfolio} from '../api';
-import {Card,Empty,Loading,PageHead,Pill,Stat,Term,Updated,money,num,pct,stamp,useResource} from '../ui';
+import type {Decision,Portfolio} from '../lib/api';
+import {Card,Empty,Loading,PageHead,Pill,Stat,Term,Updated,money,num,pct,stamp,useResource} from '../components/ui';
 
 const reasonText:Record<string,string>={WEAK_FORECAST:'Forecast confidence below the 60% entry threshold',
   INSUFFICIENT_EDGE:'Expected edge does not cover fees, slippage and funding',MODEL_RELEASE_BLOCKED:'Historical coverage and frozen model artifacts are required',

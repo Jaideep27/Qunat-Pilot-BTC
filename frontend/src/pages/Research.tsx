@@ -1,10 +1,10 @@
 import {lazy,Suspense,useState} from 'react';
-import type {Research as ResearchData} from '../api';
-import ShadowForecasts from '../ShadowForecasts';
-import StrategyResearch from '../StrategyResearch';
-import {Card,Collapsible,Empty,Loading,PageHead,Term,num,pct,useResource} from '../ui';
+import type {Research as ResearchData} from '../lib/api';
+import ShadowForecasts from '../components/ShadowForecasts';
+import StrategyResearch from '../components/StrategyResearch';
+import {Card,Collapsible,Empty,Loading,PageHead,Term,num,pct,useResource} from '../components/ui';
 
-const ResearchPlots=lazy(()=>import('../ResearchPlots'));
+const ResearchPlots=lazy(()=>import('../components/ResearchPlots'));
 
 function Release(){
   const backtests=useResource<ResearchData>('backtests',600000);

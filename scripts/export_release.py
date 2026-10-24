@@ -3,7 +3,7 @@ import json
 import shutil
 from pathlib import Path
 from quantpilot.config import settings
-from quantpilot.data import dataset_hashes
+from quantpilot.data.archives import dataset_hashes
 
 coverage = json.loads((settings.data_dir/"coverage.json").read_text(encoding="utf-8-sig"))
 if not coverage.get("release_ready") or coverage["dataset_hashes"] != dataset_hashes(settings.data_dir):

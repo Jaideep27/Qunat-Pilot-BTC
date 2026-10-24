@@ -5,15 +5,17 @@ import os
 import json
 import pandas as pd
 from filelock import FileLock, Timeout
-from quantpilot.collector import run as collect
-from quantpilot.history import backfill
-from quantpilot.worker import run_worker
+from quantpilot.data.collector import run as collect
+from quantpilot.data.history import backfill
+from quantpilot.simulation.worker import run_worker
 from quantpilot.config import settings
-from quantpilot.store import database, initialize
-from quantpilot.market_store import feed_status
-from quantpilot.operations import next_paper_run
-from quantpilot import forecaster, macro, news
-from quantpilot.process import process_started
+from quantpilot.storage.database import database, initialize
+from quantpilot.storage.market import feed_status
+from quantpilot.monitoring.operations import next_paper_run
+from quantpilot.research import forecaster
+from quantpilot.data import macro
+from quantpilot.ai import news
+from quantpilot.monitoring.process import process_started
 
 
 def repeating_history():
@@ -35,7 +37,7 @@ def news_feeds():
 def news_layer():
     # Rule engine news layer: article text (isolated Crawl4AI) and impact classification every 15 minutes.
     # Its own thread: news.run() above never returns.
-    from quantpilot import news_events
+    from quantpilot.ai import news_events
     while True:
         try:print(json.dumps(dict(news_events=news_events.cycle())),flush=True)
         except Exception as exc:print(json.dumps(dict(news_events='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
@@ -45,7 +47,8 @@ def news_layer():
 def account_reviews():
     # Four paper accounts (A8): Claude explanations of diagnosed trades and the review of every account that has
     # paused after its round, every 5 minutes. Separate from the minute cycle so a slow Claude call never delays trading.
-    from quantpilot import account_review, model_health
+    from quantpilot.accounts import review as account_review
+    from quantpilot.monitoring import model_health
     engine=database(settings.market_database_url)
     while True:
         try:print(json.dumps(dict(account_reviews=account_review.run_pending(engine,pd.Timestamp.now(tz='UTC')))),flush=True)
@@ -80,9 +83,10 @@ def shadow_forecasts():
 
 def outlook_cycle():
     # Hourly panel refresh + scheduled questions; scoring every 15 minutes.
-    from quantpilot import answers, services
-    from quantpilot.event_study import load_market
-    from quantpilot.outlook import refresh_panel
+    from quantpilot.outlook import answers
+    from quantpilot.api import services
+    from quantpilot.research.event_study import load_market
+    from quantpilot.outlook.engine import refresh_panel
     engine, last_refresh = database(), None
     while True:
         try:
@@ -101,7 +105,7 @@ def outlook_cycle():
 
 def forward_research():
     # Liquidations (stream) and order-book depth (1/min) exist only if recorded as they happen.
-    from quantpilot import forward_data
+    from quantpilot.data import forward as forward_data
     while True:
         try:forward_data.run()
         except Exception as exc:print(json.dumps(dict(forward_research='blocked',error_type=type(exc).__name__)),flush=True)
@@ -111,7 +115,9 @@ def forward_research():
 def rule_engine():
     # Rule engine: one cycle a minute (5 s past): the reference futures-v1 paper account, then the four A8 accounts.
     import httpx
-    from quantpilot import rule_live, layers, rl_manage
+    from quantpilot.rules import live as rule_live
+    from quantpilot.rules import layers
+    from quantpilot.rules import rl_manage
     engine=database(settings.market_database_url)
     with httpx.Client(timeout=15) as client:
         while True:

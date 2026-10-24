@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from quantpilot.config import settings
-from quantpilot.store import database, initialize
+from quantpilot.storage.database import database, initialize
 
 @pytest.fixture
 def account(tmp_path, monkeypatch):

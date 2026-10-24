@@ -1,6 +1,6 @@
 """Shadow research forecasts and their forward-scored outcomes."""
 from alembic import op
-from quantpilot.forecaster import ShadowForecast
+from quantpilot.research.forecaster import ShadowForecast
 
 revision = '0007_shadow_forecasts'
 down_revision = '0006_macro'
