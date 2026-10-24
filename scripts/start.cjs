@@ -22,14 +22,14 @@ function run(command,args){const result=spawnSync(command,args,{cwd:root,windows
   if(options.some(option=>!['--check','--restart-data','--restart-services'].includes(option)))throw new Error('Unknown option. Use --check, --restart-data or --restart-services.');
   if(options.includes('--check')){
     if(options.length!==1)throw new Error('--check cannot be combined with restart options.');
-    const status=await require('./service_readiness.cjs').check();
+    const status=await require('./ops/service_readiness.cjs').check();
     console.log(JSON.stringify(status,null,2));
     if(!status.ready)process.exitCode=2;
     return;
   }
   if(!fs.existsSync(python))throw new Error('Install dependencies with uv sync --locked --extra dev --extra rl first.');
-  if(process.argv.includes('--restart-data')||process.argv.includes('--restart-services'))run(python,['scripts/stop_data_supervisor.py']);
-  if(process.argv.includes('--restart-services'))run(python,['scripts/stop_data_supervisor.py','--api']);
+  if(process.argv.includes('--restart-data')||process.argv.includes('--restart-services'))run(python,['scripts/ops/stop_data_supervisor.py']);
+  if(process.argv.includes('--restart-services'))run(python,['scripts/ops/stop_data_supervisor.py','--api']);
   const pg='C:/Program Files/PostgreSQL/18/bin';
   if(!await portOpen(55432)){
     if(!fs.existsSync(path.join(root,'data/postgres-local/cluster/PG_VERSION'))){
@@ -42,12 +42,12 @@ function run(command,args){const result=spawnSync(command,args,{cwd:root,windows
     for(let attempt=0;attempt<20&&!await portOpen(55432);attempt++)await new Promise(resolve=>setTimeout(resolve,500));
     if(!await portOpen(55432))throw new Error('PostgreSQL did not start; inspect service logs.');
   }
-  if(!fs.existsSync('.env'))run(python,['scripts/configure_postgres.py']);
+  if(!fs.existsSync('.env'))run(python,['scripts/ops/configure_postgres.py']);
   run(python,['-m','quantpilot.cli','init-db']);
-  if(!await portOpen(8000))background('api',python,['scripts/serve_api.py']);
+  if(!await portOpen(8000))background('api',python,['scripts/ops/serve_api.py']);
   if(!await portOpen(5173))background('dashboard',process.env.ComSpec||'cmd.exe',['/d','/s','/c','npm --prefix frontend run dev']);
   // The supervisor owns its lock, so running this launcher twice does not duplicate jobs.
-  background('data-supervisor',python,['scripts/data_supervisor.py']);
+  background('data-supervisor',python,['scripts/ops/data_supervisor.py']);
   let ready=false;
   for(let attempt=0;attempt<90;attempt++){
     try{const response=await fetch('http://127.0.0.1:8000/api/v1/health',{signal:AbortSignal.timeout(3000)});
@@ -58,7 +58,7 @@ function run(command,args){const result=spawnSync(command,args,{cwd:root,windows
   console.log('Workspace: http://localhost:5173/#chart');
   console.log('API: http://127.0.0.1:8000/docs');
   console.log('Continuous collection and resumable history run in the background. Actual status is shown in the workspace.');
-  const status=await require('./service_readiness.cjs').check();
+  const status=await require('./ops/service_readiness.cjs').check();
   console.log(status.message);
   if(status.failed_checks?.length)console.log('Readiness gates: '+status.failed_checks.map(check=>check.name+' ('+check.status+')').join(', '));
   if(!status.ready)process.exitCode=2;

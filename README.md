@@ -79,7 +79,7 @@ uv run quantpilot audit --as-of 2026-10-18 --offline --quarantine-positioning
 uv run quantpilot train --as-of 2026-10-18
 uv run quantpilot backtest --group full
 uv run quantpilot publish-research
-uv run python scripts/export_release.py
+uv run python scripts/release/export_release.py
 ```
 
 Audit/recovery exit nonzero when blocked. Structural/provenance errors and other-family gaps still block the positioning policy. Training rechecks dataset hashes, fits preprocessing/selection on training data, calibrates separately, then freezes model/thresholds before holdout. Never remove mandatory families or backfill historical features with current values.
@@ -95,12 +95,12 @@ cd frontend
 npx playwright install chromium
 npm test
 cd ..
-uv run python scripts/smoke_release.py
+uv run python scripts/release/smoke_release.py
 ```
 
 The real-data smoke script requires audited local data and a frozen model. The release browser case requires FastAPI on port 8000 and `QUANTPILOT_RELEASE_SMOKE=1`. Set `QUANTPILOT_BROWSER_CHANNEL=chrome` to use installed Chrome. The suite also covers stream chronology/reconnect, on-demand data requests and worker-monitor failure/retry states. The trained-release and PostgreSQL workspace cases require the local API.
 
-`node scripts/verify.cjs` runs all verification stages; `--frontend` runs frontend stages only. Scoped evidence is saved under `.verification/`. [Current verification](docs/evidence/local-readiness-verification.json) includes source and evidence hashes; [frozen research evidence](docs/evidence/release-verification.json) preserves the original experiment. Python requirements have exact versions and hashes; uv/npm locks are checked in. The production build passes with a 439 kB entry chunk; lazy chunks stay below the 500 kB advisory threshold.
+`node scripts/verify/verify.cjs` runs all verification stages; `--frontend` runs frontend stages only. Scoped evidence is saved under `.verification/`. [Current verification](docs/evidence/local-readiness-verification.json) includes source and evidence hashes; [frozen research evidence](docs/evidence/release-verification.json) preserves the original experiment. Python requirements have exact versions and hashes; uv/npm locks are checked in. The production build passes with a 439 kB entry chunk; lazy chunks stay below the 500 kB advisory threshold.
 
 ## Architecture and interfaces
 

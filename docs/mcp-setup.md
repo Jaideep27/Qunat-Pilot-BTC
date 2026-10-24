@@ -44,7 +44,7 @@ On Linux/macOS, use the absolute `.venv/bin/python` executable and matching path
 
 Every response includes source, observation/served timestamps, freshness, and configuration/model version where applicable. Missing observations or unverified models return explicit blocked/no-trade results. Inputs use Pydantic bounds and enum values; there is no arbitrary URL, SQL or filesystem argument.
 
-Verify discovery and calls through the real official SDK client with `uv run pytest tests/test_services_mcp.py -q`. This passing test starts the stdio process, discovers all sixteen tools, checks their output schemas and structured service parity, and rejects invalid inputs. For a trained local release, run `uv run python scripts/smoke_release.py` to compare the nine release-era tool results with FastAPI responses and record actual latency; it requires those nine tools and accepts the tools added later.
+Verify discovery and calls through the real official SDK client with `uv run pytest tests/test_services_mcp.py -q`. This passing test starts the stdio process, discovers all sixteen tools, checks their output schemas and structured service parity, and rejects invalid inputs. For a trained local release, run `uv run python scripts/release/smoke_release.py` to compare the nine release-era tool results with FastAPI responses and record actual latency; it requires those nine tools and accepts the tools added later.
 
 Example assistant workflow: call `check_data_coverage`, then `get_market_snapshot`, `get_prediction` and `explain_decision`. Treat stale data and blocked gates as evidence to withhold a trade claim.
 

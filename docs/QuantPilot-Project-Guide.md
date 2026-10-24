@@ -36,7 +36,7 @@ Version 2026-10-21 · BTCUSDT perpetual futures research and paper trading · Ne
 
 | Step | What happens | Where |
 |---|---|---|
-| 1. Collect | Every 5 seconds the collector stores new 5-minute candles. History is backfilled to 5 years. Funding, open interest, long/short ratios, mark/index prices, Fear & Greed, macro releases and news are collected on their own schedules. Liquidations and order-book snapshots are recorded live. | `scripts/data_supervisor.py`, `collector.py`, `history.py`, `news.py`, `macro.py`, `forward_data.py` |
+| 1. Collect | Every 5 seconds the collector stores new 5-minute candles. History is backfilled to 5 years. Funding, open interest, long/short ratios, mark/index prices, Fear & Greed, macro releases and news are collected on their own schedules. Liquidations and order-book snapshots are recorded live. | `scripts/ops/data_supervisor.py`, `collector.py`, `history.py`, `news.py`, `macro.py`, `forward_data.py` |
 | 2. Store | PostgreSQL holds market data. SQLite holds the paper ledger, forecasts, answers and chat. | `market_store.py`, `store.py` |
 | 3. Compute features | 106 indicators are calculated from completed 5-minute bars, using only information known at that moment. | `features.py`, `context.py` |
 | 4. Decide (paper) | Every 15 minutes the frozen XGBoost model predicts the 60-minute direction; the risk gates decide trade or no trade. | `worker.py`, `engine.py` |

@@ -1,6 +1,6 @@
 // Observe actual PostgreSQL receipt times through the local API. No provider requests.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-process.chdir(path.resolve(__dirname,'..'));
+process.chdir(path.resolve(__dirname,'../..'));
 const median=values=>{const sorted=[...values].sort((a,b)=>a-b),middle=Math.floor(sorted.length/2);return sorted.length%2?sorted[middle]:(sorted[middle-1]+sorted[middle])/2};
 (async()=>{
   const report={checked_at:new Date().toISOString(),market:'BTCUSDT',

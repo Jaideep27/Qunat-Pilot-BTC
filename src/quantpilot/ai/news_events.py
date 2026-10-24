@@ -27,7 +27,7 @@ from quantpilot.storage.database import Base, database
 
 ROOT = Path(__file__).resolve().parents[3]
 CRAWLER = ROOT/'.venv-crawl'/'Scripts'/'python.exe'
-SCRIPT = ROOT/'scripts'/'crawl_articles.py'
+SCRIPT = ROOT/'scripts'/'ops'/'crawl_articles.py'
 MARKER = 'QP-JSON:'
 WINDOW = pd.Timedelta(hours=6)
 VETO_CATEGORIES = ('hack', 'exchange', 'regulation')

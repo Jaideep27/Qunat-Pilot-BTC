@@ -56,7 +56,7 @@ npm --prefix frontend run build
 # Run API :8000, then enable the real release browser case:
 $env:QUANTPILOT_RELEASE_SMOKE='1'
 npm --prefix frontend test
-uv run python scripts/smoke_release.py
+uv run python scripts/release/smoke_release.py
 uv run quantpilot backtest --group full
 ```
 

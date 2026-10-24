@@ -6,7 +6,7 @@ Built 2026-10-23. Design: `docs/superpowers/specs/2026-10-23-ops-safety-design.m
 Two Windows Task Scheduler tasks run under the folder `\QuantPilot\`, as the owner, while the owner is logged on. They use `pythonw.exe`, so no window appears.
 
 ### QuantPilot Watchdog
-Runs every 5 minutes and at logon (`scripts/watchdog.py`).
+Runs every 5 minutes and at logon (`scripts/ops/watchdog.py`).
 
 **What it checks:**
 - the API (`/api/v1/ready`);
@@ -23,7 +23,7 @@ Runs every 5 minutes and at logon (`scripts/watchdog.py`).
 - It emails when a problem starts, every 6 hours while the problem lasts, and when it is resolved.
 
 ### QuantPilot Backup
-Runs daily at 02:30 (`scripts/backup.py`). If the laptop was asleep, it runs as soon as possible afterwards.
+Runs daily at 02:30 (`scripts/ops/backup.py`). If the laptop was asleep, it runs as soon as possible afterwards.
 - It runs `pg_dump` of the database to `data/backups/quantpilot-pg-YYYYMMDD-HHMM.dump`, about 90 MB.
 - Each dump is checked with `pg_restore --list` before it counts.
 - 7 backups are kept on the laptop, and the latest 2 are copied to `OneDrive\QuantPilot-backups`.
@@ -48,7 +48,7 @@ QUANTPILOT_ALERT_APP_PASSWORD=abcd efgh ijkl mnop
 The app password is created at myaccount.google.com → Security → 2-Step Verification → App passwords. It only allows sending mail, and you can revoke it there at any time. Without these lines, alerts go only to `data/ops/alerts.log`.
 
 ## Restore a backup
-Stop the services first: `.venv/Scripts/python.exe scripts/stop_data_supervisor.py` and `... --api`. Then, from `C:\Program Files\PostgreSQL\18\bin`:
+Stop the services first: `.venv/Scripts/python.exe scripts/ops/stop_data_supervisor.py` and `... --api`. Then, from `C:\Program Files\PostgreSQL\18\bin`:
 ```
 dropdb   -h 127.0.0.1 -p 55432 -U <user> <database>
 createdb -h 127.0.0.1 -p 55432 -U <user> <database>
@@ -59,5 +59,5 @@ The user and database come from `QUANTPILOT_MARKET_DATABASE_URL` in `.env`; set 
 Tested on 2026-10-23: a restore into a scratch database gave the same decision, setup and candle counts as the live database.
 
 ## Turn it off or on
-- Remove the tasks: `powershell -File scripts/install_ops_tasks.ps1 -Remove`
-- Install or refresh them: `powershell -File scripts/install_ops_tasks.ps1`
+- Remove the tasks: `powershell -File scripts/ops/install_ops_tasks.ps1 -Remove`
+- Install or refresh them: `powershell -File scripts/ops/install_ops_tasks.ps1`

@@ -39,7 +39,7 @@ Reproduce the audit against trusted frozen local artifacts:
 
 ```powershell
 uv run pytest tests/test_research.py tests/test_features.py -q --junitxml=.verification/training-format-pytest.xml
-uv run python scripts/verify_training.py
+uv run python scripts/verify/verify_training.py
 ```
 
 See the [model card](model-card.md), [evaluation report](evaluation-report.md) and [coverage report](coverage-report.md).

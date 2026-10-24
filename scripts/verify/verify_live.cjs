@@ -1,6 +1,6 @@
 // Actual exchange/browser/PostgreSQL verification. No fixture prices are written.
 const fs=require('node:fs'),path=require('node:path');
-process.chdir(path.resolve(__dirname,'..'));
+process.chdir(path.resolve(__dirname,'../..'));
 const {chromium}=require(path.resolve('frontend/node_modules/@playwright/test'));
 (async()=>{
   const browser=await chromium.launch({channel:process.env.QUANTPILOT_BROWSER_CHANNEL||'chrome',headless:true});

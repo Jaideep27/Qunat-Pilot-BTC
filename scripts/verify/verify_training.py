@@ -110,7 +110,7 @@ def main():
             'Current forecast is direction classification; no separate price-level or multi-horizon model is trained',
             'Modest holdout performance and zero holdout trades do not establish profitability'],
         dataset_sha256=metadata['dataset_hashes'],model_sha256=digest(artifacts/'released.joblib'),
-        source_sha256={path:digest(path) for path in ('src/quantpilot/research.py','src/quantpilot/features.py','scripts/verify_training.py')})
+        source_sha256={path:digest(path) for path in ('src/quantpilot/research/walkforward.py','src/quantpilot/features/core.py','scripts/verify/verify_training.py')})
     Path('docs/evidence/training-format-verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(json.dumps({key:report[key] for key in ('status','model_version','split','selected_by_family','holdout_metrics','focused_tests_passed')},indent=2))
 

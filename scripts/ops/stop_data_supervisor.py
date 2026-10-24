@@ -8,7 +8,7 @@ import sys
 
 
 def main():
-    root=Path(__file__).resolve().parent.parent
+    root=Path(__file__).resolve().parents[2]
     service='api' if '--api' in sys.argv else 'data-supervisor'
     record=root/'data'/f'{service}-runtime.json'
     if not record.exists():return

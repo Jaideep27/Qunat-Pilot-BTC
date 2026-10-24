@@ -3,7 +3,7 @@ from pathlib import Path
 from urllib.parse import quote
 import psycopg
 
-root=Path(__file__).resolve().parents[1]
+root=Path(__file__).resolve().parents[2]
 password=(root/'data/postgres-local/bootstrap-password').read_text(encoding='utf-8')
 with psycopg.connect(host='127.0.0.1',port=55432,dbname='postgres',user='quantpilot',password=password,autocommit=True) as connection:
     exists=connection.execute('SELECT 1 FROM pg_database WHERE datname=%s',('quantpilot',)).fetchone()

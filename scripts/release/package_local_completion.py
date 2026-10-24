@@ -42,16 +42,16 @@ def main():
     assert len(recording['scenes'])==len(recording['captures'])==6
     assert sum(scene['seconds'] for scene in recording['scenes'])==120
     for capture in recording['captures']:assert digest('docs/walkthrough/'+capture['file'])==capture['sha256']
-    check=subprocess.run(['node','-e',"require('./scripts/service_readiness.cjs').check().then(value=>process.stdout.write(JSON.stringify(value)))"],
+    check=subprocess.run(['node','-e',"require('./scripts/ops/service_readiness.cjs').check().then(value=>process.stdout.write(JSON.stringify(value)))"],
         capture_output=True,text=True,check=True,timeout=30)
     runtime=json.loads(check.stdout)
     runtime['checked_at']=datetime.now(timezone.utc).isoformat()
     save('docs/evidence/completion-readiness.json',runtime)
-    sources=[*Path('src/quantpilot').glob('*.py'),*Path('frontend/src').glob('*.*'),
-        *Path('tests').glob('*.py'),*Path('frontend/tests').glob('*.ts'),*Path('migrations').rglob('*.py'),
-        *map(Path,['scripts/start.cjs','scripts/service_readiness.cjs','scripts/record_walkthrough.cjs',
-            'scripts/verify_walkthrough.cjs','scripts/verify_persistence.cjs','scripts/verify.cjs',
-            'scripts/package_local_completion.py','tests/service-readiness.test.cjs','.github/workflows/ci.yml'])]
+    sources=[*Path('src/quantpilot').rglob('*.py'),*Path('frontend/src').rglob('*.*'),
+        *Path('tests').rglob('*.py'),*Path('frontend/tests').glob('*.ts'),*Path('migrations').rglob('*.py'),
+        *map(Path,['scripts/start.cjs','scripts/ops/service_readiness.cjs','scripts/release/record_walkthrough.cjs',
+            'scripts/verify/verify_walkthrough.cjs','scripts/verify/verify_persistence.cjs','scripts/verify/verify.cjs',
+            'scripts/release/package_local_completion.py','tests/service-readiness.test.cjs','.github/workflows/ci.yml'])]
     evidence=['docs/evidence/local-readiness-verification.json','.verification/service-readiness.xml','docs/evidence/static-checks.json',
         'docs/evidence/persistence-runtime.json','docs/walkthrough/recording.json','docs/walkthrough/verification.json',
         'docs/walkthrough/runtime-snapshot.json','docs/evidence/completion-readiness.json']

@@ -1,11 +1,11 @@
 // Record the real local release with captions. Requires API :8000 and dashboard :5173.
-const {chromium}=require('../frontend/node_modules/playwright');
+const {chromium}=require('../../frontend/node_modules/playwright');
 const fs=require('node:fs');
 const path=require('node:path');
 const assert=require('node:assert/strict');
 const {spawnSync}=require('node:child_process');
 const crypto=require('node:crypto');
-process.chdir(path.resolve(__dirname,'..'));
+process.chdir(path.resolve(__dirname,'../..'));
 
 (async()=>{
   const smoke=JSON.parse(fs.readFileSync('.verification/release-smoke.json','utf8'));

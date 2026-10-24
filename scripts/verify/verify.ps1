@@ -1,6 +1,6 @@
 # Reproducible verification from any working directory. Requires uv and Node 22.
 $ErrorActionPreference = 'Stop'
-$repositoryPath = Split-Path -Parent $PSScriptRoot
+$repositoryPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $evidencePath = Join-Path $repositoryPath '.verification'
 New-Item -ItemType Directory -Force -Path $evidencePath | Out-Null
 $env:UV_CACHE_DIR = Join-Path $repositoryPath '.uv-cache'
@@ -20,7 +20,7 @@ function Invoke-VerificationCheck {
 
 Push-Location -LiteralPath $repositoryPath
 try {
-    Invoke-VerificationCheck -Label 'Static repository integrity' -Executable 'node' -Parameters @('scripts/check-structure.cjs')
+    Invoke-VerificationCheck -Label 'Static repository integrity' -Executable 'node' -Parameters @('scripts/verify/check-structure.cjs')
     Invoke-VerificationCheck -Label 'Python dependencies' -Executable 'uv' -Parameters @('sync', '--locked', '--extra', 'dev')
     Invoke-VerificationCheck -Label 'ML dependency imports' -Executable 'uv' -Parameters @('run', 'python', '-c', 'import numpy, numba, shap, xgboost, sklearn; print({m.__name__: m.__version__ for m in (numpy, numba, shap, xgboost, sklearn)})')
     Invoke-VerificationCheck -Label 'Python compilation' -Executable 'uv' -Parameters @('run', 'python', '-m', 'compileall', '-q', 'src', 'tests', 'migrations', 'scripts')

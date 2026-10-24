@@ -1,11 +1,11 @@
-// Portable verification. Run: node scripts/verify.cjs
+// Portable verification. Run: node scripts/verify/verify.cjs
 // Uses ordinary uv/npm commands and records evidence; changes no system execution policy.
 const fs=require('node:fs');
 const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const options=process.argv.slice(2);
 if(options.includes('--help')){
- console.log('Usage: node scripts/verify.cjs [--frontend]\n--frontend: run static checks, frontend install, build and browser tests only.');
+ console.log('Usage: node scripts/verify/verify.cjs [--frontend]\n--frontend: run static checks, frontend install, build and browser tests only.');
  process.exit(0);
 }
 if(options.some(option=>option!=='--frontend')){
@@ -13,7 +13,7 @@ if(options.some(option=>option!=='--frontend')){
  process.exit(2);
 }
 const frontendOnly=options.includes('--frontend');
-const root=path.resolve(__dirname,'..');
+const root=path.resolve(__dirname,'../..');
 const evidence=path.join(root,'.verification');
 fs.mkdirSync(evidence,{recursive:true});
 const env={...process.env,UV_CACHE_DIR:path.join(root,'.uv-cache'),
@@ -21,7 +21,7 @@ const env={...process.env,UV_CACHE_DIR:path.join(root,'.uv-cache'),
 const npm=process.platform==='win32'?'npm.cmd':'npm';
 const npx=process.platform==='win32'?'npx.cmd':'npx';
 const allSteps=[
- {name:'Static repository integrity',command:process.execPath,args:['scripts/check-structure.cjs']},
+ {name:'Static repository integrity',command:process.execPath,args:['scripts/verify/check-structure.cjs']},
  {name:'Local service readiness checks',command:process.execPath,args:['--test','tests/service-readiness.test.cjs']},
  {name:'Python dependencies',command:'uv',args:['sync','--locked','--extra','dev']},
  {name:'ML dependency imports',command:'uv',args:['run','python','-c','import numpy, numba, shap, xgboost, sklearn; print({m.__name__: m.__version__ for m in (numpy, numba, shap, xgboost, sklearn)})']},

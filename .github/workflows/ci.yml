@@ -51,7 +51,7 @@ jobs:
       - run: pip install --require-hashes -r requirements-dev.lock
       - run: pip install --no-deps .
       - run: quantpilot init-db
-      - run: python scripts/verify_postgres.py
+      - run: python scripts/verify/verify_postgres.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -69,7 +69,7 @@ jobs:
           node-version: "22"
       - run: node --test tests/service-readiness.test.cjs
         working-directory: .
-      - run: node scripts/check-structure.cjs
+      - run: node scripts/verify/check-structure.cjs
         working-directory: .
       - run: npm ci
       - run: npm run build

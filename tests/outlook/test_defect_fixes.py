@@ -154,7 +154,7 @@ def test_subscription_env_strips_every_openai_variable(monkeypatch):
 # 7. The release smoke check accepts the tools added after the release.
 def test_smoke_check_requires_the_release_tools_without_rejecting_later_ones():
     import importlib.util
-    spec = importlib.util.spec_from_file_location('smoke', 'scripts/smoke_release.py')
+    spec = importlib.util.spec_from_file_location('smoke', 'scripts/release/smoke_release.py')
     smoke = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(smoke)
     listed = set(smoke.ROUTES) | {'get_strategy_research', 'ask_outlook'}

@@ -1,5 +1,5 @@
 // Decode the exported video in Chrome and preserve a frame for visual review.
-const {chromium}=require('../frontend/node_modules/playwright');
+const {chromium}=require('../../frontend/node_modules/playwright');
 const fs=require('node:fs');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');

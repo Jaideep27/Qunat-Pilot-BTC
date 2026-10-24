@@ -42,7 +42,7 @@ def main():
     for view in ['market', 'prediction', 'research', 'paper']:
         shutil.copy2(f'frontend/test-results/release-{view}.png', f'docs/screenshots/release-{view}.png')
     now = datetime.now(timezone.utc).isoformat()
-    sources = sorted([*Path('src').rglob('*.py'), *Path('tests').glob('*.py'),
+    sources = sorted([*Path('src').rglob('*.py'), *Path('tests').rglob('*.py'),
                       *Path('frontend/src').glob('*.*'), *Path('frontend/tests').glob('*.ts')])
     source_hashes = {p.as_posix():sha(p) for p in sources}
     regression = dict(verified_at=now, python_regression=dict(
@@ -73,7 +73,7 @@ def main():
         frozen_replay='Exact full-group trading object equality, including curves and fills',
         release_exports='SHA256 matches frozen artifacts',
         runtime_source_sha256=source_hashes,
-        runtime_code_sha256=hashlib.sha256(b''.join(p.read_bytes() for p in sorted(Path('src/quantpilot').glob('*.py')))).hexdigest(),
+        runtime_code_sha256=hashlib.sha256(b''.join(p.read_bytes() for p in sorted(Path('src/quantpilot').rglob('*.py')))).hexdigest(),
         training_identity=evaluation['metadata'],
         artifact_sha256={p.as_posix():sha(p) for p in manifest_files if p.is_file()},
         paper_status=dict(equity=10000, fills=0, forward_uptime_measured=False,

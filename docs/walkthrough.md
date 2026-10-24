@@ -7,8 +7,8 @@ The refreshed recording includes the PostgreSQL chart workspace, five-year candl
 The recording metadata and scene captions are stored in [recording.json](walkthrough/recording.json). Reproduce with API on port 8000 and dashboard on 5173:
 
 ```powershell
-node scripts/record_walkthrough.cjs
-node scripts/verify_walkthrough.cjs
+node scripts/release/record_walkthrough.cjs
+node scripts/verify/verify_walkthrough.cjs
 ```
 
 The script uses installed Chrome and its built-in MediaRecorder. It reads actual local status, visits the chart workspace and four dashboard views, and records six captioned scenes. It waits for PostgreSQL storage counters and research plots to load. Captions use the current decision, collector configuration, ledger evidence and verification files. Existing successful MCP SDK/API comparison evidence is tied to the same frozen model version. It does not invent stream messages, tool responses or fills. Scene PNGs, hashes, timestamps and recording metadata accompany the video.

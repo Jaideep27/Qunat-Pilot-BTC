@@ -32,7 +32,7 @@ node scripts/start.cjs --restart-services
 Open [the chart workspace](http://localhost:5173/#chart), then optionally verify actual provider traffic and database advancement:
 
 ```powershell
-node scripts/verify_live.cjs
+node scripts/verify/verify_live.cjs
 ```
 
 The verifier uses installed Chrome by default (`QUANTPILOT_BROWSER_CHANNEL` can override it), reads the actual API, observes eight actual exchange messages, checks PostgreSQL receipt time advances and writes `docs/evidence/fast-live-runtime.json`. It exits 2 if either runtime check remains unverified. It never inserts fixture prices. Output includes the running collector's declared cadence; an absent cadence field indicates an older collector may still be loaded.
@@ -43,4 +43,4 @@ The current local check passed **88 Python tests, 14 browser tests, seven Postgr
 
 Sources: [Binance candle streams and 250 ms cadence](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/ws-streams/market), [TradingView incremental chart updates](https://tradingview.github.io/lightweight-charts/docs/api/interfaces/ISeriesApi#update).
 
-The separate [persistence sample](evidence/persistence-runtime.json) reads actual PostgreSQL observations through the API without an exchange socket. Four saved receipt timestamps advanced at a median interval of 5.638 seconds; median local API request time was 159.5 ms. The price stayed unchanged during the sample. Run `node scripts/verify_persistence.cjs` to repeat the bounded observation; its measurements do not establish provider-to-browser latency.
+The separate [persistence sample](evidence/persistence-runtime.json) reads actual PostgreSQL observations through the API without an exchange socket. Four saved receipt timestamps advanced at a median interval of 5.638 seconds; median local API request time was 159.5 ms. The price stayed unchanged during the sample. Run `node scripts/verify/verify_persistence.cjs` to repeat the bounded observation; its measurements do not establish provider-to-browser latency.

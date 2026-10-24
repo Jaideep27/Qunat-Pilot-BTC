@@ -1,6 +1,6 @@
 """The current process's creation time, recorded by service runtime files.
 
-`scripts/stop_data_supervisor.py` compares a recorded PID's OS creation time with the record before
+`scripts/ops/stop_data_supervisor.py` compares a recorded PID's OS creation time with the record before
 stopping it. Recording `time.time()` after slow imports could differ by more than its 30-second
 tolerance on a memory-starved machine and block a legitimate restart.
 """

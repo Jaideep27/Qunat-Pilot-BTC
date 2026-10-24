@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {classify,check}=require('../scripts/service_readiness.cjs');
+const {classify,check}=require('../scripts/ops/service_readiness.cjs');
 test('a responding old API is explicitly marked for reload',()=>{
   const result=classify(200,404,{});assert.equal(result.ready,false);assert.equal(result.status,'reload_required');
 });

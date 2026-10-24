@@ -26,10 +26,10 @@ assert pg['status']=='passed'
 smoke=json.loads(Path('.verification/release-smoke.json').read_text(encoding='utf-8'))
 assert smoke['status']=='passed' and smoke['mcp_tools_matched']==9
 storage=summary()
-files=[*Path('src/quantpilot').glob('*.py'),*Path('frontend/src').glob('*.*'),
-       *Path('tests').glob('*.py'),Path('frontend/tests/workspace.spec.ts'),
-       Path('scripts/start.cjs'),Path('scripts/serve_api.py'),Path('scripts/data_supervisor.py'),
-       Path('scripts/configure_postgres.py'),Path('scripts/verify_postgres.py'),
+files=[*Path('src/quantpilot').rglob('*.py'),*Path('frontend/src').rglob('*.*'),
+       *Path('tests').rglob('*.py'),Path('frontend/tests/workspace.spec.ts'),
+       Path('scripts/start.cjs'),Path('scripts/ops/serve_api.py'),Path('scripts/ops/data_supervisor.py'),
+       Path('scripts/ops/configure_postgres.py'),Path('scripts/verify/verify_postgres.py'),
        Path('migrations/versions/0003_market_history.py'),Path('compose.yaml')]
 shot=Path('frontend/test-results/postgres-workspace.png')
 assert shot.exists()

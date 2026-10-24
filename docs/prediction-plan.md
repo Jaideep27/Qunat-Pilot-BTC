@@ -120,7 +120,7 @@ Each signal is a few lines with ≤ 3 parameters × ≤ 3 values, and outputs lo
 | Modified | Change |
 |---|---|
 | `data.py`, `live.py`, `history.py` | New families: spot klines, metrics taker ratio, DVOL, Coinbase candles, liquidations (ws), depth snapshots |
-| `scripts/data_supervisor.py` | Run new forward collectors |
+| `scripts/ops/data_supervisor.py` | Run new forward collectors |
 | `event_study.py` | Daily panel builder alongside `hourly_panel` |
 | `forecaster.py`, `services.py`, `api.py`, `mcp_server.py`/`mcp_proxy.py` | Record and serve shadow signals |
 | `frontend/src/` (Prediction tab) + Playwright spec | Signals panel |
