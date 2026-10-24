@@ -6,7 +6,7 @@ Existing protection is evaluated within each bar before the next decision; a bar
 and target counts as the stop; a gap through the stop fills at the open. Liquidation uses the mark
 price under isolated margin (maintenance approximation). Stops only tighten and targets only move
 closer; no adding, averaging down or same-step reversal. State is plain JSON for persistence.
-See docs/superpowers/specs/2026-10-20-trading-agent-step-a-design.md.
+See docs/design/specs/2026-10-20-trading-agent-step-a-design.md.
 """
 from __future__ import annotations
 

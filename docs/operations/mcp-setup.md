@@ -17,7 +17,7 @@ For an external assistant supporting stdio MCP, adapt its server configuration:
   "mcpServers": {
     "quantpilot-btc": {
       "command": "C:/Projects/BTC Quant/.venv/Scripts/python.exe",
-      "args": ["-m", "quantpilot.mcp_server"],
+      "args": ["-m", "quantpilot.api.mcp_server"],
       "env": {
         "QUANTPILOT_DATA_DIR": "C:/Projects/BTC Quant/data",
         "QUANTPILOT_ARTIFACT_DIR": "C:/Projects/BTC Quant/artifacts",
@@ -48,7 +48,7 @@ Verify discovery and calls through the real official SDK client with `uv run pyt
 
 Example assistant workflow: call `check_data_coverage`, then `get_market_snapshot`, `get_prediction` and `explain_decision`. Treat stale data and blocked gates as evidence to withhold a trade claim.
 
-The actual trained release **24c8238525d4** passed discovery and all nine structured tool/API comparisons on 19 October 2026. See [smoke evidence](evidence/release-smoke.json). Cold Windows startup preloads trusted model/native libraries before starting the stdio event loop. Calls dispatch shared services to threads, and indicator results reuse a cache keyed by the current Parquet file generation. Initial feature/model loading is slower than cached reads.
+The actual trained release **24c8238525d4** passed discovery and all nine structured tool/API comparisons on 19 October 2026. See [smoke evidence](../evidence/release-smoke.json). Cold Windows startup preloads trusted model/native libraries before starting the stdio event loop. Calls dispatch shared services to threads, and indicator results reuse a cache keyed by the current Parquet file generation. Initial feature/model loading is slower than cached reads.
 
 
 ## Asking outlook questions from Claude Code
@@ -58,7 +58,7 @@ Later additions bring the full server to sixteen tools: `get_news_events`, `get_
 Connect QuantPilot to Claude Code with the fast proxy, which forwards to the running local API (start services first with `node scripts/start.cjs`):
 
 ```powershell
-claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.mcp_proxy
+claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.ai.mcp_proxy
 ```
 
-Then ask in a Claude Code chat, for example "Will BTC go up in the next 4 hours?". Claude calls `ask_outlook`, quotes the probability with its confidence label (`no_edge`, `weak` or `validated`) and evidence, and records its own view with `record_ai_view`. Every answer is scored once its horizon passes. When the API is not running, use the full server instead: `-m quantpilot.mcp_server`. The in-app **Chat** tab uses the same proxy and tools.
+Then ask in a Claude Code chat, for example "Will BTC go up in the next 4 hours?". Claude calls `ask_outlook`, quotes the probability with its confidence label (`no_edge`, `weak` or `validated`) and evidence, and records its own view with `record_ai_view`. Every answer is scored once its horizon passes. When the API is not running, use the full server instead: `-m quantpilot.api.mcp_server`. The in-app **Chat** tab uses the same proxy and tools.

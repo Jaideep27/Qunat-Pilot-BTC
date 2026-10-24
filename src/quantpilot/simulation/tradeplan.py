@@ -1,6 +1,6 @@
 """Deterministic trade plans from a MarketContext: structural stop and target, net reward:risk, size.
 
-These are registered starting rules (docs/superpowers/specs/2026-10-20-trading-agent-step-a-design.md),
+These are registered starting rules (docs/design/specs/2026-10-20-trading-agent-step-a-design.md),
 not a claim of edge. A plan never decides whether to trade; a policy does. The 24h range bounds targets
 but is never presented as a probability of reaching them.
 """

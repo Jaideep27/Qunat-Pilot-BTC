@@ -124,7 +124,7 @@ def strategy_research():
                 passing=(report or {}).get('passing', []), families=families,
                 holdout_evaluated=bool(folder and (folder/'holdout.lock').exists()),
                 forward=forward, next_test='2027-04-20',
-                note='Pre-registered research; nothing here trades. See docs/strategy-research.md.')
+                note='Pre-registered research; nothing here trades. See docs/research/strategy-research.md.')
     return envelope(data, (report or {}).get('generated'), 'QuantPilot pre-registered strategy research',
                     max_age=400*86400)
 

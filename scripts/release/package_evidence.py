@@ -59,8 +59,8 @@ def main():
     manifest_files = [*Path('release').glob('*'), *Path('docs/screenshots').glob('release-*.png'),
         Path('uv.lock'), Path('requirements.lock'), Path('requirements-dev.lock'),
         Path('frontend/package-lock.json'), Path('docs/evidence/data-quality.json'),
-        Path('docs/excluded-windows.csv'), Path('docs/evidence/coverage-report.json'),
-        Path('docs/evaluation-report.md'), Path('docs/model-card.md')]
+        Path('docs/research/excluded-windows.csv'), Path('docs/evidence/coverage-report.json'),
+        Path('docs/research/evaluation-report.md'), Path('docs/research/model-card.md')]
     video = Path('docs/walkthrough/quantpilot-btc.webm')
     if video.exists():
         video_check = json.loads(Path('docs/walkthrough/verification.json').read_text(encoding='utf-8'))

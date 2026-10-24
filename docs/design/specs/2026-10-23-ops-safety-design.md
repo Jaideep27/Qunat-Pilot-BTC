@@ -43,7 +43,7 @@ Date: 2026-10-23. Branch `rule-engine`. Approved by the owner in chat ("yes buil
 - Each dump is verified with `pg_restore --list`, which must exit 0 and list the account tables.
 - 7 of each are kept locally. The latest 2 are copied to `%USERPROFILE%\OneDrive\QuantPilot-backups`, and the copy's size is checked.
 - The result is recorded in the state file.
-- One full restore test runs into a scratch database at build time. `docs/operations.md` describes how to restore.
+- One full restore test runs into a scratch database at build time. `docs/operations/operations.md` describes how to restore.
 
 **Scheduling.** Two Task Scheduler tasks run as the owner, only when they are logged on, through `pythonw.exe` (no console window):
 - "QuantPilot Watchdog": every 5 minutes, plus at logon;

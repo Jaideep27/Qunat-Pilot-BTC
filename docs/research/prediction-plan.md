@@ -38,9 +38,9 @@ Why the current setup can't get there, and what changes:
 1. **Write `C:\Projects\BTC Quant\progress.md`**: the complete project record (outline at the end of this plan).
 2. **`docs/research/preregistration.md`**: every hypothesis below, written before any result is seen, with its exact signal definition, small fixed parameter grid, label, holding period and pass rule. Adding a hypothesis later is allowed only as a new dated entry.
 3. **Trial registry** `artifacts/strategy-research/trials.jsonl`: one line per configuration ever evaluated (including failures). Overfitting corrections use this count.
-4. Copy this plan to `docs/prediction-plan.md`.
+4. Copy this plan to `docs/research/prediction-plan.md`.
 
-### Phase 1 — evaluation upgrade (new `src/quantpilot/selective.py`)
+### Phase 1 — evaluation upgrade (new `src/quantpilot/research/selective.py`)
 - `triple_barrier(panel, side, tp, sl, max_hold)` → +1/−1/0 per call, plus the realised net return.
 - **Cost model reused from `engine.py`:** 5 bps fee + 3 bps slippage per side, actual funding over the hold. Expectancy is always net.
 - `selective_report(calls)` returns:
@@ -65,7 +65,7 @@ Forward-only (start the clock on day 1, testable after ~3 months):
 
 **Storage:** existing `market_observations` (family + JSON), so no new tables. Collectors are added in `live.py`/`data.py` following the existing family pattern and run by the data supervisor.
 
-### Phase 3 — pre-registered strategy families (`src/quantpilot/signals.py`)
+### Phase 3 — pre-registered strategy families (`src/quantpilot/research/signals.py`)
 Each signal is a few lines with ≤ 3 parameters × ≤ 3 values, and outputs long / short / no call.
 
 **Swing track (daily bars, hold 1–14 days, spot 2017+, perp 2019+):**
@@ -98,7 +98,7 @@ Each signal is a few lines with ≤ 3 parameters × ≤ 3 values, and outputs lo
   - PBO < 0.3;
   - deflated Sharpe > 0 at 95%, using the registry trial count;
   - positive in most yearly sub-periods.
-- The report shows **every** trial, including failures, in `docs/strategy-research.md`.
+- The report shows **every** trial, including failures, in `docs/research/strategy-research.md`.
 
 ### Phase 6 — forward shadow and UI
 - Passing signals are added to the shadow forecaster (`forecaster.run_cycle`). They are recorded only and never trade.
@@ -111,10 +111,10 @@ Each signal is a few lines with ≤ 3 parameters × ≤ 3 values, and outputs lo
 | New | Purpose |
 |---|---|
 | `progress.md` | Full project record (Phase 0) |
-| `docs/prediction-plan.md`, `docs/research/preregistration.md`, `docs/strategy-research.md` | Plan, hypotheses, results |
-| `src/quantpilot/selective.py` | Triple-barrier labels, cost-aware selective metrics, Wilson/deflated Sharpe, trial registry |
-| `src/quantpilot/signals.py` | Pre-registered signal functions (both tracks) |
-| `src/quantpilot/strategy_research.py` | Walk-forward runner + meta-labeling; CLI `research-strategies --track {swing,intraday} --output` (resumable via `progress.jsonl`, like `risk_experiment`) |
+| `docs/research/prediction-plan.md`, `docs/research/preregistration.md`, `docs/research/strategy-research.md` | Plan, hypotheses, results |
+| `src/quantpilot/research/selective.py` | Triple-barrier labels, cost-aware selective metrics, Wilson/deflated Sharpe, trial registry |
+| `src/quantpilot/research/signals.py` | Pre-registered signal functions (both tracks) |
+| `src/quantpilot/research/strategies.py` | Walk-forward runner + meta-labeling; CLI `research-strategies --track {swing,intraday} --output` (resumable via `progress.jsonl`, like `risk_experiment`) |
 | `tests/test_selective.py`, `tests/test_signals.py`, `tests/test_strategy_research.py` | Unit and leakage-canary tests |
 
 | Modified | Change |

@@ -1,6 +1,6 @@
 # Operations: watchdog, email alerts and backups
 
-Built 2026-10-23. Design: `docs/superpowers/specs/2026-10-23-ops-safety-design.md`. Nothing here touches trading.
+Built 2026-10-23. Design: `docs/design/specs/2026-10-23-ops-safety-design.md`. Nothing here touches trading.
 
 ## What runs
 Two Windows Task Scheduler tasks run under the folder `\QuantPilot\`, as the owner, while the owner is logged on. They use `pythonw.exe`, so no window appears.

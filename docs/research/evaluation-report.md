@@ -56,7 +56,7 @@ Each expanding fold fits candidates on past data, calibrates separately, selects
 
 ## Coverage and exclusions
 
-Strict source completeness is false. The user-authorized policy quarantines 62 affected positioning rows and dependent feature windows without interpolation. All families and calendar months are retained. There are 177 positioning/lookback exclusions; total research exclusions are 257 including the final label/purge boundary. Exact invalid-feature windows are listed in [excluded-windows.csv](excluded-windows.csv); monthly eligibility is in [data-quality.json](evidence/data-quality.json).
+Strict source completeness is false. The user-authorized policy quarantines 62 affected positioning rows and dependent feature windows without interpolation. All families and calendar months are retained. There are 177 positioning/lookback exclusions; total research exclusions are 257 including the final label/purge boundary. Exact invalid-feature windows are listed in [excluded-windows.csv](excluded-windows.csv); monthly eligibility is in [data-quality.json](../evidence/data-quality.json).
 
 ## Costs, identity and limits
 

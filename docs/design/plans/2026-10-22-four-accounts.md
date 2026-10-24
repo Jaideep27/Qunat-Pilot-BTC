@@ -16,7 +16,7 @@ gets a reviewed report.
 
 **Tech Stack:** Python 3.11, pandas, scikit-learn, SQLAlchemy (PostgreSQL), FastAPI, React/Vite, Playwright, pytest.
 
-**Spec:** `docs/superpowers/specs/2026-10-22-four-accounts-design.md`
+**Spec:** `docs/design/specs/2026-10-22-four-accounts-design.md`
 
 ## Global Constraints
 

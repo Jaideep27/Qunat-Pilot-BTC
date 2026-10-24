@@ -48,7 +48,7 @@ These are standing instructions from the owner and decisions already made. Follo
 - Nothing may place real orders or size trades. Paper trading only.
 - Claude and Codex reasoning must use **subscription logins only, never billed API keys**. Strip `ANTHROPIC_*`, `CLAUDE_CODE_*`, `QUANTPILOT_*` and `OPENAI*` keys from the environment of any `claude`/`codex` subprocess. `~/.claude/settings.json` has been checked: no `apiKeyHelper`, no env keys.
 - Calls to `claude -p` must use:
-  - the native executable `C:\Users\jaide\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe` (the `.cmd` shim mangles JSON);
+  - the native executable `%APPDATA%\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe` (the `.cmd` shim mangles JSON);
   - the flags `--tools ""`, `--strict-mcp-config`, `--settings` with `{"disableAllHooks":true}`, `--disable-slash-commands`, `--no-session-persistence`;
   - an empty working directory, with untrusted text passed only through stdin.
 - **Never use `--bare`**: it disables the subscription login. Model: `claude-sonnet-5-5`, effort low. Codex model: `gpt-6-luna`.
@@ -276,7 +276,7 @@ Interactions:
 | | | **Multi-horizon research harness** with validation-only champions and PBO; the **shadow forecaster** with a promotion gate |
 | | | **Market outlook Q&A and in-app Chat** (11-task plan), independent review, fix pass (commit `95d6274`) |
 | | | **Fixes to seven verified defects:**<br>- direction "down" intent;<br>- the live price from completed candles only;<br>- scoring against the recorded price over gap-free windows (scoring v2);<br>- stale labels;<br>- the Claude-timeout fallback;<br>- Codex environment stripping;<br>- the smoke check and doc counts.<br>Commit `6dd7430`, branch `trading-agent` |
-| | | **Trading agent, step A:** market context, trade plans, futures simulator (commit `5ef0cae`, branch `trading-agent`). Design: `docs/superpowers/specs/2026-10-20-trading-agent-step-a-design.md` |
+| | | **Trading agent, step A:** market context, trade plans, futures simulator (commit `5ef0cae`, branch `trading-agent`). Design: `docs/design/specs/2026-10-20-trading-agent-step-a-design.md` |
 | 2026-10-21 | Claude | **Cleanup:**<br>- unused imports and variables removed (side-effect imports kept and marked);<br>- `/backtests` 4.8 MB → summary;<br>- evidence JSON moved to `docs/evidence/`;<br>- Codex `fix*.cjs` scripts archived and deleted.<br>**Dashboard redesign:** Overview home, focused pages, tooltips, live price and Ask box (commits `50fafc7`, `f40e57d`) |
 | | | **Selective prediction research**: progress record, pre-registration, trade-style scoring, new data, forward collectors, 10 rule families + 2 meta-labeled primaries, report, dashboard panel, independent review, fixes (commits `5453862` → `c030629`) |
 
@@ -326,7 +326,7 @@ Interactions:
   - Fails PBO (0.42). Its deflated Sharpe is 0.01 as registered; it depends on the variance choice (amendment A3), but PBO fails regardless.
 - **Intraday:** every family lost money after costs or had too few calls.
 - **Independent review:** found no bug that could change the verdict.
-- Full tables: [docs/strategy-research.md](docs/strategy-research.md).
+- Full tables: [docs/research/strategy-research.md](research/strategy-research.md).
 
 ### Trading agent step B (pre-registered, 2026-10-21)
 - **Setup:** structure-based trade plans (stop behind support/resistance, target at the next level, reward:risk ≥ 1.5 or 2.0, 0.25% risk), entered by trend, best-plan or pullback rules plus a coin-flip control. Decisions hourly from 2021-10 to 2025-10, run in the futures simulator after all costs.
@@ -436,11 +436,11 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 | Step | What | Status |
 |---|---|---|
 | A | Verify and fix the defects; MarketContext; deterministic TradePlans; versioned futures simulator | **done** (branch `trading-agent`, not merged) |
-| B | Pre-register the trade-plan rules plus simple entry rules (amendment A4); evaluate walk-forward with the same costs and pass rule | **done: no edge.** Every rule lost after costs, and a coin flip did as well. See [docs/trading-agent-research.md](docs/trading-agent-research.md) |
+| B | Pre-register the trade-plan rules plus simple entry rules (amendment A4); evaluate walk-forward with the same costs and pass rule | **done: no edge.** Every rule lost after costs, and a coin flip did as well. See [docs/research/trading-agent-research.md](research/trading-agent-research.md) |
 | C | RL for trade management only (hold, exit, tighten stop, pull in target), compared against fixed exits | waiting for the owner's decision: management cannot create an edge the entries lack (only 13–14% of stopped trades were ever 1R ahead) |
 | D | Experimental forward paper account ($10,000 or $1,000, 2× isolated), worker, persistence, dashboard and API/MCP inspection | after C |
 
-**Rule engine (owner request, 2026-10-21; branch `rule-engine` from `trading-agent`, not merged).** This replaces steps C and D with the owner's rulebook as event-triggered playbooks plus ML, news and RL layers, in five milestones. Full write-up: [docs/rule-engine.md](docs/rule-engine.md). Spec: `docs/superpowers/specs/2026-10-21-rule-engine-design.md`. Amendments A6 and A7.
+**Rule engine (owner request, 2026-10-21; branch `rule-engine` from `trading-agent`, not merged).** This replaces steps C and D with the owner's rulebook as event-triggered playbooks plus ML, news and RL layers, in five milestones. Full write-up: [docs/rule-engine.md](rule-engine.md). Spec: `docs/design/specs/2026-10-21-rule-engine-design.md`. Amendments A6 and A7.
 
 | Milestone | What | Status |
 |---|---|---|
@@ -455,7 +455,7 @@ Pre-registration amendments (`docs/research/preregistration.md`):
 - Every decision and trade is recorded with its checklist ticks, a market snapshot and a Claude-written reason.
 - Each account pauses after 30 trades for a review with the owner.
 - In history every tier still lost on average (A −0.11R, D −0.15R per trade), so this is data collection.
-See [docs/rule-engine.md](docs/rule-engine.md#four-paper-accounts-amendment-a8-2026-10-22).
+See [docs/rule-engine.md](rule-engine.md#four-paper-accounts-amendment-a8-2026-10-22).
 
 **Model health (owner request, 2026-10-23; amendment A9).** MLOps checks on the score model behind the four accounts:
 - live accuracy: predicted against actual win chance;
@@ -470,7 +470,7 @@ The first check found that the premium input had been missing on every live setu
 - Email alerts go out when a problem starts, every 6 hours while it lasts, and when it is resolved.
 - A nightly backup at 02:30 is checked before it counts; 7 are kept on the laptop and the latest 2 go to OneDrive (about 90 MB each).
 - The restart path and a full restore were tested live.
-See [docs/operations.md](docs/operations.md).
+See [docs/operations/operations.md](operations/operations.md).
 
 Live check of step A on 2026-10-20: the context built 60 days of real data in 6 s. At 15:50 UTC both the long and short plans were correctly rejected: the price sat between nearby 4h levels, so reward:risk was below 1.5.
 
@@ -508,10 +508,10 @@ Live check of step A on 2026-10-20: the context built 60 days of real data in 6 
 |---|---|
 | This status | `progress.md` |
 | Overview and commands | `README.md` |
-| Selective research plan, pre-registration, results | `docs/prediction-plan.md`, `docs/research/preregistration.md`, `docs/strategy-research.md` |
-| Earlier research | `docs/forecast-research.md`, `docs/event-study.md`, `docs/evaluation-report.md`, `docs/model-card.md` |
-| Outlook Q&A design and plan | `docs/superpowers/specs/2026-10-20-market-outlook-qa-design.md`, `docs/superpowers/plans/2026-10-20-market-outlook-qa.md` |
-| MCP setup | `docs/mcp-setup.md` |
-| Operations, data platform, recovery | `docs/operations.md`, `docs/market-platform.md`, `docs/live-data.md`, `docs/recovery.md`, `docs/coverage-report.md`, `docs/data-dictionary.md`, `docs/architecture.md` |
+| Selective research plan, pre-registration, results | `docs/research/prediction-plan.md`, `docs/research/preregistration.md`, `docs/research/strategy-research.md` |
+| Earlier research | `docs/research/forecast-research.md`, `docs/research/event-study.md`, `docs/research/evaluation-report.md`, `docs/research/model-card.md` |
+| Outlook Q&A design and plan | `docs/design/specs/2026-10-20-market-outlook-qa-design.md`, `docs/design/plans/2026-10-20-market-outlook-qa.md` |
+| MCP setup | `docs/operations/mcp-setup.md` |
+| Operations, data platform, recovery | `docs/operations/operations.md`, `docs/operations/market-platform.md`, `docs/operations/live-data.md`, `docs/operations/recovery.md`, `docs/research/coverage-report.md`, `docs/research/data-dictionary.md`, `docs/architecture.md` |
 | Research artifacts | `artifacts/strategy-research/run-20261020/` (report, trial registry, per-family calls); `artifacts/research-champion-20261020/`, `artifacts/research-risk-20261020/`, `artifacts/event-study/`, `artifacts/outlook/`, `artifacts/shadow/`; frozen release files `artifacts/released.joblib`, `holdout.lock` |
 | Data caches | `data/` (Parquet, SQLite, backups), `data/research/` (research panels and caches) |

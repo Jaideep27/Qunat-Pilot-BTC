@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.11, pandas, numpy, scikit-learn (IsotonicRegression), SQLAlchemy, FastAPI, official MCP SDK (FastMCP), httpx, Claude Code CLI 2.1.x, React 19 + Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-10-20-market-outlook-qa-design.md`
+**Spec:** `docs/design/specs/2026-10-20-market-outlook-qa-design.md`
 
 ## Global Constraints
 
@@ -2477,7 +2477,7 @@ git commit -m "Add the Chat tab to the dashboard"
 ### Task 11: Real validation run, live verification and documentation
 
 **Files:**
-- Modify: `README.md`, `docs/forecast-research.md` (append "Outlook validation" section), `docs/mcp-setup.md` (Claude Code connection)
+- Modify: `README.md`, `docs/research/forecast-research.md` (append "Outlook validation" section), `docs/operations/mcp-setup.md` (Claude Code connection)
 - Artifacts (not committed): `artifacts/outlook/panel.parquet`, `artifacts/outlook/validation.json`
 
 - [ ] **Step 1: Build the panel cache**
@@ -2504,9 +2504,9 @@ Expected: all pass (two opt-in live-data browser tests skipped).
 
 - [ ] **Step 5: Document and commit**
 
-Add to `README.md` a "Ask QuantPilot" paragraph (Chat tab, `quantpilot ask`, MCP tools, scoreboard); to `docs/mcp-setup.md` the Claude Code command `claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.mcp_proxy`; to `docs/forecast-research.md` the validation results table (analog skill and promotion per horizon, touch calibration verdict, range coverage).
+Add to `README.md` a "Ask QuantPilot" paragraph (Chat tab, `quantpilot ask`, MCP tools, scoreboard); to `docs/operations/mcp-setup.md` the Claude Code command `claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.mcp_proxy`; to `docs/research/forecast-research.md` the validation results table (analog skill and promotion per horizon, touch calibration verdict, range coverage).
 
 ```bash
-git add README.md docs/forecast-research.md docs/mcp-setup.md
+git add README.md docs/research/forecast-research.md docs/operations/mcp-setup.md
 git commit -m "Document the outlook Q&A, chat and validation results"
 ```

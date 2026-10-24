@@ -1,6 +1,6 @@
 # Selective strategy research (2026-10-20)
 
-**Result: no strategy passed.** 186 configurations were tested across 10 rule families and 2 meta-labeled primaries, for intraday (hours) and swing (days–weeks) trading, exactly as pre-registered in [research/preregistration.md](research/preregistration.md). None met the pass rule on the development span, so, as pre-registered, **the holdout year was not used** and remains untouched for future tests.
+**Result: no strategy passed.** 186 configurations were tested across 10 rule families and 2 meta-labeled primaries, for intraday (hours) and swing (days–weeks) trading, exactly as pre-registered in [research/preregistration.md](preregistration.md). None met the pass rule on the development span, so, as pre-registered, **the holdout year was not used** and remains untouched for future tests.
 
 ## What was tested
 

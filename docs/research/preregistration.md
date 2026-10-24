@@ -90,7 +90,7 @@ Deribit DVOL is not a direction signal. It is used only as a meta-labeling featu
 
 ## 8. Accounting
 - Every configuration evaluated, including failures, is appended to `artifacts/strategy-research/trials.jsonl`.
-- `docs/strategy-research.md` reports every family, including failures.
+- `docs/research/strategy-research.md` reports every family, including failures.
 - A backtest hit rate ≥ 75% is investigated for leakage before it is reported as a result.
 
 ## 9. What a pass does and does not mean
@@ -169,7 +169,7 @@ Two forward-only intraday families are registered now, before their data exists 
 
 **A6 — 2026-10-21, rule engine: event-triggered playbooks (rulebook v1). Registered before any of them was evaluated.**
 
-- **Question.** Do the playbooks in `rulebook/v1.yaml` (hash `3ea0f47e52c1`) make money after costs? They are built from the owner's rulebook: R01–R18, SR-01..SR-06, the confluence tab and the diagnostics tab. Design: `docs/superpowers/specs/2026-10-21-rule-engine-design.md`. Every threshold is in that file; changing any of them makes a new rulebook version that needs its own amendment.
+- **Question.** Do the playbooks in `rulebook/v1.yaml` (hash `3ea0f47e52c1`) make money after costs? They are built from the owner's rulebook: R01–R18, SR-01..SR-06, the confluence tab and the diagnostics tab. Design: `docs/design/specs/2026-10-21-rule-engine-design.md`. Every threshold is in that file; changing any of them makes a new rulebook version that needs its own amendment.
 - **Data and spans.**
   - Binance USD-M BTCUSDT 5m candles, mark, open interest and positioning, funding settlements, Fear & Greed, and the macro calendar (first-release times), from the PostgreSQL store.
   - Development: decisions from 2021-10-20 to the last 15m close before 2025-10-20. Patterns are built in yearly chunks with 60 days of warm-up. No row at or after 2025-10-20 is read: a trade still open at the end of the data exits at the last close, marked `END_OF_DATA`.
@@ -249,7 +249,7 @@ Two forward-only intraday families are registered now, before their data exists 
 - **The holdout (2025-10-20 → 2026-10-19) stays untouched.** Live trading begins on deployment.
 
 
-**A9 — 2026-10-23, model health for the A8 score model (`src/quantpilot/model_health.py`). Registered before deployment.**
+**A9 — 2026-10-23, model health for the A8 score model (`src/quantpilot/monitoring/model_health.py`). Registered before deployment.**
 - **Scope.** Monitoring of the frozen score model `7996f4bd6a09`. Nothing here changes the model, the cutoffs or the account rules, with one exception: the data check below.
 - **Reference.** Built once from the A8 development training set (7,071 setups, `artifacts/rule-engine/research-v2-20261021`):
   - per input: present share, range, quintile edges and training shares, with missing as a bin of its own;

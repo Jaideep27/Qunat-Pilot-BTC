@@ -6,7 +6,7 @@ Date: 2026-10-20 · Status: draft for owner review · Branch: `news-pipeline`
 
 The owner wants to ask natural questions such as "Will BTC go up or down in the next 1h / 4h / 24h?" and receive a real, immediate answer that uses everything QuantPilot has: indicators, volume, positioning, funding, the macro calendar, news and the validated forecasters. Answers must be reachable from a chat with Claude in Claude Code (via MCP tools) and from a **chat inside the QuantPilot dashboard**, where follow-up questions keep the conversation's context.
 
-Constraints carried from the research (docs/forecast-research.md):
+Constraints carried from the research (docs/research/forecast-research.md):
 
 - No model has validated skill for BTC direction at 1h, 4h or 24h. An honest answer is a **probability with reasons and a confidence label**, never a yes/no promise.
 - Every number shown must come from a method that has been checked historically and is scored forward.
@@ -176,7 +176,7 @@ Written first (TDD), mirroring existing test style:
 - `chat`: transcript assembly and truncation; generated MCP config and `--allowedTools` contain only QuantPilot tools and no built-ins; stream-json parsing of tool calls; `record_ai_view` restricted to the run's answer ids; limits and failure replies (fake CLI).
 - `mcp_proxy`: every tool forwards to the matching API route and returns the same envelope (tested against the FastAPI app with a test client); no write routes other than recording.
 - Playwright: Chat tab with fixtures — sending a message, tool chips, embedded answer card with the no-edge label, AI-unavailable reply, quick chips in quant-only mode, history outcomes.
-- Real run: `quantpilot validate-outlook` on the five-year panel; results summarized in `docs/forecast-research.md`.
+- Real run: `quantpilot validate-outlook` on the five-year panel; results summarized in `docs/research/forecast-research.md`.
 
 ## 10. Out of scope
 

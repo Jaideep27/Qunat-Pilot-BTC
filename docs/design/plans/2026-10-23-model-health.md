@@ -12,7 +12,7 @@
 
 **Tech Stack:** Python 3 (pandas, numpy, scikit-learn, joblib, SQLAlchemy), FastAPI, React + Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-10-23-model-health-design.md`
+**Spec:** `docs/design/specs/2026-10-23-model-health-design.md`
 
 ## Global Constraints
 - Paper only. Nothing places real orders.

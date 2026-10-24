@@ -1,6 +1,6 @@
 # Rule engine: event-triggered playbooks (results and how to use it)
 
-Branch `rule-engine` (from `trading-agent`). Design: `docs/superpowers/specs/2026-10-21-rule-engine-design.md`. Pre-registration: amendments A6 and A7 in `docs/research/preregistration.md`. Paper only: nothing places or sizes real orders.
+Branch `rule-engine` (from `trading-agent`). Design: `docs/design/specs/2026-10-21-rule-engine-design.md`. Pre-registration: amendments A6 and A7 in `docs/research/preregistration.md`. Paper only: nothing places or sizes real orders.
 
 ## What it does
 - **Triggers**, the only moments the engine looks at all:
@@ -62,7 +62,7 @@ Crawl4AI lives in its own environment: `uv venv .venv-crawl` then `uv pip instal
 At the owner's request, four extra paper futures accounts ($10,000 each) trade the same rulebook v2 setups live.
 - **What they share:** playbooks, triggers, checklists, stops, targets and management.
 - **What differs:** which setups they take and how much they risk.
-- Config: `rulebook/accounts-v1.yaml`. Design: `docs/superpowers/specs/2026-10-22-four-accounts-design.md`.
+- Config: `rulebook/accounts-v1.yaml`. Design: `docs/design/specs/2026-10-22-four-accounts-design.md`.
 
 **How a setup is scored.**
 - Every confirmed setup gets `p`, its chance of a net profit, from one frozen L2 logistic regression on the M3 feature list. Training: 7,071 development setups, model hash `7996f4bd6a09`.

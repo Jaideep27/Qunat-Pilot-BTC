@@ -58,7 +58,7 @@ export default function StrategyResearch(){
         <div><dt>Next pre-registered test</dt><dd>{data.next_test}</dd></div>
         <div><dt><Term k="holdout">Holdout</Term></dt><dd>{data.holdout_evaluated?'Evaluated once':'Holdout year untouched'}</dd></div></dl>
       <p className="source">A pass needs enough calls, a hit rate whose lower bound beats break-even, a <Term k="deflated_sharpe">deflated Sharpe</Term> of at least 0.95
-        given every configuration tried, <Term k="pbo">PBO</Term> below 0.3 and most years positive. Details: docs/strategy-research.md and docs/trading-agent-research.md.</p>
+        given every configuration tried, <Term k="pbo">PBO</Term> below 0.3 and most years positive. Details: docs/research/strategy-research.md and docs/research/trading-agent-research.md.</p>
     </>}
   </Card>;
 }

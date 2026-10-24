@@ -3,7 +3,7 @@
 Rows are indexed by the bar's close (the instant it becomes known). Higher timeframes use completed
 bars only; swing levels count only once confirmed; every external family is joined backward with its
 availability tolerance. The snapshot is context for trade plans and policies, never a direction call.
-See docs/superpowers/specs/2026-10-20-trading-agent-step-a-design.md.
+See docs/design/specs/2026-10-20-trading-agent-step-a-design.md.
 """
 from __future__ import annotations
 

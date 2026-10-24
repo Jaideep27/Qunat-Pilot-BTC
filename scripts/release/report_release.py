@@ -68,7 +68,7 @@ Dataset hashes, package versions, seed {meta['seed']}, feature schema, costs and
 
 This is historical simulation. Bar-based stop fills, assumed historical availability, simplified isolated margin and deployment scheduling remain approximations. Drawdown statistics use five-minute equity observations; plotted curves are hourly samples. Forward paper uptime and execution evidence have not yet accumulated.
 '''
-    Path("docs/evaluation-report.md").write_text(text,encoding="utf-8")
+    Path("docs/research/evaluation-report.md").write_text(text,encoding="utf-8")
     m=full["holdout"]
     card=f'''# Model card
 
@@ -90,7 +90,7 @@ This is historical simulation. Bar-based stop fills, assumed historical availabi
 
 **Limitations:** regime change; overlapping labels at five-minute sampling; correlated features; assumed historical publication delays; sparse source gaps and quarantined windows; bar-based execution and drawdown sampling; approximate margin; no order-book reconstruction. Historical performance does not measure forward paper uptime or live execution. A stale or incomplete current observation must produce no trade.
 '''
-    Path("docs/model-card.md").write_text(card,encoding="utf-8")
+    Path("docs/research/model-card.md").write_text(card,encoding="utf-8")
     print(json.dumps(dict(version=meta["version"],groups=len(rows),eligible_rows=meta["eligible_rows"])))
 
 

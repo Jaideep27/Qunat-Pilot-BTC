@@ -11,7 +11,7 @@
 
 **Tech Stack:** Python stdlib (smtplib, sqlite3, subprocess, shutil), httpx, SQLAlchemy, the PostgreSQL 18 client tools, PowerShell `Register-ScheduledTask`.
 
-**Spec:** `docs/superpowers/specs/2026-10-23-ops-safety-design.md`
+**Spec:** `docs/design/specs/2026-10-23-ops-safety-design.md`
 
 ## Global Constraints
 - Never print, log or email secrets (database URLs, app password).
@@ -80,6 +80,6 @@
 - [ ] Verify: run `watchdog.py` once by hand (healthy → no action); install the tasks; check `Get-ScheduledTask` and the next run time. Commit.
 
 ### Task 4: docs and email setup
-- [ ] Write `docs/operations.md` (what runs, where the logs and backups are, how to restore, how to remove the tasks) and add a line to `progress.md`.
+- [ ] Write `docs/operations/operations.md` (what runs, where the logs and backups are, how to restore, how to remove the tasks) and add a line to `progress.md`.
 - [ ] Guide the owner through creating a Gmail app password and putting it in `.env`; send a test email.
 - [ ] Commit.

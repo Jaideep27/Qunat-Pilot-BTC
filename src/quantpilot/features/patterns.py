@@ -3,7 +3,7 @@ volatility bands, divergences and support/resistance events, one row per complet
 
 Extends `context.context_frame` (same index, same causality rules): every value at a row uses only data
 known at that bar's close, levels are the ones known at the previous 15-minute close, and a missing
-input stays missing. See docs/superpowers/specs/2026-10-21-rule-engine-design.md, section 3.1.
+input stays missing. See docs/design/specs/2026-10-21-rule-engine-design.md, section 3.1.
 """
 from __future__ import annotations
 

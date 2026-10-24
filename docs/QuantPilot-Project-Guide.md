@@ -260,7 +260,7 @@ All features use only completed bars and data available at that moment, so nothi
 | Dashboard | http://localhost:5173 |
 | API documentation | http://127.0.0.1:8000/docs |
 | Ask a question | Dashboard top bar (press `/`), the Ask page, or `quantpilot ask "Chance BTC touches 90k this week?"` |
-| Use from Claude Code | `claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.mcp_proxy` |
+| Use from Claude Code | `claude mcp add quantpilot -- "C:\Projects\BTC Quant\.venv\Scripts\python.exe" -m quantpilot.ai.mcp_proxy` |
 | Run the tests | `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider`, then `cd frontend && npx playwright test` |
 | Re-run research | `quantpilot research-data`, `quantpilot research-strategies --output DIR`, `quantpilot research-agent --output DIR` |
 
@@ -365,9 +365,9 @@ Suggested bullets:
 |---|---|
 | Live status document | `progress.md` |
 | This guide | `docs/QuantPilot-Project-Guide.md` and `.pdf` |
-| Research write-ups | `docs/forecast-research.md`, `docs/strategy-research.md`, `docs/trading-agent-research.md`, `docs/event-study.md` |
+| Research write-ups | `docs/research/forecast-research.md`, `docs/research/strategy-research.md`, `docs/research/trading-agent-research.md`, `docs/research/event-study.md` |
 | Rules registered before testing | `docs/research/preregistration.md` |
-| Designs and plans | `docs/superpowers/specs/`, `docs/superpowers/plans/`, `docs/prediction-plan.md` |
+| Designs and plans | `docs/design/specs/`, `docs/design/plans/`, `docs/research/prediction-plan.md` |
 | Python code | `src/quantpilot/` |
 | Dashboard code | `frontend/src/` |
 | Tests | `tests/`, `frontend/tests/` |
