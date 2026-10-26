@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from quantpilot.monitoring.process import NO_WINDOW
+
 ENGINE_STALE = pd.Timedelta(minutes=5)
 DATA_STALE_S = 20*60
 DISK_MIN_GB = 5.0
@@ -155,10 +157,10 @@ def backup(now, pg_bin, db_url, sqlite_path, local_dir, offsite_dir, keep_local=
         return (text or '').replace(password, '***')[:300] if password else (text or '')[:300]
     try:
         dump = run([str(Path(pg_bin)/'pg_dump'), '--format=custom', '--file', str(part), '--dbname', target],
-                   capture_output=True, text=True, env=env, timeout=3600)
+                   capture_output=True, text=True, env=env, timeout=3600, creationflags=NO_WINDOW)
         if dump.returncode != 0:
             raise RuntimeError('pg_dump failed: '+clean(dump.stderr or dump.stdout))
-        listing = run([str(Path(pg_bin)/'pg_restore'), '--list', str(part)], capture_output=True, text=True, env=env, timeout=600)
+        listing = run([str(Path(pg_bin)/'pg_restore'), '--list', str(part)], capture_output=True, text=True, env=env, timeout=600, creationflags=NO_WINDOW)
         if listing.returncode != 0 or 'account_decisions' not in (listing.stdout or ''):
             raise RuntimeError('verify failed: the dump does not list the account tables')
         part.replace(final)

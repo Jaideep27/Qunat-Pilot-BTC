@@ -167,6 +167,8 @@ def test_backup_dumps_verifies_copies_and_prunes(tmp_path):
     dump_args, kw = run.calls[0]
     assert 's3cret' not in ' '.join(map(str, dump_args)) and kw['env']['PGPASSWORD'] == 's3cret'
     assert any('postgresql://user@127.0.0.1:55432/qp' == a for a in map(str, dump_args))
+    from quantpilot.monitoring.process import NO_WINDOW
+    assert all(kw.get('creationflags') == NO_WINDOW for _, kw in run.calls[:2])  # no console flash at 02:30
 
 
 def test_failed_dump_keeps_old_backups_and_reports(tmp_path):

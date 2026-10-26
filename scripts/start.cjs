@@ -1,7 +1,7 @@
 // Start the PostgreSQL-backed local application. No secrets are printed.
 const fs=require('node:fs');
 const path=require('node:path');
-const {spawn,spawnSync}=require('node:child_process');
+const {spawnSync}=require('node:child_process');
 const net=require('node:net');
 const crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..');process.chdir(root);
@@ -9,11 +9,14 @@ const logs=path.join(root,'.verification','services');
 const python=path.join(root,'.venv','Scripts','python.exe');
 const portOpen=port=>new Promise(resolve=>{const socket=net.connect({host:'127.0.0.1',port});socket.setTimeout(1500);
   socket.on('connect',()=>{socket.destroy();resolve(true)});socket.on('error',()=>resolve(false));socket.on('timeout',()=>{socket.destroy();resolve(false)})});
+// Services start through scripts/ops/start_hidden.py: a detached start left them without a console, so Windows
+// opened a visible terminal for every console program they ran (each PostgreSQL backend, for one).
 function background(name,command,args){
   fs.mkdirSync(logs,{recursive:true});
-  const out=fs.openSync(path.join(logs,name+'.log'),'a');
-  const child=spawn(command,args,{cwd:root,windowsHide:true,detached:true,stdio:['ignore',out,out],env:process.env});
-  child.unref();fs.closeSync(out);console.log(name+' started (PID '+child.pid+').');return child.pid;
+  const result=spawnSync(python,['scripts/ops/start_hidden.py',path.join(logs,name+'.log'),'--',command,...args],
+    {cwd:root,windowsHide:true,encoding:'utf8',env:process.env});
+  if(result.status!==0)throw new Error(name+' did not start: '+(result.stderr||result.stdout||'unknown error'));
+  const pid=Number(result.stdout.trim());console.log(name+' started (PID '+pid+').');return pid;
 }
 function run(command,args){const result=spawnSync(command,args,{cwd:root,windowsHide:true,encoding:'utf8'});
   if(result.status!==0)throw new Error((result.stderr||result.stdout||'Command failed').replace(/postgresql[^\s]+/g,'[database URL hidden]'))}
