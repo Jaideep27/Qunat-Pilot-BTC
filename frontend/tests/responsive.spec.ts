@@ -118,6 +118,19 @@ test('the command palette and keyboard shortcuts switch pages',async({page})=>{
   await expect(palette).toBeHidden();
 });
 
+test('Escape closes the command palette even before its search box has focus',async({page})=>{
+  await mock(page);
+  await page.setViewportSize({width:1366,height:768});
+  await page.goto('/#overview');
+  await expect(page.getByRole('heading',{name:'Overview',level:1})).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'Open command palette'}).click();
+  const palette=page.getByRole('dialog',{name:'Command palette'});
+  await expect(palette).toBeVisible();
+  await page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
+  await page.keyboard.press('Escape');
+  await expect(palette).toBeHidden();
+});
+
 test('the sidebar collapses, remembers it and the active marker follows the page',async({page})=>{
   await mock(page);
   await page.setViewportSize({width:1440,height:900});

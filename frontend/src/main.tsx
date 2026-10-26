@@ -86,6 +86,13 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
   const [index,setIndex]=useState(0);
   const input=useRef<HTMLInputElement>(null);
   useEffect(()=>{if(open){setQuery('');setIndex(0);requestAnimationFrame(()=>input.current?.focus())}},[open]);
+  // Escape closes from anywhere: focus reaches the search box a frame late, and a click can move it away.
+  useEffect(()=>{
+    if(!open)return;
+    const close=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();onClose()}};
+    window.addEventListener('keydown',close);
+    return ()=>window.removeEventListener('keydown',close);
+  },[open,onClose]);
   const actions=useMemo<Action[]>(()=>{
     const q=query.trim().toLowerCase();
     const pages=routes.map((r,i)=>({id:r.id,label:'Go to '+r.label,hint:'Alt+'+(i+1),run:()=>go(r.id)}))
@@ -100,8 +107,7 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
         <input ref={input} aria-label="Search pages or ask" placeholder="Jump to a page or ask a question…" value={query}
           onChange={e=>{setQuery(e.target.value);setIndex(0)}}
           onKeyDown={e=>{
-            if(e.key==='Escape'){e.preventDefault();onClose()}
-            else if(e.key==='ArrowDown'){e.preventDefault();setIndex(i=>Math.min(actions.length-1,i+1))}
+            if(e.key==='ArrowDown'){e.preventDefault();setIndex(i=>Math.min(actions.length-1,i+1))}
             else if(e.key==='ArrowUp'){e.preventDefault();setIndex(i=>Math.max(0,i-1))}
             else if(e.key==='Enter'){e.preventDefault();choose(actions[index])}
           }}/><kbd aria-hidden>Esc</kbd></div>

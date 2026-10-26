@@ -51,6 +51,7 @@ def synthetic(n, seed, reversal=True):
 
 
 def test_environment_follows_the_gymnasium_api():
+    pytest.importorskip('gymnasium', reason='needs the optional rl extra')
     from gymnasium.utils.env_checker import check_env
     env = rl_manage.ManageEnv(synthetic(5, 0))
     check_env(env, skip_render_check=True)
@@ -63,6 +64,7 @@ def test_tabular_q_learns_to_protect_profits_and_the_gate_sees_it():
 
 
 def test_ppo_trains_saves_and_reloads(tmp_path):
+    pytest.importorskip('stable_baselines3', reason='needs the optional rl extra')
     path = rl_manage.train_ppo(synthetic(40, 3), tmp_path/'ppo', timesteps=2048, seed=0)
     policy = rl_manage.ppo_policy(path)
     assert policy(np.zeros(len(rl_manage.STATE), np.float32)) in rl_manage.ACTIONS
