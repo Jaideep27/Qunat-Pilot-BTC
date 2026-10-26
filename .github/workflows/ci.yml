@@ -17,7 +17,8 @@ jobs:
           cache-dependency-path: requirements-dev.lock
       - run: pip install --require-hashes -r requirements-dev.lock
       - run: pip install --no-deps -e .
-      - run: python -c "import numpy, numba, shap, xgboost, sklearn; print({m.__name__: m.__version__ for m in (numpy, numba, shap, xgboost, sklearn)})"
+      - run: |
+          python -c "import numpy, numba, shap, xgboost, sklearn; print({m.__name__: m.__version__ for m in (numpy, numba, shap, xgboost, sklearn)})"
       - run: python -m pip freeze > verification-dependencies.txt
       - run: python -m compileall -q src tests migrations scripts
       - run: pytest -q --junitxml=verification-pytest.xml
