@@ -1,5 +1,5 @@
 import {useMemo,useState} from 'react';
-import {post} from '../lib/api';
+import {post,publicView} from '../lib/api';
 import {Card,Collapsible,Empty,Loading,Meter,Pill,Segmented,money,num,pct,signedPct,stamp,useResource} from '../components/ui';
 
 type Position={side:string;quantity:number;entry:number;stop:number;target:number;liquidation:number|null;leverage:number|null;entry_time:string;playbook:string;score:number|null};
@@ -118,7 +118,7 @@ function AccountCard({a,watchNow,onReview,onResume,busy}:{a:Account;watchNow:Acc
     <Meter value={a.in_round} max={a.round_length} tone={a.in_round>=a.round_length?'warn':undefined}/>
     {a.status==='PAUSED_FOR_REVIEW'&&<div className="account-actions">
       <button type="button" className="link" onClick={onReview} disabled={!a.review}>{a.review?'Open review':'Review being written…'}</button>
-      <button type="button" className="button" onClick={onResume} disabled={busy} aria-label={'Resume '+a.name}>Resume next round</button></div>}
+      {!publicView&&<button type="button" className="button" onClick={onResume} disabled={busy} aria-label={'Resume '+a.name}>Resume next round</button>}</div>}
     {p?<dl className="facts">
       <div><dt>{p.playbook} · {p.side}</dt><dd>{num(p.quantity,3)} BTC · {p.leverage}×</dd></div>
       <div><dt>Entry</dt><dd>{money(p.entry)}</dd></div><div><dt>Stop / target</dt><dd>{money(p.stop)} / {money(p.target)}</dd></div>

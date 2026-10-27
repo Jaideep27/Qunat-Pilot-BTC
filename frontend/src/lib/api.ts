@@ -15,6 +15,8 @@ export interface Comparison {group:string;kind:string;threshold:number;holdout:{
 export interface Research {status:string;comparisons:Comparison[];benchmarks:Record<string,Partial<Trading>>;reason?:string;metadata?:{eligible_rows:number;version:string}}
 export interface Coverage {release_ready:boolean;strict_release_ready?:boolean;quarantine?:{source_rows:number;source_fraction:number;feature_lookback_bars:number;status:string};status?:string;start?:string;end_exclusive?:string;reason?:string;families?:Record<string,{rows:number;missing_windows:number;native_missing_count?:number;invalid_rows?:number;issues:string[]}>}
 export const preview = new URLSearchParams(location.search).has('preview');
+// The public gateway marks its page; ?public shows the same read-only view locally.
+export const publicView = document.querySelector('meta[name="quantpilot-public"]')!==null||new URLSearchParams(location.search).has('public');
 export async function request<T>(resource:string):Promise<Envelope<T>> {
   if(preview) return (await import('./preview')).fixture(resource) as Envelope<T>;
   const controller = new AbortController();
@@ -27,6 +29,7 @@ export async function request<T>(resource:string):Promise<Envelope<T>> {
 }
 
 export async function post<T>(resource:string,body:unknown):Promise<Envelope<T>>{
+  if(publicView) throw new Error('This public view is read-only.');
   const response=await fetch((import.meta.env.VITE_API_URL??'')+'/api/v1/'+resource,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!response.ok){const detail=await response.json().catch(()=>({}));throw new Error(detail.detail??('Service returned '+response.status))}

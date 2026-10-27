@@ -2,7 +2,7 @@ import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,lazy
 import {createRoot} from 'react-dom/client';
 import {Activity,ChevronsLeft,ChevronsRight,Command,CornerDownLeft,Search} from 'lucide-react';
 import {routes,fromHash,type Route} from './app/routes';
-import {preview,type Candle} from './lib/api';
+import {preview,publicView,type Candle} from './lib/api';
 import {subscribeKlines} from './lib/liveFeed';
 import {Boundary,Loading,money,signedPct,useFlash,useResource} from './components/ui';
 import './styles/styles.css';
@@ -97,14 +97,14 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
     const q=query.trim().toLowerCase();
     const pages=routes.map((r,i)=>({id:r.id,label:'Go to '+r.label,hint:'Alt+'+(i+1),run:()=>go(r.id)}))
       .filter(a=>!q||a.label.toLowerCase().includes(q));
-    return query.trim()?[...pages,{id:'ask',label:`Ask: “${query.trim()}”`,hint:'Enter',run:()=>ask(query.trim())}]:pages;
+    return query.trim()&&!publicView?[...pages,{id:'ask',label:`Ask: “${query.trim()}”`,hint:'Enter',run:()=>ask(query.trim())}]:pages;
   },[query,go,ask]);
   if(!open)return null;
   const choose=(a?:Action)=>{if(a){onClose();a.run()}};
   return <div className="palette-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
     <div className="palette" role="dialog" aria-modal="true" aria-label="Command palette">
       <div className="palette-input"><Command size={16} aria-hidden/>
-        <input ref={input} aria-label="Search pages or ask" placeholder="Jump to a page or ask a question…" value={query}
+        <input ref={input} aria-label="Search pages or ask" placeholder={publicView?'Jump to a page…':'Jump to a page or ask a question…'} value={query}
           onChange={e=>{setQuery(e.target.value);setIndex(0)}}
           onKeyDown={e=>{
             if(e.key==='ArrowDown'){e.preventDefault();setIndex(i=>Math.min(actions.length-1,i+1))}
@@ -115,7 +115,7 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
         {actions.map((a,i)=><li key={a.id} role="option" aria-selected={i===index} className={i===index?'on':''}
           onMouseEnter={()=>setIndex(i)} onMouseDown={e=>{e.preventDefault();choose(a)}}>
           <span>{a.label}</span><kbd aria-hidden>{i===index?<CornerDownLeft size={11}/>:a.hint}</kbd></li>)}
-        {!actions.length&&<li className="palette-empty">No page matches. Type a question to ask it.</li>}
+        {!actions.length&&<li className="palette-empty">{publicView?'No page matches.':'No page matches. Type a question to ask it.'}</li>}
       </ul>
     </div>
   </div>;
@@ -136,7 +136,7 @@ function App(){
   useEffect(()=>{const t=setTimeout(prefetch,2500);return()=>clearTimeout(t)},[]);
   useEffect(()=>{const sync=()=>setRoute(fromHash());addEventListener('hashchange',sync);return()=>removeEventListener('hashchange',sync)},[]);
   const go=useCallback((next:Route)=>{if('#'+next!==location.hash)history.pushState(null,'','#'+next);setRoute(next);scrollTo({top:0})},[]);
-  const ask=useCallback((text:string)=>{setSeed({text,id:Date.now()});go('ask')},[go]);
+  const ask=useCallback((text:string)=>{if(publicView)return;setSeed({text,id:Date.now()});go('ask')},[go]);
   useEffect(()=>{safeWrite('qp:sidebar',narrow?'narrow':'wide')},[narrow]);
   useEffect(()=>{
     const key=(e:KeyboardEvent)=>{
@@ -171,12 +171,13 @@ function App(){
     <div className="main-col">
       <header className="topbar">
         <Boundary name="The price ticker"><LivePrice/></Boundary>
-        <AskBox onAsk={ask}/>
+        {!publicView&&<AskBox onAsk={ask}/>}
         <button type="button" className="palette-button" onClick={()=>setPalette(true)} aria-label="Open command palette" title="Command palette (Ctrl+K)">
           <Command size={14} aria-hidden/><span>Ctrl K</span></button>
         <Clock/>
-        <a className="topbar-link" href="/docs" onClick={e=>{e.preventDefault();open('http://127.0.0.1:8000/docs','_blank')}}>API</a>
+        {!publicView&&<a className="topbar-link" href="/docs" onClick={e=>{e.preventDefault();open('http://127.0.0.1:8000/docs','_blank')}}>API</a>}
       </header>
+      {publicView&&<div role="note" aria-label="Public view" className="banner banner-warn">Public read-only view · Paper trading only, no real money · Not financial advice</div>}
       {preview&&<div className="banner banner-warn">INTERFACE PREVIEW · Synthetic values. No released model, measured results or paper trades.</div>}
       {health.error&&<div role="alert" className="banner banner-bad">QuantPilot services unavailable. Check the backend connection.
         <button type="button" onClick={health.reload}>Retry</button></div>}
@@ -185,7 +186,7 @@ function App(){
           <div className="page-enter">
             {route==='overview'&&<Overview go={go} ask={ask}/>}
             {route==='chart'&&<><div className="page-head"><div><h1>Chart</h1><p>Persistent history, 86 indicator studies, drawing tools and a live exchange stream.</p></div></div><TradingWorkspace/></>}
-            {route==='ask'&&<Ask seed={seed}/>}
+            {route==='ask'&&!publicView&&<Ask seed={seed}/>}
             {route==='research'&&<Research/>}
             {route==='rules'&&<Rules/>}
             {route==='paper'&&<Paper/>}

@@ -84,6 +84,28 @@ test('a paused account shows its review and resumes on request',async({page})=>{
   await expect.poll(()=>resumed).toEqual(['/api/v1/rules/accounts/acct-b/resume']);
 });
 
+test('the public view is read-only: no resume, no Ask, no chat, and it says so',async({page})=>{
+  const resumed:string[]=[];
+  await mock(page,resumed);
+  await page.goto('/?public#rules');
+  const b=page.getByRole('region',{name:'Account Steady'});
+  await expect(b).toContainText('Paused for review',{timeout:30000});
+  await expect(b.getByRole('button',{name:'Open review'})).toBeVisible();
+  await expect(b.getByRole('button',{name:/Resume/})).toHaveCount(0);
+  await expect(page.getByRole('note',{name:'Public view'})).toContainText('Not financial advice');
+  await expect(page.getByRole('search')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Ask',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'API'})).toHaveCount(0);
+  await page.keyboard.press('Control+k');
+  await page.keyboard.type('btc');
+  await expect(page.getByRole('dialog',{name:'Command palette'}).getByRole('option',{name:/^Ask/})).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.goto('/?public#ask');
+  await expect(page.getByRole('heading',{name:'Overview',level:1})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Up or down next 4h?'})).toHaveCount(0);
+  expect(resumed).toEqual([]);
+});
+
 test('account trades explain why each trade was taken and why it lost',async({page})=>{
   await mock(page,[]);
   await page.goto('/#rules');

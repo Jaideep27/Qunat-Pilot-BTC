@@ -49,6 +49,8 @@ function run(command,args){const result=spawnSync(command,args,{cwd:root,windows
   run(python,['-m','quantpilot.cli','init-db']);
   if(!await portOpen(8000))background('api',python,['scripts/ops/serve_api.py']);
   if(!await portOpen(5173))background('dashboard',process.env.ComSpec||'cmd.exe',['/d','/s','/c','npm --prefix frontend run dev']);
+  // Public read-only view for the tunnel; it serves the last production build of the dashboard.
+  if(fs.existsSync('frontend/dist/index.html')&&!await portOpen(8090))background('public-view',python,['scripts/ops/serve_public.py']);
   // The supervisor owns its lock, so running this launcher twice does not duplicate jobs.
   background('data-supervisor',python,['scripts/ops/data_supervisor.py']);
   let ready=false;
@@ -60,6 +62,7 @@ function run(command,args){const result=spawnSync(command,args,{cwd:root,windows
   if(!ready)throw new Error('API did not become ready; inspect .verification/services/api.log.');
   console.log('Workspace: http://localhost:5173/#chart');
   console.log('API: http://127.0.0.1:8000/docs');
+  if(await portOpen(8090))console.log('Public read-only view: http://127.0.0.1:8090/ (the only port a tunnel may publish)');
   console.log('Continuous collection and resumable history run in the background. Actual status is shown in the workspace.');
   const status=await require('./ops/service_readiness.cjs').check();
   console.log(status.message);

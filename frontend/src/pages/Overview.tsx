@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {ArrowUpRight,CalendarClock,Newspaper,ShieldCheck,Sparkles} from 'lucide-react';
-import type {Candle} from '../lib/api';
+import {publicView,type Candle} from '../lib/api';
 import MarketChart from '../components/MarketChart';
 import {AccountsStrip} from './Accounts';
 import type {Route} from '../app/routes';
@@ -61,7 +61,7 @@ function Outlook({price,ask}:{price:number|undefined;ask:(q:string)=>void}){
         <div><dt>Market condition</dt><dd>{f.regime}</dd></div>
         {horizon==='24h'&&<div><dt>Chance of touching −5% in 24h</dt><dd>{pct(f.drop5_risk)}</dd></div>}
       </dl>
-      <div className="chips">{QUICK.map(q=><button key={q} type="button" onClick={()=>ask(q)}>{q}</button>)}</div>
+      {!publicView&&<div className="chips">{QUICK.map(q=><button key={q} type="button" onClick={()=>ask(q)}>{q}</button>)}</div>}
       <Updated resource={forecasts}/>
     </>}
   </Card>;
