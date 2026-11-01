@@ -52,7 +52,12 @@ def style_frame(candles):
     bars = patterns.resample(candles, '15min', 3)[['open', 'high', 'low', 'close', 'volume']]
     out = bars.join(out, how='inner')
     out['regime'] = regimes(out)    # like patterns.regime: missing inputs fall through to RANGE (styles check warm-up)
-    out['atr_1h'] = atr_1h.reindex(out.index, method='ffill')
+    out['atr_1h'] = ind.atr.reindex(out.index, method='ffill')
+    for tf, rule, count in (('1h', '1h', 12), ('4h', '4h', 48)):     # confirmed-swing levels, as `context_frame`
+        bars = one_hour if tf == '1h' else context.timeframe_bars(candles, rule, count)
+        lv = context.nearest_levels(context.confirmed_swings(bars.high, 'high'), context.confirmed_swings(bars.low, 'low'),
+                                    out.index, out.close)
+        out[f'support_{tf}'], out[f'resistance_{tf}'] = lv.support.to_numpy(), lv.resistance.to_numpy()
     out['band4_mid'] = (out.band4_high+out.band4_low)/2
     out['range_pos'] = div(out.close-out.band4_low, out.band4_high-out.band4_low)
     return out.replace([np.inf, -np.inf], np.nan)

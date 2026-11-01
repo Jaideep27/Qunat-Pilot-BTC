@@ -333,3 +333,37 @@ Two forward-only intraday families are registered now, before their data exists 
   5. **Berdondini binomial check:** on the independent trades (the BEF selection: same-outcome consecutive pairs), P(≥ k wins | p = 0.5) < 1%.
 
   C1 has no win/lose prediction, so it is judged on items 3–4 and on the net annual return against holding cash. Every style is also shown against buy-and-hold BTC.
+
+**A11 — 2026-11-01, the Combined Bot: one account, one trade, all strategies decide together. Registered before it was evaluated or run.**
+
+- **Why.** The owner asked for one final bot that listens to every strategy and holds a single trade. It is the fifth account of accounts-v2, beside the four A10 styles. It goes live with them after one restart that the owner approves.
+- **Candidates.** Signals firing at a 15m close:
+  - R1 and B1 signals (A10);
+  - confirmed rulebook hits with a valid plan:
+    - history: `tradeable` hits of `artifacts/rule-engine/research-v2-20261021/hits`;
+    - live: statuses TAKEN, SKIPPED_LOWER_PRIORITY or POSITION_OPEN. The last occurs only because the reference account is busy, which is the live counterpart of history's flat simulation.
+  - at the daily close, a T1 entry.
+  - A playbook candidate keeps its plan's stop, target and `time_stop_hours`. The playbooks' own break-even moves and aborts are **not** applied.
+- **Leaders by regime** (`patterns.regime` at the close):
+  - TREND_UP or TREND_DOWN: T1, PB02, PB04, PB07, PB08, PB12, PB13, B1;
+  - RANGE: R1, PB03, PB09, PB10, PB11, B1;
+  - HIGH_VOL or PANIC: PB01, PB05, PB06.
+  - Only leaders can be traded; other candidates can only confirm.
+- **Veto.** T1's latest daily vote: no shorts at +1, no longs at −1.
+- **Second opinion** (at least one, on the same side):
+  - another candidate from a different source (R1, B1, T1, or a different playbook family) at this close or in the 4 closes before;
+  - or price at a level: a long whose close is within 0.5 × ATR(1h) above `support_1h` or `support_4h`, or a short within 0.5 × ATR(1h) below `resistance_1h` or `resistance_4h`. These are the confirmed-swing levels of `features.context`.
+  - The veto vote is not a second opinion.
+- **Choice.** Most second opinions first, then the leader order above, then the larger reward:risk.
+- **Trade.**
+  - The winner's stop, target, time stop and entry (limit for B1).
+  - 1% risk at the stop, 2× cap, one position, no flips, macro blackout.
+  - Daily brake 3%; floor $5,000.
+  - A T1-led trade also exits when the vote breaks.
+- **Idle money.**
+  - **Open:** after ≥ 24h with no position and no pending order, if the mean of the last 21 funding rates is > 0, the account opens the C1 hedge (carry-v1, 60/40).
+  - **Close:** at a decision that enters a trade (the entry is placed the same minute and fills at the next bar), or when the mean of the last 9 rates is < 0.
+  - Hedge cycles are journaled as trades (`C1`). They do not count toward the 30-trade review.
+- **Trials and pass rule.** Two configurations, with and without idle parking. The live account uses parking. Pass rule as A10 (intraday track, ≥ 100 price trades).
+  - Spans: 2021-10-20 → bars closing before 2025-10-20. The holdout stays untouched.
+  - Reported against each member and against buy-and-hold.

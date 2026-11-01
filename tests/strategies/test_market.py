@@ -53,3 +53,11 @@ def test_nothing_after_a_cutoff_changes_earlier_rows(candles):
     cut = full.index[len(full)//2]
     part = market.style_frame(candles[candles.available_at <= cut])
     pd.testing.assert_frame_equal(part, full.loc[:cut])
+
+
+def test_support_and_resistance_match_the_context_frame(candles):
+    from quantpilot.features import context
+    sf = market.style_frame(candles)
+    cf = context.context_frame(dict(candles=candles))
+    for column in ('support_1h', 'resistance_1h', 'support_4h', 'resistance_4h', 'atr_1h'):
+        pd.testing.assert_series_equal(sf[column], cf.loc[sf.index, column], check_names=False)
