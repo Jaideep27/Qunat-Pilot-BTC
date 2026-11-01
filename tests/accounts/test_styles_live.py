@@ -189,3 +189,32 @@ def test_the_combined_bot_parks_idle_money_after_a_flat_day(account, market):
     step(account, market, t+pd.Timedelta(days=1, hours=9), config=cfg5())
     acct = journal.load_account(account, 'acct-combined')
     assert acct['hedge'] and acct['hedge']['open'] and acct['futures']['position'] is None
+
+
+def cfg6():
+    c = cfg5()
+    c['accounts'].insert(1, dict(id='acct-trend-bot', name='Trend-Led Bot', style='X2', risk=.01, leverage=2.0, daily_brake=.03))
+    return c
+
+
+def test_the_trend_led_bot_enters_with_the_daily_trend_when_another_member_agrees(account, market, monkeypatch):
+    t15 = START+pd.Timedelta(days=40, hours=18)
+    idx = pd.date_range(START-pd.Timedelta(days=200), START+pd.Timedelta(days=41), freq='D', tz='UTC')
+    close = 50_000*np.exp(np.linspace(0, .8, len(idx)))
+    daily = pd.DataFrame(dict(open=close, high=close*1.01, low=close*.99, close=close, volume=1.0), index=idx)
+    monkeypatch.setattr(range_trader, 'signals', lambda sf: pd.DataFrame(columns=['side']))
+    monkeypatch.setattr(breakout, 'signals', lambda sf: pd.DataFrame(columns=['side']))
+    monkeypatch.setattr(live.combined, 'at_level', lambda side, row: [])
+    price = float(market['candles'].close[market['candles'].available_at <= t15].iloc[-1])
+    short = dict(playbook='PB08S', side='short', time=t15, status='TAKEN', plan=dict(entry=price, stop=price*1.01, target=price*.98, reward_risk=2.0))
+    long = dict(playbook='PB08L', side='long', time=t15, status='TAKEN', plan=dict(entry=price, stop=price*.99, target=price*1.02, reward_risk=2.0))
+    step(account, market, t15-pd.Timedelta(minutes=30), config=cfg6(), daily=daily)
+    step(account, market, t15+pd.Timedelta(seconds=30), config=cfg6(), daily=daily, hits=[short])
+    assert not journal.load_account(account, 'acct-trend-bot')['futures']['pending']      # against the trend: nothing
+    step(account, market, t15+pd.Timedelta(minutes=15, seconds=30), config=cfg6(), daily=daily,
+         hits=[dict(long, time=t15+pd.Timedelta(minutes=15))])
+    acct = journal.load_account(account, 'acct-trend-bot')
+    plan = acct['futures']['pending']['plan']
+    assert plan['side'] == 'long' and plan['target'] is None and plan['playbook'] == 'T1' and acct['active']['on']
+    d = [r for r in account_journal.decisions(account, 'acct-trend-bot') if r['decision'] == 'TAKEN'][0]
+    assert d['payload']['chosen']['agreements'] == ['PB08L'] and d['payload']['style'] == 'X2'

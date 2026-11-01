@@ -41,7 +41,7 @@ type Health={overall:'OK'|'WATCH'|'ALARM'|'UNKNOWN';reasons:string[];reference:s
 
 const words=(s:string)=>s.replaceAll('_',' ').toLowerCase();
 // accounts-v2 (A10): four different styles
-const STYLE:Record<string,string>={X1:'All strategies · one trade at a time',T1:'Trend · holds days to weeks',R1:'Range · holds up to 4 hours',B1:'Breakout · holds up to a day',C1:'Funding · no bet on direction'};
+const STYLE:Record<string,string>={X1:'All strategies · one trade at a time',X2:'Trend-led · one trade at a time',T1:'Trend · holds days to weeks',R1:'Range · holds up to 4 hours',B1:'Breakout · holds up to a day',C1:'Funding · no bet on direction'};
 const MEMBER:Record<string,string>={T1:'Trend Rider',R1:'Range Trader',B1:'Breakout Hunter'};
 function Members({m}:{m:NonNullable<Account['members']>}){
   return <>
@@ -50,7 +50,7 @@ function Members({m}:{m:NonNullable<Account['members']>}){
     {m.hedge&&<p className="account-last">Idle money is earning funding in the hedge until the next trade.</p>}
   </>;
 }
-const FILTERS={All:'',Bot:'acct-combined',Trend:'acct-trend',Range:'acct-range',Breakout:'acct-breakout',Funding:'acct-carry',A:'acct-a',B:'acct-b',C:'acct-c',D:'acct-d'} as const;
+const FILTERS={All:'',Bot:'acct-combined','Trend bot':'acct-trend-bot',Trend:'acct-trend',Range:'acct-range',Breakout:'acct-breakout',Funding:'acct-carry',A:'acct-a',B:'acct-b',C:'acct-c',D:'acct-d'} as const;
 type Filter=keyof typeof FILTERS;
 const CRITERIA:Record<string,string>={enough_trades:'too few trades',beats_break_even:'wins not above break-even',positive_mean:'loses on average',
   deflated_sharpe:'could be luck (Sharpe)',most_years_positive:'not positive in most years',not_luck:'could be luck (coin-flip test)',beats_cash:'did not beat cash'};
@@ -237,10 +237,10 @@ export default function AccountsSection(){
     catch(e){setMessage(`${a.name}: ${(e as Error).message}`)}finally{setBusy(false)}};
   const review=list(reviews.data?.reviews).find(r=>r.id===open);
   const styled=!!data?.accounts.some(a=>a.style);
-  const options:Filter[]=styled?['All','Bot','Trend','Range','Breakout','Funding']:['All','A','B','C','D'];
+  const options:Filter[]=styled?['All','Bot','Trend bot','Trend','Range','Breakout','Funding']:['All','A','B','C','D'];
   return <>
     <div className="banner span-3" role="status">{styled
-      ?'Five paper accounts, $10,000 each. The Combined Bot listens to every strategy and holds one trade at a time. Beside it, each strategy also trades on its own: Trend Rider follows long trends, Range Trader works sideways markets, Breakout Hunter waits for quiet spells to break, and the Funding Collector earns funding without betting on direction. Each says when it is on or off, and pauses for a review with you. Paper money only.'
+      ?'Six paper accounts, $10,000 each. The Combined Bot listens to every strategy and holds one trade at a time; the Trend-Led Bot lets only the daily trend choose the direction and the others time its entries. Beside them, each strategy also trades on its own: Trend Rider follows long trends, Range Trader works sideways markets, Breakout Hunter waits for quiet spells to break, and the Funding Collector earns funding without betting on direction. Each says when it is on or off, and pauses for a review with you. Paper money only.'
       :`Four paper accounts, $10,000 each, from careful to aggressive. Each takes the rulebook's confirmed setups whose score clears its cutoff, sizes by its own risk and leverage, and pauses after ${data?.accounts[0]?.round_length??30} trades for a review. Paper money only.`}
       {message&&<strong> {message}</strong>}</div>
     {!data?<Card title="Paper accounts" className="span-3"><Loading/></Card>

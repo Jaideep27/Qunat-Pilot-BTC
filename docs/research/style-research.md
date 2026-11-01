@@ -78,3 +78,26 @@ The bot listens to every member and holds one trade at a time. Same span and cos
 - But most entries were still led by the two losing members, and the extra filters did not turn their losses into gains.
 - The idle hedge earned little: it parked only after a full flat day, and most of its funding went to switching costs.
 - A bot led only by the members that made money in history (Trend Rider, plus the hedge) is an obvious next idea. It would be chosen after seeing these results, so it would need a new amendment and a forward test, and only if the owner wants it.
+
+## The Trend-Led Bot (A12, post-hoc)
+
+**This rule was chosen after the results above were seen, so this history is optimistic by construction.**
+
+The bot follows only Trend Rider's direction, lets the other strategies (or a support/resistance level) time each entry, and parks idle money in the hedge.
+
+| Item | Result |
+|---|---|
+| Account, 2021-10 → 2025-10 | **−15.2%** (worst drop −15.3%; holding BTC +69%) |
+| Price trades | 97; won 41% (break-even 39%); profit factor 1.11; **+$143** |
+| Idle-hedge cycles | 95; funding +$545; switching costs −$2,211; **−$1,666** |
+| Entries timed by | a level 103 times, Breakout Hunter 6, rulebook setups 3, Range Trader 1 |
+| Pass rule | fail: wins not above break-even with confidence, deflated Sharpe, years, coin-flip test |
+
+**Finding that matters for both bots: idle parking, as written, costs money.**
+
+| Bot | Hedge cycles | Hedge result |
+|---|---|---|
+| Trend-Led Bot | 95 | −$1,666 |
+| Combined Bot | 101 | −$1,746 |
+
+Opening the hedge after one flat day and closing it at every trade switches far too often for the funding earned. Changing this needs the owner's decision and a new amendment.

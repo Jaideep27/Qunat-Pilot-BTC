@@ -42,16 +42,17 @@ def test_rules_endpoints_after_cycles(account):
 def test_accounts_endpoint_lists_the_four_styles_with_rules_text(account):
     with TestClient(app) as client:
         data = client.get('/api/v1/rules/accounts').json()['data']
-    assert [a['id'] for a in data['accounts']] == ['acct-combined', 'acct-trend', 'acct-range', 'acct-breakout', 'acct-carry']
-    assert [a['style'] for a in data['accounts']] == ['X1', 'T1', 'R1', 'B1', 'C1']
+    assert [a['id'] for a in data['accounts']] == ['acct-combined', 'acct-trend-bot', 'acct-trend', 'acct-range', 'acct-breakout', 'acct-carry']
+    assert [a['style'] for a in data['accounts']] == ['X1', 'X2', 'T1', 'R1', 'B1', 'C1']
     x = data['accounts'][0]
     assert x['name'] == 'Combined Bot' and any('second opinion' in line for line in x['rules']) and 'members' in x
-    a = data['accounts'][2]
+    assert any('Trend Rider decides the direction' in line for line in data['accounts'][1]['rules'])
+    a = data['accounts'][3]
     assert a['name'] == 'Range Trader' and a['status'] == 'NOT_STARTED' and a['equity'] == 10_000 and a['round_length'] == 30
     assert any('sideways' in line for line in a['rules']) and any('Paper money' in line for line in a['rules'])
     assert a['leverage'] == 2 and a['risk'] == .01 and 'history_test' in a and 'active' in a
     assert a['report']['trades'] == 0 and a['report']['win_rate'] is None and 'max_drawdown' in a['report']
-    carry = data['accounts'][4]
+    carry = data['accounts'][5]
     assert carry['round_unit'] == 'days' and carry['round_length'] == 30
     assert data['config_hash'] and data['retired'] and data['retired'][0]['id'] == 'acct-a'
 
@@ -67,7 +68,7 @@ def test_an_open_style_position_shows_its_time_machine_and_a_stop_only_trend(acc
                                                     plan=dict(playbook='T1', hit_id=hit, style='T1')))),
         pd.Timestamp.now(tz='UTC'))
     with TestClient(app) as client:
-        a = client.get('/api/v1/rules/accounts').json()['data']['accounts'][1]
+        a = client.get('/api/v1/rules/accounts').json()['data']['accounts'][2]
     assert a['position']['target'] is None and a['position']['time_machine']['stop_first'] == .3
     assert a['active']['reason'] == 'On: up'
 

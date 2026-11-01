@@ -230,5 +230,24 @@ test('the combined bot says who leads, the veto, and that idle money earns fundi
   await expect(x).toContainText('Daily trend: up (shorts vetoed)');
   await expect(x).toContainText('Idle money is earning funding');
   await expect(x).toContainText('$3.20');
-  await expect(page.getByRole('group',{name:'Account filter'}).getByText('Bot')).toBeVisible();
+  await expect(page.getByRole('group',{name:'Account filter'}).getByText('Bot',{exact:true})).toBeVisible();
+});
+
+test('the trend-led bot shows that only the trend decides the direction',async({page})=>{
+  const six={...withBot,accounts:[withBot.accounts[0],style('acct-trend-bot','Trend-Led Bot','X2',{
+    active:{on:true,reason:'On: the daily trend is up; it waits for another strategy or support to time a long.'},
+    members:{regime:'TREND_UP',vote:1,leaders:['T1'],hedge:false}}),...withBot.accounts.slice(1)]};
+  await page.route('**/api/v1/**',route=>{
+    const key=new URL(route.request().url()).pathname.split('/').at(-1)!;
+    const values:Record<string,unknown>={accounts:six,'account-trades':{trades:[]},decisions:{decisions:[]},reviews:{reviews:[]},
+      rules:{rulebook:{hash:'x',version:2,name:'x'},layers:{},modes:{},playbooks:[],account:null,checklist:[],research:null,provenance_note:'paper',accounts:[]},
+      journal:{hits:[],trades:[],triggers:[]},research:{status:'not_run'},candles:[],indicators:{}};
+    return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
+  });
+  await page.goto('/#rules');
+  const x=page.getByRole('region',{name:'Account Trend-Led Bot'});
+  await expect(x).toContainText('Trend-led · one trade at a time',{timeout:30000});
+  await expect(x).toContainText('Leads now: Trend Rider');
+  await expect(x).toContainText('waits for another strategy or support');
+  await expect(page.getByRole('group',{name:'Account filter'}).getByText('Trend bot')).toBeVisible();
 });

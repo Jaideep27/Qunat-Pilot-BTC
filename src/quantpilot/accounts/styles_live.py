@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -20,7 +21,8 @@ from quantpilot.simulation import carry as ledger
 from quantpilot.simulation import futures
 from quantpilot.strategies import base, bot, breakout, carry, combined, market, range_trader, timemachine, trend
 
-MODULES = dict(T1=trend, R1=range_trader, B1=breakout, C1=carry, X1=combined)
+TREND_BOT = SimpleNamespace(NAME=combined.TREND_NAME, RULES=combined.TREND_RULES)
+MODULES = dict(T1=trend, R1=range_trader, B1=breakout, C1=carry, X1=combined, X2=TREND_BOT)
 HIT_OK = ('TAKEN', 'SKIPPED_LOWER_PRIORITY', 'POSITION_OPEN')     # A11: setups whose plan was valid
 STOPPED = ('PAUSED_FOR_REVIEW', 'FLOOR_HIT')
 FRESH = pd.Timedelta(minutes=5)
@@ -30,10 +32,10 @@ _cache: dict = {}
 
 
 def new_state(cfg, account, now, last_bar):
-    if account['style'] == 'X1':
+    if account['style'] in ('X1', 'X2'):
         st = bot.new(cfg['balance'], now=now, daily_brake=account['daily_brake'], floor=cfg['floor'], bar_minutes=1)
         iso = pd.Timestamp(now).isoformat()
-        return dict(st, style='X1', status='RUNNING', round=1, in_round=0, number=0, last_bar=last_bar, last_decision=None,
+        return dict(st, style=account['style'], blocked=None, status='RUNNING', round=1, in_round=0, number=0, last_bar=last_bar, last_decision=None,
                     last_funding=None, recent=[], members=None, extra={}, created=iso, round_started=iso, active=None,
                     config=cfg.get('hash'))
     if account['style'] == 'C1':
@@ -314,7 +316,7 @@ def dict_intent(it, t):
 
 
 def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, daily, history, market_engine, hits,
-                   round_length):
+                   round_length, mode='X1'):
     s = acct['futures']
     before = len(s['trades'])
     rates = _rates(frames.get('funding'))
@@ -331,6 +333,9 @@ def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, da
             previous = row.available_at
             acct['last_funding'] = pd.Timestamp(row.available_at).isoformat()
         acct['last_bar'] = t.isoformat()
+    for tr in s['trades'][before:]:
+        if mode == 'X2' and tr['reason'] == 'STOP':
+            acct['blocked'] = 'long' if tr['side'] == 1 else 'short'
     _record(engine, account, acct, before, round_length)
     for cycle in acct['cycles']:      # idle-hedge cycles: journaled, not counted toward the review
         account_journal.add_trade(engine, account['id'], acct['round'], 0, cycle)
@@ -345,6 +350,14 @@ def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, da
     row = sf.loc[t15].to_dict()
     regime = row.get('regime')
     on, reason = combined.active(regime, vote)
+    if mode == 'X2':
+        side = {1: 'long', -1: 'short'}.get(vote)
+        on = side is not None
+        reason = (f"On: the daily trend is {'up' if vote == 1 else 'down'}; it waits for another strategy or "
+                  f"{'support' if vote == 1 else 'resistance'} to time a {side}.") if on else \
+            'Off: no clear daily trend (20/60/120-day trends and the 50-day average disagree), so it stays out.'
+        if acct.get('blocked') and vote != (1 if acct['blocked'] == 'long' else -1) and f is not None and t15 in f.index:
+            acct['blocked'] = None
     acct['active'] = dict(on=on, reason=reason, as_of=t15.isoformat())
     hedge = acct.get('hedge')
     acct['members'] = dict(regime=regime, vote=vote, leaders=list(combined.LEADERS.get(regime, ())),
@@ -360,15 +373,26 @@ def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, da
     if daily_close is not None and acct.get('leader') == 'T1' and p and s['pending'] is None and             not trend.holds(f, daily_close, 'long' if p['side'] == 1 else 'short'):
         bot.exit_(acct, t15)
     from quantpilot.rules import rulebook
-    current = _candidates(sf, t15, hits, combined.time_stops(rulebook.cached()), f, daily_close)
+    current = _candidates(sf, t15, hits, combined.time_stops(rulebook.cached()), f, daily_close if mode == 'X1' else None)
     recent = [dict(c, time=pd.Timestamp(c['time'])) for c in acct.get('recent') or []]
     recent = [c for c in recent if c['time'] >= t15-combined.WINDOW]
     acct['recent'] = [_plain_candidate(c) for c in recent+current]
-    if not current:
+    if mode == 'X2':
+        if not vote or not bot.flat(acct):
+            return
+        drow = f.loc[f.index[f.index <= t15][-1]].to_dict()
+        out = combined.trend_led(vote, drow, current, recent, row, t15, acct.get('blocked'))
+        out.update(leaders=['T1'])
+        if out['chosen'] is None and not current:
+            return          # nothing to record: no member spoke and no level was near
+    elif not current:
         return
-    out = combined.decide(regime, vote, current, recent, row)
+    else:
+        out = combined.decide(regime, vote, current, recent, row)
     chosen = out['chosen']
-    if chosen is None:
+    if chosen is None and mode == 'X2':
+        status = out['status']
+    elif chosen is None:
         status = sorted((c['status'] for c in out['considered']),
                         key=['NO_SECOND_OPINION', 'VETOED', 'NOT_LEADER'].index)[0]
     elif acct['status'] in STOPPED or s['paused']:
@@ -382,7 +406,7 @@ def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, da
     else:
         status = 'TAKEN'
     sizing, tm = None, None
-    hit_id = f'X1:{t15.isoformat()}'
+    hit_id = f'{mode}:{t15.isoformat()}'
     if status == 'TAKEN':
         plan = combined.to_plan(chosen, s['equity'], t15)
         plan['hit_id'] = hit_id
@@ -403,7 +427,7 @@ def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, da
     account_journal.add_decisions(engine, [dict(
         account=account['id'], hit_id=hit_id, time=t15, decision=status, score=None, confidence=None, cutoff=None,
         trade_id=f"{account['id']}:{hit_id}" if status == 'TAKEN' else None,
-        payload=dict(style='X1', regime=regime, vote=vote, leaders=out['leaders'], considered=[plain(c) for c in out['considered']],
+        payload=dict(style=mode, regime=regime, vote=vote, leaders=out['leaders'], considered=[plain(c) for c in out['considered']],
                      chosen=plain(chosen) if chosen else None, side=chosen['side'] if chosen else None,
                      reason=f"{chosen['source']} led, backed by {', '.join(chosen['agreements'])}" if chosen else None,
                      sizing=sizing, time_machine=tm, snapshot=_snapshot(row, frames.get('funding')), active=acct['active']))])
@@ -428,7 +452,7 @@ def step_all(engine, frames, fast, now, macro_events, cfg=None, daily=None, hist
     now = pd.Timestamp(now)
     retire(engine, cfg.get('retired'), now)
     sf = _frame(frames)
-    if daily is None and market_engine is not None and any(a['style'] in ('T1', 'X1') for a in cfg['accounts']):
+    if daily is None and market_engine is not None and any(a['style'] in ('T1', 'X1', 'X2') for a in cfg['accounts']):
         daily = _daily(market_engine, now)
     out = {}
     for account in cfg['accounts']:
@@ -437,9 +461,9 @@ def step_all(engine, frames, fast, now, macro_events, cfg=None, daily=None, hist
             last = fast.available_at.max().isoformat() if len(fast) else now.floor('min').isoformat()
             acct = new_state(cfg, account, now, last)
         new = fast[fast.available_at > pd.Timestamp(acct['last_bar'])] if acct['last_bar'] else fast.iloc[0:0]
-        if account['style'] == 'X1':
+        if account['style'] in ('X1', 'X2'):
             _step_combined(engine, account, acct, sf, frames, new, now, macro_events, daily, history, market_engine or engine,
-                           hits, cfg['round_length'])
+                           hits, cfg['round_length'], mode=account['style'])
         elif account['style'] == 'C1':
             acct['floor'] = cfg['floor']
             _step_carry(engine, account, acct, frames, new, now, account.get('review_days', 30),
@@ -450,7 +474,7 @@ def step_all(engine, frames, fast, now, macro_events, cfg=None, daily=None, hist
         s = acct['futures']
         s['decisions'], s['rejections'] = s.get('decisions', [])[-500:], s.get('rejections', [])[-500:]
         journal.save_account(engine, account['id'], acct, now)
-        equity = bot.equity(acct) if account['style'] == 'X1' else s['equity']
+        equity = bot.equity(acct) if account['style'] in ('X1', 'X2') else s['equity']
         out[account['id']] = dict(style=account['style'], status=acct['status'], equity=equity, trades=acct['number'],
                                   active=(acct.get('active') or {}).get('on'))
     try:

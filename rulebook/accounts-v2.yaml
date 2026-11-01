@@ -1,5 +1,5 @@
-# Paper accounts, accounts-v2 (pre-registrations A10 and A11, 2026-11-01): the Combined Bot (all strategies, one trade)
-# and the four styles it listens to, each also trading on its own.
+# Paper accounts, accounts-v2 (pre-registrations A10, A11 and A12, 2026-11-01): the Combined Bot (all strategies,
+# one trade), the Trend-Led Bot (Trend Rider leads, the others time entries) and the four styles, each also trading on its own.
 # They replace the A8 accounts in accounts-v1.yaml, which are retired (their trades and reviews stay in the journal).
 # Changing anything here makes accounts-v3 and needs a new amendment. Paper money only.
 version: 2
@@ -11,6 +11,12 @@ accounts:
 - id: acct-combined
   name: Combined Bot
   style: X1
+  risk: 0.01
+  leverage: 2.0
+  daily_brake: 0.03
+- id: acct-trend-bot
+  name: Trend-Led Bot
+  style: X2
   risk: 0.01
   leverage: 2.0
   daily_brake: 0.03
