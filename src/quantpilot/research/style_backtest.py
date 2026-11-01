@@ -15,14 +15,14 @@ import pandas as pd
 from quantpilot.research import selective
 from quantpilot.simulation import carry as ledger
 from quantpilot.simulation import futures
-from quantpilot.strategies import base, breakout, carry, market, range_trader, trend
+from quantpilot.strategies import base, bot, breakout, carry, combined, market, range_trader, trend
 
 DEV_START, DEV_END = pd.Timestamp('2021-10-20', tz='UTC'), pd.Timestamp('2025-10-20', tz='UTC')
 TREND_START, CARRY_START = pd.Timestamp('2017-08-18', tz='UTC'), pd.Timestamp('2020-01-01', tz='UTC')
 WARMUP = pd.Timedelta(days=60)
 BALANCE = 10_000.0
-MIN_TRADES = dict(T1=30, R1=100, B1=100, C1=10)
-TRACK = dict(T1='swing', R1='intraday', B1='intraday', C1='swing')
+MIN_TRADES = dict(T1=30, R1=100, B1=100, C1=10, X1=100)
+TRACK = dict(T1='swing', R1='intraday', B1='intraday', C1='swing', X1='intraday')
 SIGNALS = dict(R1=range_trader.signals, B1=breakout.signals)
 REGISTRIES = ('artifacts/strategy-research/run-20261020/trials.jsonl', 'artifacts/agent-research/run-20261020/trials.jsonl',
               'artifacts/rule-engine/research-20261021/trials.jsonl', 'artifacts/rule-engine/research-v2-20261021/trials.jsonl')
@@ -137,6 +137,73 @@ def run_carry(rates, price, start, end):
     return dict(style='C1', trades=s['trades'], account=acct)
 
 
+def run_combined(candles, daily, rates, hits, start, end, macro_events=(), stops=None, park=True):
+    """X1 (A11): every member's candidates, the regime boss, the daily veto and a second opinion; one book,
+    with idle money in the hedge when `park`. Funding `rates` (8-hourly) drive both the position and the hedge."""
+    sf = market.style_frame(candles)
+    f = trend.frame(daily)
+    cands = {}
+    for source, fn in (('R1', range_trader.signals), ('B1', breakout.signals)):
+        for t, items in combined.from_signals(fn(sf), source).items():
+            cands.setdefault(t, []).extend(items)
+    if hits is not None and len(hits):
+        h = hits[hits.tradeable & hits.plan_stop.notna()] if 'tradeable' in hits else hits
+        for row in h.to_dict('records'):
+            t = pd.Timestamp(row['time'])
+            cands.setdefault(t, []).append(combined.from_hit(row, stops or {}))
+    for t in f.index[f.vote != 0]:
+        it = trend.intent(f, t)
+        if it is not None:
+            cands.setdefault(t, []).append(combined.from_trend(it))
+    c = market.candles_of(candles)
+    c = c[(c.available_at >= start) & (c.available_at < end)]
+    rates = rates.sort_index()
+    st, curve, previous, recent = bot.new(BALANCE, now=start, bar_minutes=5), [], None, []
+    stats = dict(decisions=0, chosen=0, vetoed=0, no_second_opinion=0, not_leader=0, led_by={})
+    daily_closes = set(f.index)
+    for bar in c.itertuples():
+        t = bar.available_at
+        due = rates[(rates.index > previous) & (rates.index <= t)] if previous is not None else rates.iloc[0:0]
+        bot.on_bar(st, t, bar.open, bar.high, bar.low, bar.close, due.tolist())
+        for when, rate in due.items():
+            bot.on_settlement(st, t, rate, bar.close, rates[rates.index <= when].iloc[-21:].tolist(), allow_park=park)
+        previous = t
+        if t.minute % 15:
+            continue
+        vote = int(f.vote.asof(t)) if len(f) and t >= f.index[0] else 0
+        s = st['futures']
+        if t in daily_closes and st['leader'] == 'T1' and s['position'] and s['pending'] is None and \
+                not trend.holds(f, t, 'long' if s['position']['side'] == 1 else 'short'):
+            bot.exit_(st, t)
+        current = cands.get(t, [])
+        recent = [x for x in recent if x['time'] >= t-combined.WINDOW]
+        if current and bot.flat(st) and not s['paused'] and not s['halted_day'] and not s.get('floor_hit') \
+                and not base.in_blackout(t, macro_events) and t in sf.index:
+            row = sf.loc[t].to_dict()
+            out = combined.decide(row['regime'], vote, current, recent, row)
+            stats['decisions'] += 1
+            for rec in out['considered']:
+                key = {'VETOED': 'vetoed', 'NO_SECOND_OPINION': 'no_second_opinion', 'NOT_LEADER': 'not_leader'}.get(rec['status'])
+                if key:
+                    stats[key] += 1
+            if out['chosen']:
+                ch = out['chosen']
+                stats['chosen'] += 1
+                stats['led_by'][ch['source']] = stats['led_by'].get(ch['source'], 0)+1
+                bot.enter(st, combined.to_plan(ch, s['equity'], t), bar.close, t, leader=ch['source'])
+        recent.extend(current)
+        if t.hour == 0 and t.minute == 0:
+            curve.append(bot.equity(st, bar.close))
+    last = float(c.close.iloc[-1]) if len(c) else None
+    if st['hedge']:
+        bot._close_hedge(st, last, c.available_at.iloc[-1], 'END_OF_TEST')
+    hold = float(c.close.iloc[-1]/c.open.iloc[0]-1) if len(c) else None
+    account = _account(st['futures']['equity'], curve, st['futures']['trades'], hold)
+    account.update(funding=float(sum(x['funding'] for x in st['cycles'])), hedge_cycles=len(st['cycles']), parked=park)
+    return dict(style='X1', trades=st['futures']['trades'], cycles=st['cycles'], stats=stats, account=account,
+                rejections=len(st['futures']['rejections']))
+
+
 def judge(style, result, registries=REGISTRIES):
     """The A10 pass rule on the style's closed trades (per-trade result = net / equity at entry)."""
     trades = result['trades']
@@ -165,8 +232,9 @@ def _plain(x):
     return json.loads(json.dumps(x, default=str))
 
 
-def research(output, engine=None):
-    """Run every style once (resumable per style) and write report.json."""
+def research(output, engine=None, combined_bot=False):
+    """Run every style once (resumable per style) and write report.json; with `combined_bot`, also the A11 bot
+    with and without idle parking."""
     from quantpilot.config import settings
     from quantpilot.data.macro import events as load_macro
     from quantpilot.research.event_study import load_market
@@ -174,10 +242,17 @@ def research(output, engine=None):
     folder = Path(output)
     (folder/'runs').mkdir(parents=True, exist_ok=True)
     results = {}
-    for style in ('C1', 'T1', 'R1', 'B1'):
+    names = ('C1', 'T1', 'R1', 'B1')+(('X1', 'X1-nopark') if combined_bot else ())
+    for style in names:
         path = folder/'runs'/f'{style}.json'
         if path.exists():
             results[style] = json.loads(path.read_text(encoding='utf-8'))
+            continue
+        if style.startswith('X1'):
+            result = _run_combined_dev(settings, engine, park=style == 'X1')
+            result['verdict'] = judge('X1', result)
+            path.write_text(json.dumps(_plain(result)), encoding='utf-8')
+            results[style] = _plain(result)
             continue
         if style == 'T1':
             panel = pd.read_parquet(Path(settings.data_dir)/'research'/'daily_panel.parquet')
@@ -201,6 +276,28 @@ def research(output, engine=None):
                   styles={k: dict(verdict=v['verdict'], account=v['account'], trades=len(v['trades'])) for k, v in results.items()})
     (folder/'report.json').write_text(json.dumps(_plain(report), indent=2), encoding='utf-8')
     return report
+
+
+def _run_combined_dev(settings, engine=None, park=True):
+    from quantpilot.data.macro import events as load_macro
+    from quantpilot.research.event_study import load_market
+    from quantpilot.research.playbooks import load_hits
+    from quantpilot.rules import rulebook
+    from quantpilot.storage.database import database
+    panel = pd.read_parquet(Path(settings.data_dir)/'research'/'daily_panel.parquet')
+    daily = panel[['open', 'high', 'low', 'close', 'volume']].copy()
+    daily.index = daily.index+pd.Timedelta(days=1)
+    rates, _ = _carry_inputs(settings, engine)
+    hits = load_hits('artifacts/rule-engine/research-v2-20261021')
+    hits = hits[(hits.time >= DEV_START) & (hits.time < DEV_END)]
+    keep = ['playbook', 'side', 'time', 'tradeable']+[c for c in hits.columns if c.startswith('plan_')]
+    hits = hits[keep].copy()
+    engine = engine or database(settings.market_database_url)
+    frames = load_market(engine, DEV_START-WARMUP, DEV_END, families=())
+    candles = frames['candles'][pd.to_datetime(frames['candles'].available_at, utc=True) < DEV_END]
+    del frames
+    return run_combined(candles, daily, rates, hits, DEV_START, DEV_END, load_macro(database()),
+                        stops=combined.time_stops(rulebook.cached()), park=park)
 
 
 def _carry_inputs(settings, engine=None):

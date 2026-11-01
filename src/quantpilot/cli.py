@@ -55,6 +55,7 @@ def main():
     agent.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
     styles=sub.add_parser('research-styles', help='A10: history test of the four account styles (development span only)')
     styles.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
+    styles.add_argument('--combined', action='store_true', help='Also run the A11 Combined Bot (with and without idle parking)')
     playbooks=sub.add_parser('research-playbooks', help='Rule engine A6: pre-registered rulebook playbooks (never trades)')
     playbooks.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
     playbooks.add_argument('--prior', action='append', help='Earlier trial registry to count (repeatable)')
@@ -193,7 +194,7 @@ def main():
         print(json.dumps({k: report['families'][k]['gate'] for k in report['families']}, indent=2, default=str))
     elif args.command == 'research-styles':
         from quantpilot.research.style_backtest import research
-        report = research(args.output)
+        report = research(args.output, combined_bot=args.combined)
         print(json.dumps({k: dict(passed=v['verdict']['passed'], account=v['account']) for k, v in report['styles'].items()},
                          indent=2, default=str))
     elif args.command == 'research-playbooks':

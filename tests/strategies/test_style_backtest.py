@@ -54,3 +54,36 @@ def test_judge_reads_mixed_timestamp_formats():
               dict(entry_time='2020-03-26T08:00:00.002000+00:00', net=-1.0, return_on_equity=-.001)]
     verdict = sb.judge('C1', dict(trades=trades, account=dict(final_equity=10_000.0)), registries=[])
     assert verdict['report']['calls'] == 2
+
+
+def combined_inputs(days=75, seed=7):
+    candles = synthetic(days=days, seed=seed)
+    start = candles.event_time.iloc[0]+pd.Timedelta(days=45)
+    end = candles.event_time.iloc[-1]
+    idx = pd.date_range(start-pd.Timedelta(days=200), end+pd.Timedelta(days=1), freq='D', tz='UTC')
+    close = 50_000*np.exp(np.linspace(0, .6, len(idx)))
+    daily = pd.DataFrame(dict(open=close, high=close*1.01, low=close*.99, close=close, volume=1.0), index=idx)
+    times = pd.date_range(candles.event_time.iloc[0].ceil('8h'), end, freq='8h', tz='UTC')
+    rates = pd.Series(.0001, index=times)
+    t0 = start.ceil('15min')+pd.Timedelta(hours=6)
+    price = float(candles.close[candles.available_at <= t0].iloc[-1])
+    hits = pd.DataFrame([dict(playbook='PB08L', side='long', time=t0+pd.Timedelta(hours=24*k), tradeable=True,
+                              plan_entry=price, plan_stop=price*.99, plan_target=price*1.02, plan_reward_risk=2.0)
+                         for k in range(10)])
+    return candles, daily, rates, hits, start, end
+
+
+def test_the_combined_bot_trades_only_vetted_leaders_and_parks_idle_money():
+    candles, daily, rates, hits, start, end = combined_inputs()
+    stops = {'PB08L': 12}
+    park = sb.run_combined(candles, daily, rates, hits, start, end, macro_events=[], stops=stops, park=True)
+    flat = sb.run_combined(candles, daily, rates, hits, start, end, macro_events=[], stops=stops, park=False)
+    assert set(park) >= {'trades', 'cycles', 'account', 'stats'}
+    assert not flat['cycles'] and park['cycles']
+    assert park['account']['funding'] > 0
+    for t in park['trades']:
+        assert t['plan']['style'] == 'X1' and t['plan']['playbook'] in ('T1', 'R1', 'B1', 'PB08L')
+    s = park['stats']
+    assert s['decisions'] >= s['chosen'] and {'vetoed', 'no_second_opinion', 'not_leader'} <= set(s)
+    verdict = sb.judge('X1', park, registries=[])
+    assert 'not_luck' in verdict['criteria']
