@@ -264,7 +264,7 @@ def research(output, engine=None, combined_bot=False):
     folder = Path(output)
     (folder/'runs').mkdir(parents=True, exist_ok=True)
     results = {}
-    names = ('C1', 'T1', 'R1', 'B1')+(('X1', 'X1-nopark', 'X2') if combined_bot else ())
+    names = ('C1', 'T1', 'R1', 'B1')+(('X1', 'X1-nopark', 'X2', 'X2-nopark') if combined_bot else ())
     for style in names:
         path = folder/'runs'/f'{style}.json'
         if path.exists():
@@ -272,7 +272,7 @@ def research(output, engine=None, combined_bot=False):
             continue
         if style.startswith('X'):
             mode = style[:2]
-            result = _run_combined_dev(settings, engine, park=style != 'X1-nopark', mode=mode)
+            result = _run_combined_dev(settings, engine, park=not style.endswith('-nopark'), mode=mode)
             result['verdict'] = judge(mode, result)
             path.write_text(json.dumps(_plain(result)), encoding='utf-8')
             results[style] = _plain(result)

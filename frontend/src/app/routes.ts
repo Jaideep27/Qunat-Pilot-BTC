@@ -4,7 +4,7 @@ import {publicView} from '../lib/api';
 // Four tabs; everything else lives under More (and stays reachable by link and the Ctrl+K palette).
 const all=[
   {id:'overview',label:'Home',icon:House,tab:true,about:''},
-  {id:'bots',label:'Bots',icon:Bot,tab:true,about:''},
+  {id:'bots',label:'Bot',icon:Bot,tab:true,about:''},
   {id:'chart',label:'Chart',icon:CandlestickChart,tab:true,about:''},
   {id:'more',label:'More',icon:LayoutGrid,tab:true,about:''},
   {id:'ask',label:'Ask',icon:MessageSquare,tab:false,about:'Ask a question about BTC in plain words.'},

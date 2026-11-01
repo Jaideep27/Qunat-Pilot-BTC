@@ -59,7 +59,7 @@ check('Local Markdown document links resolve',()=>{
 });
 check('Eight dashboard views, attribution and browser audit source exist',()=>{
  const routes=read('frontend/src/app/routes.ts');
- for(const tab of ['Overview','Chart','Ask','Research','Rules','Paper','News','System'])assert(routes.includes("label:'"+tab+"'"),tab);
+ for(const tab of ['Home','Bot','Chart','More','Ask','News','Research','Rule engine','Old paper account','System'])assert(routes.includes("label:'"+tab+"'"),tab);
  assert(read('frontend/src/main.tsx').includes('https://www.tradingview.com/'));
  assert(read('frontend/tests/dashboard.spec.ts').includes('Execution ledger'));
  // The legacy cloud paper worker runs only on demand: a schedule would fail every 15 minutes without its database.

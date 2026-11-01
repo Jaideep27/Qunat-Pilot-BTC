@@ -16,7 +16,8 @@ from quantpilot.simulation import tradeplan
 from quantpilot.simulation.futures import liquidation_price
 
 V1 = Path(__file__).resolve().parents[3]/'rulebook'/'accounts-v1.yaml'      # A8, retired 2026-11-01
-CONFIG = Path(__file__).resolve().parents[3]/'rulebook'/'accounts-v2.yaml'  # A10, the four styles
+V2 = Path(__file__).resolve().parents[3]/'rulebook'/'accounts-v2.yaml'      # A10-A13, retired 2026-11-01
+CONFIG = Path(__file__).resolve().parents[3]/'rulebook'/'accounts-v3.yaml'  # A14, one Master Bot
 PERCENT = lambda x: f'{100*x:g}%'
 
 

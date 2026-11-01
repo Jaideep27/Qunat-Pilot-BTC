@@ -74,8 +74,15 @@ def test_watch_items_for_a_long():
 
 
 def test_v2_config_runs_four_different_styles_and_retires_the_a8_accounts():
-    v2 = accounts.load()
+    v2 = accounts.load(accounts.V2)
     assert v2['version'] == 2 and [a['style'] for a in v2['accounts']] == ['X1', 'X2', 'T1', 'R1', 'B1', 'C1']
     assert v2['retired'] == ['acct-a', 'acct-b', 'acct-c', 'acct-d'] and len(v2['hash']) == 12
     assert all(a['risk'] == .01 and a['leverage'] == 2.0 for a in v2['accounts'] if a['style'] != 'C1')
     assert all(len(a['id']) <= 16 for a in v2['accounts'])      # the journal's account column
+
+
+def test_v3_is_one_master_account_and_retires_every_other():
+    v3 = accounts.load()
+    assert v3['version'] == 3 and [(a['id'], a['style'], a['park']) for a in v3['accounts']] == [('acct-master', 'X2', False)]
+    assert set(v3['retired']) == {'acct-a', 'acct-b', 'acct-c', 'acct-d', 'acct-combined', 'acct-trend-bot', 'acct-trend',
+                                   'acct-range', 'acct-breakout', 'acct-carry'}

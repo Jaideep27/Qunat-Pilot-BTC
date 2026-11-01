@@ -13,7 +13,7 @@ type Report={trades:number;wins:number;win_rate:number|null;account_return:numbe
 export type Bot={id:string;name:string;status:string;equity:number;account_return:number;round:number;in_round:number;round_length:number;round_unit?:string;
   halted_day:boolean;position:Position|null;pending:boolean;review:{id:string;round:number;status:string}|null;rules:string[];report?:Report|null;
   style?:string;active?:{on:boolean;reason:string}|null;history_test?:HistoryTest;
-  members?:{regime:string|null;vote:number;leaders:string[];hedge:boolean}|null};
+  members?:{regime:string|null;vote:number;leaders:string[];hedge:boolean;range_trader?:string;breakout?:string;funding?:string;volume?:number|null}|null};
 type Bots={accounts:Bot[]};
 type Decision={id:string;account:string;trade_id:string|null;payload:{sizing?:{risk_amount?:number}|null;reason?:string;time_machine?:TimeMachine|null}};
 type Trade={id:string;account:string;number:number;playbook:string;side:string;entry_time:string;exit_time:string;net:number;reason:string;
@@ -71,7 +71,7 @@ function BotCard({b,onResume,onReview,busy}:{b:Bot;onResume:()=>void;onReview:()
       <div><span>Return</span><strong className={b.account_return<0?'tone-down':b.account_return>0?'tone-up':''}>{signedPct(b.account_return)}</strong></div>
     </div>
     {b.active&&<p className="bot-now"><span className={'dot '+(b.active.on?'on':'')} aria-hidden/>{b.active.reason}</p>}
-    {m&&<p className="muted">Leads now: {m.leaders.length?[...new Set(m.leaders.map(l=>MEMBER[l]??'rulebook setups'))].join(', '):'nobody yet'} · daily trend {m.vote===1?'up':m.vote===-1?'down':'unclear'}
+    {m&&b.style!=='X2'&&<p className="muted">Leads now: {m.leaders.length?[...new Set(m.leaders.map(l=>MEMBER[l]??'rulebook setups'))].join(', '):'nobody yet'} · daily trend {m.vote===1?'up':m.vote===-1?'down':'unclear'}
       {m.hedge?' · idle money is earning funding':''}</p>}
     {p?<PositionLine p={p}/>:<p className="muted">{b.pending?'An order is placed and waiting to fill.':'No open trade.'}</p>}
     {tm&&tm.paths>0&&<p className="muted">Before entry, 2,000 replays of recent days gave: stop first {pct(tm.stop_first,0)}
@@ -93,6 +93,25 @@ function BotCard({b,onResume,onReview,busy}:{b:Bot;onResume:()=>void;onReview:()
         <div><dt>Average win / loss</dt><dd>{money(b.report.avg_win)} / {money(b.report.avg_loss)}</dd></div>
         <div><dt>Worst drop</dt><dd>{signedPct(b.report.max_drawdown)}</dd></div>
       </dl></Collapsible>}
+  </Card>;
+}
+
+const MARKET:Record<string,string>={RANGE:'moving sideways',TREND_UP:'trending up',TREND_DOWN:'trending down',HIGH_VOL:'swinging hard',PANIC:'in a panic'};
+const strip=(t?:string)=>(t??'').replace(/^(On|Off): /,'');
+/** What each advisor is telling the master right now, in plain words. */
+function Advisors({m}:{m:NonNullable<Bot['members']>}){
+  const rows:[string,string][]=[
+    ['Trend Rider (direction)',m.vote===1?'Up: the master may only buy.':m.vote===-1?'Down: the master may only sell.':'No clear trend: the master stays out.'],
+    ['Range Trader (timing)',strip(m.range_trader)||'—'],
+    ['Breakout Hunter (timing, volume)',strip(m.breakout)||'—'],
+    ['Rulebook setups (timing)','The 20 support/resistance setups report every confirmed signal.'],
+    ['Support and resistance (timing)','A buy can also be timed by price sitting on support; a sell by price under resistance.'],
+    ['Funding Collector (context)',m.funding??'—'],
+    ['Volume (context)',m.volume==null?'—':`${m.volume}× the usual 15-minute volume.`],
+    ['Market type',m.regime?MARKET[m.regime]??m.regime:'—'],
+  ];
+  return <Card title="Advisors" label="Advisors" className="span-3" tag="no money of their own">
+    <ul className="plain-list">{rows.map(([k,v])=><li key={k}><span>{k}</span><strong>{v}</strong></li>)}</ul>
   </Card>;
 }
 
@@ -124,7 +143,8 @@ export function BotList({go}:{go:(r:Route)=>void}){
   const res=useResource<Bots>('rules/accounts',60000);
   const bots=list(res.data?.accounts);
   const open=(id:string)=>{remember(id);go('bots')};
-  return <Card title="Your bots" label="Your bots" className="span-3" actions={<button type="button" className="link" onClick={()=>go('bots')}>Open</button>}>
+  const one=bots.length===1;
+  return <Card title={one?'Your bot':'Your bots'} label={one?'Your bot':'Your bots'} className="span-3" actions={<button type="button" className="link" onClick={()=>go('bots')}>Open</button>}>
     {!res.data?<Loading lines={3}/>:!bots.length?<p className="muted">The bots start with the next engine cycle.</p>:
       <ul className="bot-list">{bots.map(b=>{const [label,tone]=botStatus(b);return <li key={b.id}>
         <button type="button" onClick={()=>open(b.id)} aria-label={`Open ${b.name}`}>
@@ -132,7 +152,7 @@ export function BotList({go}:{go:(r:Route)=>void}){
           <span className="bot-money"><strong>{money(b.equity)}</strong><small className={b.account_return<0?'tone-down':b.account_return>0?'tone-up':'muted'}>{signedPct(b.account_return)}</small></span>
           <Pill tone={tone}>{label}</Pill>
         </button></li>})}</ul>}
-    <p className="source">Paper money only. Each bot started with $10,000.</p>
+    <p className="source">{one?'Paper money only. It started with $10,000; the other strategies advise it.':'Paper money only. Each bot started with $10,000.'}</p>
   </Card>;
 }
 
@@ -154,13 +174,15 @@ export default function BotsPage(){
     catch(e){setMessage(`${b.name}: ${(e as Error).message}`)}finally{setBusy(false)}};
   const review=list(reviews.data?.reviews).find(r=>r.id===open);
   return <div className="page-narrow">
-    <PageHead title="Bots" description="Six paper bots, $10,000 each. Pick one to see what it is doing and why."/>
+    {bots.length===1?<PageHead title={bots[0].name} description="One paper account, $10,000. The other strategies advise it; only it trades."/>
+      :<PageHead title="Bots" description="Paper bots, $10,000 each. Pick one to see what it is doing and why."/>}
     {message&&<div className="banner" role="status">{message}</div>}
     <div className="grid">
       {!res.data?<Card title="Bots" className="span-3"><Loading/></Card>:<>
-        <div className="bot-picker span-3" role="group" aria-label="Choose a bot">{bots.map(b=>
-          <button key={b.id} type="button" aria-pressed={b.id===bot?.id} className={b.id===bot?.id?'on':''} onClick={()=>pick(b.id)}>{SHORT[b.id]??b.name}</button>)}</div>
+        {bots.length>1&&<div className="bot-picker span-3" role="group" aria-label="Choose a bot">{bots.map(b=>
+          <button key={b.id} type="button" aria-pressed={b.id===bot?.id} className={b.id===bot?.id?'on':''} onClick={()=>pick(b.id)}>{SHORT[b.id]??b.name}</button>)}</div>}
         {bot&&<BotCard b={bot} busy={busy} onResume={()=>resume(bot)} onReview={()=>setOpen(bot.review?.id??null)}/>}
+        {bot?.members&&bot.style==='X2'&&<Advisors m={bot.members}/>}
         {review&&bot&&<ReviewPanel review={review} name={bot.name}/>}
         {bot&&<Card title="Trades" label="Account trades" className="span-3">
           {!trades.data?<Loading/>:<TradeList trades={[...list(trades.data.trades)].filter(t=>t.account===bot.id)} decisions={byTrade}/>}

@@ -236,3 +236,32 @@ def test_with_parking_off_the_bot_keeps_idle_money_as_cash_and_closes_an_open_he
     step(account, market, t+pd.Timedelta(days=1, hours=9, minutes=5), config=off)
     acct = journal.load_account(account, 'acct-combined')
     assert acct['hedge'] is None and acct['cycles'][-1]['reason'] == 'PARKING_OFF'
+
+
+def test_retiring_closes_a_funding_hedge_and_a_bots_idle_hedge(account):
+    from quantpilot.simulation import carry as ledger
+    from quantpilot.strategies import bot
+    t = START+pd.Timedelta(days=30)
+    c = ledger.initial(10_000.0)
+    ledger.open_(c, 80_000.0, t)
+    journal.save_account(account, 'acct-carry', dict(status='RUNNING', style='C1', futures=c), t)
+    st = bot.new(10_000.0, now=t)
+    h = ledger.initial(10_000.0)
+    ledger.open_(h, 80_000.0, t)
+    st['hedge'] = h
+    journal.save_account(account, 'acct-combined', dict(st, status='RUNNING', style='X1'), t)
+    live.retire(account, ['acct-carry', 'acct-combined'], t+pd.Timedelta(hours=1))
+    carry_state = journal.load_account(account, 'acct-carry')
+    assert carry_state['status'] == 'RETIRED' and carry_state['futures']['open'] is False
+    assert carry_state['futures']['trades'][-1]['reason'] == 'RETIRED'
+    bot_state = journal.load_account(account, 'acct-combined')
+    assert bot_state['status'] == 'RETIRED' and bot_state['hedge'] is None and bot_state['cycles'][-1]['reason'] == 'RETIRED'
+
+
+def test_the_master_records_every_advisor_view_including_funding_and_volume(account, market):
+    master = dict(cfg5(), accounts=[dict(id='acct-master', name='Master Bot', style='X2', risk=.01, leverage=2.0,
+                                         daily_brake=.03, park=False)])
+    step(account, market, START+pd.Timedelta(days=40, minutes=1), config=master)
+    m = journal.load_account(account, 'acct-master')['members']
+    assert {'regime', 'vote', 'range_trader', 'breakout', 'funding', 'volume'} <= set(m)
+    assert isinstance(m['funding'], str) and 'funding' in m['funding'].lower() and m['volume'] > 0

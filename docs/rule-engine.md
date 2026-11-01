@@ -84,6 +84,24 @@ The owner noticed that the four A8 accounts copied each other: they traded the s
   - Funding Collector: +13.9% over 5.8 years, not proven.
   - Range Trader and Breakout Hunter: each lost half the account.
 
+## One Master Bot (amendment A14, accounts-v3, 2026-11-02)
+
+There is one paper account, `acct-master`, run by the Master Bot. The rules are A12 with parking off (A13).
+
+**Its advisors (no money of their own):**
+- Trend Rider's daily vote sets the side.
+- Range Trader, Breakout Hunter (double-volume breakouts), the rulebook setups and support/resistance levels time the entry.
+- The Funding Collector's funding reading and the 15-minute relative volume are recorded with every decision.
+
+**Code:**
+- Config: `rulebook/accounts-v3.yaml`.
+- Logic: `strategies/combined.trend_led`, run by the `X2` path of `accounts/styles_live.py`.
+- The dashboard's Bot page shows the master and an "Advisors" panel.
+
+**Retired:** the six accounts-v2 accounts and the four A8 accounts. Their journals are kept.
+
+**History:** +1.6% over 2021-10 → 2025-10, worst drop −4.6%. Not proven, and post-hoc. See `docs/research/style-research.md`.
+
 ## The Combined Bot (amendment A11, accounts-v2, 2026-11-01)
 
 One more account, `acct-combined`, listens to every strategy and holds a single trade:

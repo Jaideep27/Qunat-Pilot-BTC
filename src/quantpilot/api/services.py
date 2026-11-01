@@ -506,12 +506,13 @@ SHARED_STYLE_RULES = ['Paper money only: nothing here places a real order.',
                       'Stops for the day after losing 3%; stops early for review below $5,000.']
 
 
-def _style_history(style):
+def _style_history(style, park=True):
     """The A10 history-test verdict for a style, from the latest run (a 'running' note until it exists)."""
     import json as _json
     from pathlib import Path as _Path
     from quantpilot.config import settings
-    runs = sorted((_Path(settings.artifact_dir)/'style-research').glob('run-*/runs/'+style+'.json'))
+    key = style if park or style not in ('X1', 'X2') else style+'-nopark'     # A13: bots without idle parking
+    runs = sorted((_Path(settings.artifact_dir)/'style-research').glob('run-*/runs/'+key+'.json'))
     if not runs:
         return dict(status='running', note='The history test (2021-2025) is still running.')
     result = _json.loads(runs[-1].read_text(encoding='utf-8'))
@@ -587,7 +588,7 @@ def _account_view(cfg, account, state, expectations, reviews, engine=None):
                 expectations=expectations.get(account['id']),
                 review={k: own[0][k] for k in ('id', 'round', 'status')} if own else None, **text)
     if style:
-        view.update(style=style, active=state.get('active'), history_test=_style_history(style))
+        view.update(style=style, active=state.get('active'), history_test=_style_history(style, account.get('park', True)))
         if style in ('X1', 'X2'):
             view.update(members=state.get('members'), round_unit='trades')
         if style == 'C1':

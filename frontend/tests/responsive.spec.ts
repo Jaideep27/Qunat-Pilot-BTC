@@ -59,7 +59,7 @@ async function noOverflow(page:Page,where:string){
 
 const sizes=[[375,812,'phone'],[768,1024,'tablet portrait'],[1024,768,'tablet landscape'],[1366,768,'laptop'],
   [1280,600,'short window'],[1920,1080,'full HD'],[2560,1080,'ultra-wide']] as const;
-const pages=[['overview','Home'],['bots','Bots'],['more','More'],['chart','Chart'],['ask','Ask'],['research','Research'],['rules','Rule engine'],['paper','Paper trading'],
+const pages=[['overview','Home'],['bots','Bot'],['more','More'],['chart','Chart'],['ask','Ask'],['research','Research'],['rules','Rule engine'],['paper','Paper trading'],
   ['news','News'],['system','System health']] as const;
 
 for(const [width,height,name] of sizes){

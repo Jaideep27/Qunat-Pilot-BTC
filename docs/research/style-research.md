@@ -101,3 +101,18 @@ The bot follows only Trend Rider's direction, lets the other strategies (or a su
 | Combined Bot | 101 | −$1,746 |
 
 Opening the hedge after one flat day and closing it at every trade switches far too often for the funding earned. Changing this needs the owner's decision and a new amendment.
+
+## The Master Bot (A14): one account
+
+The owner asked for one account and one master bot. It runs the Trend-Led rules (A12) with idle parking off (A13); every other strategy is an advisor without money.
+
+| Item | Result |
+|---|---|
+| Account, 2021-10 → 2025-10 | **+1.6%** (worst drop −4.6%; holding BTC +69%) |
+| Trades | 97; won 41% (break-even 39%); profit factor 1.11 |
+| By year (mean per trade) | 2021 −0.18%, 2022 −0.03%, 2023 +0.20%, 2024 +0.17%, 2025 −0.11% |
+| Pass rule | fail: wins not above break-even with confidence, deflated Sharpe, years, coin-flip test |
+
+**What it means:**
+- Small and steady, but not proven, and far behind simply holding BTC.
+- The rule was chosen after the earlier results were seen, so this history flatters it. Only the live record from 2026-11-02 can judge it.

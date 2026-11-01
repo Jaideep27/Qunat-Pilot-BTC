@@ -39,39 +39,35 @@ def test_rules_endpoints_after_cycles(account):
         assert levels['overlay']['vwap'] > 0 and levels['markers']
 
 
-def test_accounts_endpoint_lists_the_four_styles_with_rules_text(account):
+def test_the_accounts_endpoint_shows_one_master_bot_with_its_advisors(account):
     with TestClient(app) as client:
         data = client.get('/api/v1/rules/accounts').json()['data']
-    assert [a['id'] for a in data['accounts']] == ['acct-combined', 'acct-trend-bot', 'acct-trend', 'acct-range', 'acct-breakout', 'acct-carry']
-    assert [a['style'] for a in data['accounts']] == ['X1', 'X2', 'T1', 'R1', 'B1', 'C1']
-    x = data['accounts'][0]
-    assert x['name'] == 'Combined Bot' and any('second opinion' in line for line in x['rules']) and 'members' in x
-    assert not any('idle money' in line.lower() for line in x['rules'])          # A13: parking is off
-    assert any('Trend Rider decides the direction' in line for line in data['accounts'][1]['rules'])
-    a = data['accounts'][3]
-    assert a['name'] == 'Range Trader' and a['status'] == 'NOT_STARTED' and a['equity'] == 10_000 and a['round_length'] == 30
-    assert any('sideways' in line for line in a['rules']) and any('Paper money' in line for line in a['rules'])
-    assert a['leverage'] == 2 and a['risk'] == .01 and 'history_test' in a and 'active' in a
-    assert a['report']['trades'] == 0 and a['report']['win_rate'] is None and 'max_drawdown' in a['report']
-    carry = data['accounts'][5]
-    assert carry['round_unit'] == 'days' and carry['round_length'] == 30
-    assert data['config_hash'] and data['retired'] and data['retired'][0]['id'] == 'acct-a'
+    assert [a['id'] for a in data['accounts']] == ['acct-master']
+    m = data['accounts'][0]
+    assert m['name'] == 'Master Bot' and m['style'] == 'X2' and m['status'] == 'NOT_STARTED' and m['equity'] == 10_000
+    assert any('Trend Rider decides the direction' in line for line in m['rules'])
+    assert not any('idle money' in line.lower() for line in m['rules'])                     # A13: parking is off
+    assert any('Paper money' in line for line in m['rules']) and 'history_test' in m and 'members' in m
+    assert m['report']['trades'] == 0 and m['report']['win_rate'] is None
+    assert len(data['retired']) == 10 and {r['id'] for r in data['retired']} >= {'acct-carry', 'acct-combined', 'acct-a'}
 
 
-def test_an_open_style_position_shows_its_time_machine_and_a_stop_only_trend(account):
+def test_the_master_shows_its_open_trade_with_the_time_machine_and_its_advisors(account):
     from quantpilot.rules import journal
-    hit = 'T1:2026-11-01T00:00:00+00:00'
-    journal.save_account(account, 'acct-trend', dict(
-        status='RUNNING', round=1, in_round=0, number=0, style='T1', active=dict(on=True, reason='On: up'),
-        extra={hit: dict(time_machine=dict(stop_first=.3, target_first=0.0, neither=.7, median_r=.2))},
-        futures=dict(equity=10_100.0, position=dict(side=1, quantity=.1, entry=80_000.0, stop=74_000.0, target=None,
-                                                    leverage=2.0, liquidation=40_000.0, entry_time='2026-11-01T00:01:00+00:00',
-                                                    plan=dict(playbook='T1', hit_id=hit, style='T1')))),
+    from quantpilot.strategies import bot
+    hit = 'X2:2026-11-01T00:00:00+00:00'
+    st = bot.new(10_000.0, now=pd.Timestamp('2026-11-01', tz='UTC'))
+    st['futures']['position'] = dict(side=1, quantity=.1, entry=80_000.0, stop=74_000.0, target=None, leverage=2.0, liquidation=40_000.0,
+                                     entry_time='2026-11-01T00:01:00+00:00', plan=dict(playbook='T1', hit_id=hit, style='X2'))
+    journal.save_account(account, 'acct-master', dict(
+        st, status='RUNNING', round=1, in_round=0, number=0, style='X2', active=dict(on=True, reason='On: the daily trend is up'),
+        members=dict(regime='TREND_UP', vote=1, leaders=['T1'], hedge=False, funding='Funding about +8.8% a year (buyers pay sellers).', volume=1.4),
+        extra={hit: dict(time_machine=dict(stop_first=.3, target_first=0.0, neither=.7, median_r=.2), reason='T1: timed by PB08L')}),
         pd.Timestamp.now(tz='UTC'))
     with TestClient(app) as client:
-        a = client.get('/api/v1/rules/accounts').json()['data']['accounts'][2]
-    assert a['position']['target'] is None and a['position']['time_machine']['stop_first'] == .3
-    assert a['active']['reason'] == 'On: up'
+        m = client.get('/api/v1/rules/accounts').json()['data']['accounts'][0]
+    assert m['position']['target'] is None and m['position']['time_machine']['stop_first'] == .3
+    assert m['members']['funding'].startswith('Funding about') and m['members']['volume'] == 1.4
 
 
 def test_decisions_and_trades_filter_by_account(account):
@@ -104,19 +100,3 @@ def test_model_health_endpoint(account):
     assert body['data']['overall'] in ('OK', 'WATCH', 'ALARM') and body['data']['reasons']
     assert {'card', 'calibration', 'drift', 'data_checks', 'challenger'} <= set(body['data'])
 
-
-def test_the_combined_bot_shows_its_idle_hedge_and_counts_it_in_equity(account):
-    from quantpilot.rules import journal
-    from quantpilot.simulation import carry as ledger
-    from quantpilot.strategies import bot
-    st = bot.new(10_000.0, now=pd.Timestamp('2026-11-01', tz='UTC'))
-    h = ledger.initial(10_000.0)
-    ledger.open_(h, 80_000.0, pd.Timestamp('2026-11-02', tz='UTC'))
-    ledger.fund(h, .0005, 80_000.0, pd.Timestamp('2026-11-02 08:00', tz='UTC'))
-    st['hedge'] = h
-    journal.save_account(account, 'acct-combined', dict(st, status='RUNNING', round=1, in_round=0, number=0, style='X1',
-                                                        members=dict(regime='RANGE', vote=0, hedge=True)), pd.Timestamp.now(tz='UTC'))
-    with TestClient(app) as client:
-        x = client.get('/api/v1/rules/accounts').json()['data']['accounts'][0]
-    assert x['position']['kind'] == 'hedge' and x['position']['funding'] > 0
-    assert x['equity'] == pytest.approx(bot.equity(st)) and x['members']['regime'] == 'RANGE'

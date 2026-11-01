@@ -392,3 +392,13 @@ Two forward-only intraday families are registered now, before their data exists 
 - The history results without parking are already reported:
   - Combined Bot without parking: −50% (A11, second trial).
   - Trend-Led Bot: its price trades alone made +$143.
+
+**A14 — 2026-11-01, one account: the Master Bot (owner's decision).**
+- The owner wants a single account with one master bot that takes the other bots' views as inputs and executes alone.
+- **accounts-v3:** one account, `acct-master` ("Master Bot"), $10,000, running the A12 Trend-Led rules with idle parking off (A13).
+- **Advisors without money:**
+  - Trend Rider's daily vote sets the side.
+  - Range Trader, Breakout Hunter (including its double-volume breakout), the confirmed rulebook setups and the support/resistance levels time the entry, exactly as in A12.
+  - The Funding Collector's funding reading and the relative volume are recorded with every decision as context. They are not new trading rules.
+- **Retired:** the six accounts-v2 accounts and the four A8 accounts. Open paper positions are closed at their last price, and their journals stay.
+- **History:** the master's rule is A12 with parking off (one more trial, "X2-nopark"). It is post-hoc, so only the live record can judge it.

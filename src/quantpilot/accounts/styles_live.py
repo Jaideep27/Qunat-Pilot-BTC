@@ -290,6 +290,25 @@ def _rates(funding):
     return f.drop_duplicates('event_time', keep='last')
 
 
+def _funding_view(rates, t):
+    """The Funding Collector's reading, as context: the 7-day mean funding as a yearly rate."""
+    if rates is None or not len(rates):
+        return 'Funding: no data yet.'
+    week = rates[rates.event_time <= t].funding_rate.astype(float).iloc[-21:]
+    if not len(week):
+        return 'Funding: no data yet.'
+    yearly = float(week.mean())*3*365
+    who = 'buyers pay sellers, so longs are crowded' if yearly > .10 else 'buyers pay sellers' if yearly > 0 else 'sellers pay buyers'
+    return f'Funding about {yearly:+.1%} a year ({who}).'
+
+
+def _relative_volume(sf, t):
+    """The last 15 minutes' volume against the 20 before (1.0 = usual)."""
+    v = sf.volume.loc[:t].iloc[-21:]
+    base = float(v.iloc[:-1].mean()) if len(v) > 1 else 0.0
+    return round(float(v.iloc[-1])/base, 2) if base > 0 else None
+
+
 def _plain_candidate(c):
     return {k: (pd.Timestamp(v).isoformat() if k == 'time' else v) for k, v in c.items()}
 
@@ -365,9 +384,10 @@ def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, da
             acct['blocked'] = None
     acct['active'] = dict(on=on, reason=reason, as_of=t15.isoformat())
     hedge = acct.get('hedge')
-    acct['members'] = dict(regime=regime, vote=vote, leaders=list(combined.LEADERS.get(regime, ())),
+    acct['members'] = dict(regime=regime, vote=vote, leaders=['T1'] if mode == 'X2' else list(combined.LEADERS.get(regime, ())),
                            hedge=bool(hedge and hedge['open']), as_of=t15.isoformat(),
-                           range_trader=range_trader.active(sf, t15)[1], breakout=breakout.active(sf, t15)[1])
+                           range_trader=range_trader.active(sf, t15)[1], breakout=breakout.active(sf, t15)[1],
+                           funding=_funding_view(rates, t15), volume=_relative_volume(sf, t15))
     if acct['last_decision'] and t15 <= pd.Timestamp(acct['last_decision']):
         return
     acct['last_decision'] = t15.isoformat()
@@ -445,8 +465,14 @@ def retire(engine, ids, now):
         if not acct or acct.get('status') == 'RETIRED':
             continue
         s = acct.get('futures') or {}
-        if s.get('position') and s.get('mark'):
+        if s.get('version') == ledger.VERSION:                    # the Funding Collector's hedge
+            if s.get('open') and s.get('last_price'):
+                ledger.close(s, s['last_price'], now, 'RETIRED')
+        elif s.get('position') and s.get('mark'):
             futures._close(s, s['mark'], pd.Timestamp(now).isoformat(), 'RETIRED')
+        hedge = acct.get('hedge')
+        if hedge and hedge.get('open') and hedge.get('last_price'):   # a bot's idle hedge
+            bot._close_hedge(acct, hedge['last_price'], now, 'RETIRED')
         acct['status'], acct['retired_at'] = 'RETIRED', pd.Timestamp(now).isoformat()
         journal.save_account(engine, account_id, acct, now)
 

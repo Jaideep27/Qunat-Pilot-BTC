@@ -133,5 +133,28 @@ test('home and bots fit a phone screen with four tabs',async({page})=>{
     expect(width.scroll,hash).toBeLessThanOrEqual(width.doc+1);
   }
   const nav=page.getByRole('navigation',{name:'Main navigation'});
-  for(const tab of ['Home','Bots','Chart','More'])await expect(nav.getByRole('button',{name:tab})).toBeVisible();
+  for(const tab of ['Home','Bot','Chart','More'])await expect(nav.getByRole('button',{name:tab})).toBeVisible();
+});
+
+test('one master bot: no picker, and every advisor says what it tells the master',async({page})=>{
+  const master={accounts:[bot('acct-master','Master Bot','X2',{active:{on:true,reason:'On: the daily trend is up; it waits for another strategy or support to time a long.'},
+    members:{regime:'TREND_UP',vote:1,leaders:['T1'],hedge:false,range_trader:'Off: the market is trend up, and Range Trader only trades sideways markets.',
+      breakout:'On: the market has been quiet; it watches for a breakout on double volume.',funding:'Funding about +8.8% a year (buyers pay sellers).',volume:1.4}})]};
+  await page.route('**/api/v1/**',route=>{
+    const key=new URL(route.request().url()).pathname.split('/').at(-1)!;
+    const values:Record<string,unknown>={accounts:master,'account-trades':{trades:[]},decisions:{decisions:[]},reviews:{reviews:[]},candles:[],news:{items:[]}};
+    return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
+  });
+  await page.goto('/#bots');
+  await expect(page.getByRole('heading',{name:'Master Bot',level:1})).toBeVisible({timeout:30000});
+  await expect(page.getByRole('group',{name:'Choose a bot'})).toHaveCount(0);
+  const advisors=page.getByRole('region',{name:'Advisors'});
+  await expect(advisors).toContainText('Trend Rider');
+  await expect(advisors).toContainText('Up: the master may only buy');
+  await expect(advisors).toContainText('only trades sideways markets');
+  await expect(advisors).toContainText('double volume');
+  await expect(advisors).toContainText('Funding about +8.8% a year');
+  await expect(advisors).toContainText('1.4× the usual');
+  await page.goto('/');
+  await expect(page.getByRole('region',{name:'Your bot'})).toContainText('Master Bot');
 });
