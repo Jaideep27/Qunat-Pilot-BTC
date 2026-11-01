@@ -59,7 +59,7 @@ The bot listens to every member and holds one trade at a time. Same span and cos
 | With idle money parked (live version) | 314 | 46% (56%) | **−50%** (floor hit in 2023) | −51% | 101, +$109 funding | fail on every item |
 | Without parking | 405 | 45% (57%) | **−50%** (floor hit in 2023) | −52% | — | fail on every item |
 
-**Who led the 395 trades of the live version:**
+**Who led the 395 entries the live version chose (314 filled; the rest expired or were invalidated at the fill):**
 
 | Leader | Trades |
 |---|---|
