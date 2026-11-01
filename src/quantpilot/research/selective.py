@@ -171,3 +171,13 @@ def trial_sharpes(paths, track, min_calls=None):
     """Per-trial Sharpe ratios; `min_calls` drops trials too small to estimate one (amendment A3)."""
     return [r['sharpe'] for r in _trials(paths, track).values() if r.get('sharpe') is not None
             and (min_calls is None or (r.get('calls') or 0) >= min_calls)]
+
+
+def binomial_luck(outcomes):
+    """Berdondini's check (A10): keep non-overlapping consecutive pairs with the same outcome (win-win or
+    loss-loss, trades from different market states) and ask how likely that many win-win pairs are by coin flip."""
+    seq = [int(bool(o)) for o in outcomes]
+    pairs = [(a, b) for a, b in zip(seq[0::2], seq[1::2]) if a == b]
+    n, k = len(pairs), sum(a for a, _ in pairs)
+    p = float(stats.binom.sf(k-1, n, .5)) if n else 1.0
+    return dict(pairs=n, wins=k, p_value=p)

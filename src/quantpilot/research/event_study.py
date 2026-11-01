@@ -32,13 +32,15 @@ EXTERNAL = {'positioning': VALUES['positioning'], 'funding': ['funding_rate'], '
             'index': ['index_price'], 'sentiment': ['fear_greed']}
 
 
-def load_market(engine=None, start=None, end=None):
-    """Completed BTCUSDT perpetual candles and valid external observations from the durable store."""
+def load_market(engine=None, start=None, end=None, families=None):
+    """Completed BTCUSDT perpetual candles and valid external observations from the durable store
+    (only the external `families` named, when given)."""
     from quantpilot.storage.market import PERP, MarketCandle, MarketObservation
     engine = engine or database(settings.market_database_url)
     start, end = utc(start), utc(end)
     candle_columns = ['event_time', 'available_at', 'open', 'high', 'low', 'close', 'volume', 'taker_buy_volume']
-    candles, families = [], {family: [] for family in EXTERNAL}
+    wanted = EXTERNAL if families is None else {f: EXTERNAL[f] for f in families}
+    candles, families = [], {family: [] for family in wanted}
     # Month-sized reads keep peak memory small: Python row objects never exist for the full history.
     bounds = list(pd.date_range(start.normalize().replace(day=1), end, freq='MS'))
     edges = [start-pd.Timedelta(days=2)]+[b for b in bounds if b > start]+[end]
@@ -50,7 +52,7 @@ def load_market(engine=None, start=None, end=None):
                 .order_by(MarketCandle.event_time)).all()
             if rows:
                 candles.append(_compact(pd.DataFrame(rows, columns=candle_columns)))
-            for family, columns in EXTERNAL.items():
+            for family, columns in wanted.items():
                 rows = connection.execute(select(MarketObservation.event_time, MarketObservation.available_at,
                                                  MarketObservation.values).where(
                     MarketObservation.market == PERP, MarketObservation.valid.is_(True),

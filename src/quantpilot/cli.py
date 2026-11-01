@@ -53,6 +53,8 @@ def main():
     strategies.add_argument('--holdout', action='store_true', help='Evaluate the frozen passing rules ONCE on the holdout')
     agent=sub.add_parser('research-agent', help='Trading-agent step B: pre-registered trade-plan entry rules (never trades)')
     agent.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
+    styles=sub.add_parser('research-styles', help='A10: history test of the four account styles (development span only)')
+    styles.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
     playbooks=sub.add_parser('research-playbooks', help='Rule engine A6: pre-registered rulebook playbooks (never trades)')
     playbooks.add_argument('--output', required=True, help='Run directory (resumes an interrupted run)')
     playbooks.add_argument('--prior', action='append', help='Earlier trial registry to count (repeatable)')
@@ -189,6 +191,11 @@ def main():
         from quantpilot.research.agent import research
         report = research(args.output)
         print(json.dumps({k: report['families'][k]['gate'] for k in report['families']}, indent=2, default=str))
+    elif args.command == 'research-styles':
+        from quantpilot.research.style_backtest import research
+        report = research(args.output)
+        print(json.dumps({k: dict(passed=v['verdict']['passed'], account=v['account']) for k, v in report['styles'].items()},
+                         indent=2, default=str))
     elif args.command == 'research-playbooks':
         from quantpilot.research.playbooks import PRIORS, research
         report = research(args.output, priors=tuple(args.prior) if args.prior else PRIORS)
