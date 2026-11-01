@@ -58,7 +58,33 @@ quantpilot train-challenger --output DIR         # A9: shadow challenger (needs 
 ```
 Crawl4AI lives in its own environment: `uv venv .venv-crawl` then `uv pip install --python .venv-crawl/Scripts/python.exe crawl4ai==0.7.4`. It runs in HTTP mode, without a browser.
 
-## Four paper accounts (amendment A8, 2026-10-22)
+## Four paper accounts, four styles (amendment A10, accounts-v2, 2026-11-01)
+
+The owner noticed that the four A8 accounts copied each other: they traded the same setups and differed only in size. Accounts-v2 replaces them with four different styles. The A8 accounts are marked `RETIRED`; their trades and reviews stay in the journal.
+
+| Account | Style | On when | Trades |
+|---|---|---|---|
+| Trend Rider (T1) | 20/60/120-day trend vote plus the 50-day average; stop 3 × the 20-day range | Every trend measure agrees | At the daily close; holds days to weeks |
+| Range Trader (R1) | Fades a poke outside the 4h 80% band once price closes back inside; target the middle | The regime is RANGE | At 15m closes; up to 4 hours |
+| Breakout Hunter (B1) | A 15m close beyond 20 bars on double volume after a quiet spell; resting entry at the fair-value gap | Hourly volatility was in its lowest 20% | At 15m closes; up to 24 hours |
+| Funding Collector (C1) | Spot long plus an equal perp short (60%/40% of equity) | The 7-day average funding is above 0 | At funding settlements; reviewed every 30 days |
+
+- **Shared rules:**
+  - 1% risk per trade, 2× leverage cap, daily brake 3%, floor $5,000;
+  - macro blackout;
+  - each account pauses after 30 trades (the collector: 30 days) for a review with the owner.
+- **Time Machine** (from github.com/Jakeschincariol/day-trader-skill): every entry records the odds of 2,000 replays of the next hours or days, built from the last 60 days. It is a record, never a gate.
+- **Code:**
+  - `strategies/` holds the styles, the style frame and the Time Machine;
+  - `simulation/carry.py` is the hedge ledger;
+  - `accounts/styles_live.py` is the live engine.
+  - `rules/live.cycle` picks the engine by config version: v2 runs the styles, v1 the retired A8 fan-out.
+- **History test:** `docs/research/style-research.md`. No style passed.
+  - Trend Rider: +28.6% over 8 years, not proven.
+  - Funding Collector: +13.9% over 5.8 years, not proven.
+  - Range Trader and Breakout Hunter: each lost half the account.
+
+## Four paper accounts (amendment A8, 2026-10-22; retired 2026-11-01)
 At the owner's request, four extra paper futures accounts ($10,000 each) trade the same rulebook v2 setups live.
 - **What they share:** playbooks, triggers, checklists, stops, targets and management.
 - **What differs:** which setups they take and how much they risk.
