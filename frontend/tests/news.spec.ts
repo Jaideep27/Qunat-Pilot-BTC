@@ -30,7 +30,7 @@ async function open(page:Page,status:string,newsData?:unknown){
   await page.goto('/');await page.waitForLoadState('networkidle');
   // Record only the requests made by the News tab itself.
   requested.length=0;
-  await page.getByRole('button',{name:'News',exact:true}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^News/}).click();
   await expect(page.getByRole('region',{name:'News evidence'})).toBeVisible();
   return requested;
 }

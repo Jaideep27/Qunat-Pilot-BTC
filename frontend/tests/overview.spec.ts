@@ -29,15 +29,13 @@ async function open(page:Page,overrides:Record<string,unknown>={}){
   return asked;
 }
 
-test('the overview outlook switches horizons and labels a no-edge forecast honestly',async({page})=>{
+test('home says plainly what the market is doing, with no research jargon',async({page})=>{
   await open(page);
-  const outlook=page.getByRole('region',{name:'Outlook'});
-  await expect(outlook).toContainText('51.0%');
-  await expect(outlook).toContainText('No edge');
-  await outlook.getByRole('button',{name:'24h',exact:true}).click();
-  await expect(outlook).toContainText('51.9%');
-  await expect(outlook).toContainText('Chance of touching −5% in 24h');
-  await expect(page.getByRole('region',{name:'Next macro event'})).toContainText('FOMC rate decision');
+  const market=page.getByRole('region',{name:'Market now'});
+  await expect(market).toContainText('moving sideways');
+  await expect(market).toContainText('about a coin flip (51% up)');
+  await expect(market).toContainText('FOMC rate decision');
+  await expect(market).not.toContainText('Brier');
   await expect(page.getByRole('region',{name:'Latest headlines'})).toContainText('Bitcoin climbs as ETF flows return');
 });
 
@@ -54,14 +52,15 @@ test('the top-bar ask box jumps to Ask with an instant quant answer',async({page
 
 test('glossary terms explain themselves on hover',async({page})=>{
   await open(page);
-  const term=page.getByRole('region',{name:'Outlook'}).getByRole('button',{name:'Base rate'});
+  await page.goto('/#research');
+  const term=page.getByRole('button',{name:'Hit rate'}).first();
   await term.hover();
-  await expect(page.getByRole('tooltip').filter({hasText:'How often this happened historically'})).toBeVisible();
+  await expect(page.getByRole('tooltip')).toBeVisible();
 });
 
 test('a malformed response shows a message instead of blanking the app',async({page})=>{
   await open(page,{forecasts:{latest:'not a list'}});
   await expect(page.getByRole('status').filter({hasText:'could not be displayed'})).toBeVisible();
-  await page.getByRole('button',{name:'System',exact:true}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^System/}).click();
   await expect(page.getByRole('heading',{name:'System health',level:1})).toBeVisible({timeout:30000});
 });

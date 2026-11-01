@@ -26,7 +26,7 @@ test('the rules page shows the live checklist, playbook verdicts, the journal an
   await page.route('**/api/v1/**',route=>{const key=new URL(route.request().url()).pathname.split('/').at(-1)!;
     const values:Record<string,unknown>={rules:status,journal,research,candles:[],indicators:{}};
     return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});});
-  await page.goto('/');await page.getByRole('button',{name:'Rules',exact:true}).click();
+  await page.goto('/');await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Rule engine/}).click();
   await expect(page.getByRole('heading',{name:'Rule engine',level:1})).toBeVisible({timeout:30000});
   await expect(page.getByRole('note')).toContainText('3ea0f47e52c1');
   const checklist=page.getByRole('region',{name:'Live checklist'});

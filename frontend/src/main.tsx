@@ -1,13 +1,15 @@
 import React,{useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,lazy,Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Activity,ChevronsLeft,ChevronsRight,Command,CornerDownLeft,Search} from 'lucide-react';
-import {routes,fromHash,type Route} from './app/routes';
+import {routes,tabs,tabOf,fromHash,type Route} from './app/routes';
 import {preview,publicView,type Candle} from './lib/api';
 import {subscribeKlines} from './lib/liveFeed';
 import {Boundary,Loading,money,signedPct,useFlash,useResource} from './components/ui';
 import './styles/styles.css';
 
 const Overview=lazy(()=>import('./pages/Overview'));
+const Bots=lazy(()=>import('./pages/Bots'));
+const More=lazy(()=>import('./pages/More'));
 const TradingWorkspace=lazy(()=>import('./components/TradingWorkspace'));
 const Ask=lazy(()=>import('./pages/Ask'));
 const Research=lazy(()=>import('./pages/Research'));
@@ -52,12 +54,6 @@ function LivePrice(){
     <Sparkline values={series}/>
     <span className={'live-dot '+(streaming?'on':'')} title={streaming?'Live exchange stream':'Latest stored candle'}/>
   </div>;
-}
-
-function Clock(){
-  const [now,setNow]=useState(()=>new Date());
-  useEffect(()=>{const t=setInterval(()=>setNow(new Date()),1000);return()=>clearInterval(t)},[]);
-  return <span className="clock" title="Coordinated Universal Time">{now.toISOString().slice(11,19)} <small>UTC</small></span>;
 }
 
 function AskBox({onAsk}:{onAsk:(q:string)=>void}){
@@ -122,7 +118,7 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
 }
 
 // Fetch the other pages' code once the first page is idle, so switching tabs is instant.
-const prefetch=()=>[()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/Paper'),()=>import('./pages/Rules'),()=>import('./pages/News'),
+const prefetch=()=>[()=>import('./pages/Bots'),()=>import('./pages/More'),()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/Paper'),()=>import('./pages/Rules'),()=>import('./pages/News'),
   ()=>import('./pages/System'),()=>import('./components/TradingWorkspace')].forEach(load=>void load().catch(()=>{}));
 
 function App(){
@@ -141,7 +137,7 @@ function App(){
   useEffect(()=>{
     const key=(e:KeyboardEvent)=>{
       if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();setPalette(p=>!p);return}
-      if(e.altKey&&!e.ctrlKey&&!e.metaKey&&/^[1-9]$/.test(e.key)){const r=routes[Number(e.key)-1];if(r){e.preventDefault();go(r.id)}}
+      if(e.altKey&&!e.ctrlKey&&!e.metaKey&&/^[1-9]$/.test(e.key)){const r=tabs[Number(e.key)-1];if(r){e.preventDefault();go(r.id)}}
     };
     addEventListener('keydown',key);return()=>removeEventListener('keydown',key);
   },[go]);
@@ -161,8 +157,8 @@ function App(){
         <span className="brand-mark"><Activity size={20}/></span><span className="brand-name">QuantPilot<small>BTC intelligence</small></span></a>
       <div className="nav-items" ref={nav}>
         <span className="nav-indicator" style={indicator} aria-hidden/>
-        {routes.map((r,i)=>{const Icon=r.icon;return <button key={r.id} type="button" aria-label={r.label}
-          aria-current={route===r.id?'page':undefined} className={route===r.id?'active':''} onClick={()=>go(r.id)} title={`${r.label} · Alt+${i+1}`}>
+        {tabs.map((r,i)=>{const Icon=r.icon;const on=tabOf(route)===r.id;return <button key={r.id} type="button" aria-label={r.label}
+          aria-current={on?'page':undefined} className={on?'active':''} onClick={()=>go(r.id)} title={`${r.label} · Alt+${i+1}`}>
           <Icon size={18} aria-hidden/><span>{r.label}</span></button>})}</div>
       <div className="sidebar-foot"><span className="pill pill-accent">Paper only</span><small>Research & simulation. No real-money execution.</small></div>
       <button type="button" className="nav-collapse" onClick={()=>setNarrow(n=>!n)} aria-label={narrow?'Expand sidebar':'Collapse sidebar'}
@@ -172,10 +168,6 @@ function App(){
       <header className="topbar">
         <Boundary name="The price ticker"><LivePrice/></Boundary>
         {!publicView&&<AskBox onAsk={ask}/>}
-        <button type="button" className="palette-button" onClick={()=>setPalette(true)} aria-label="Open command palette" title="Command palette (Ctrl+K)">
-          <Command size={14} aria-hidden/><span>Ctrl K</span></button>
-        <Clock/>
-        {!publicView&&<a className="topbar-link" href="/docs" onClick={e=>{e.preventDefault();open('http://127.0.0.1:8000/docs','_blank')}}>API</a>}
       </header>
       {publicView&&<div role="note" aria-label="Public view" className="banner banner-warn">Public read-only view · Paper trading only, no real money · Not financial advice</div>}
       {preview&&<div className="banner banner-warn">INTERFACE PREVIEW · Synthetic values. No released model, measured results or paper trades.</div>}
@@ -185,7 +177,9 @@ function App(){
         <Boundary key={route} name="This page"><Suspense fallback={<Loading lines={6}/>}>
           <div className="page-enter">
             {route==='overview'&&<Overview go={go} ask={ask}/>}
-            {route==='chart'&&<><div className="page-head"><div><h1>Chart</h1><p>Persistent history, 86 indicator studies, drawing tools and a live exchange stream.</p></div></div><TradingWorkspace/></>}
+            {route==='bots'&&<Bots/>}
+            {route==='more'&&<More go={go}/>}
+            {route==='chart'&&<><div className="page-head"><div><h1>Chart</h1><p>Live Bitcoin price with indicators and drawing tools.</p></div></div><TradingWorkspace/></>}
             {route==='ask'&&!publicView&&<Ask seed={seed}/>}
             {route==='research'&&<Research/>}
             {route==='rules'&&<Rules/>}

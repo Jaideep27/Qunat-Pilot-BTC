@@ -12,7 +12,7 @@ test('trained release renders real market, prediction, research and paper eviden
   await page.screenshot({path:'test-results/release-market.png',fullPage:true});
   const predictionResponse=page.waitForResponse(response=>response.url().endsWith('/api/v1/predictions')&&response.status()===200);
   const portfolioResponse=page.waitForResponse(response=>response.url().endsWith('/api/v1/portfolio')&&response.status()===200);
-  await page.getByRole('button',{name:'Paper',exact:true}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Old paper account/}).click();
   const decision=(await (await predictionResponse).json()).data;
   await expect(page.getByRole('heading',{name:'Decision gates'})).toBeVisible();
   const reasons=decision.reasons.length?decision.reasons:['ALL_GATES_PASSED'];
@@ -25,14 +25,14 @@ test('trained release renders real market, prediction, research and paper eviden
     await expect(ledger.locator('tbody tr')).toHaveCount(portfolio.fills.length);
   }else await expect(page.getByText('No fills recorded')).toBeVisible();
   await page.screenshot({path:'test-results/release-paper.png',fullPage:true});
-  await page.getByRole('button',{name:'Research',exact:true}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Research/}).click();
   await page.getByText('Original release model (2026)').click();
   await expect(page.getByRole('heading',{name:'Holdout equity · full'})).toBeVisible();
   await expect(page.getByRole('button',{name:'full',exact:true})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Probability calibration'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Drawdown: hourly equity samples'})).toBeVisible();
   await page.screenshot({path:'test-results/release-research.png',fullPage:true});
-  await page.getByRole('button',{name:'System',exact:true}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^System/}).click();
   await expect(page.getByText('ELIGIBLE WITH QUARANTINE',{exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -1,6 +1,5 @@
 import {useState} from 'react';
 import {Card,Collapsible,Empty,Loading,PageHead,Pill,Segmented,Stat,Updated,money,num,pct,signedPct,stamp,useResource} from '../components/ui';
-import AccountsSection from './Accounts';
 
 type Playbook={id:string;name:string;family:string;side:string;source:string[];thesis:string;priority:number;shadow_only:boolean;
   trigger:{any:string[];within_bars:number;min_bars:number};regimes:string[];conditions:string[];abort:string[];
@@ -39,12 +38,11 @@ export default function Rules(){
   const [view,setView]=useState<'Hits'|'Trades'|'Triggers'>('Hits');
   const s=status.data,a=s?.account,j=journal.data,r=research.data;
   return <>
-    <PageHead title="Rule engine" description="Your rulebook as event-triggered playbooks. When a spike, dump or technical event fires, the matching playbook runs its checklist; four paper accounts and a reference account act on it.">
+    <PageHead title="Rule engine" description="Your rulebook as event-triggered setups. When a spike, dump or price event fires, the matching setup runs its checklist; a reference paper account acts on it, and the bots listen to it.">
       <Updated resource={status}/>
     </PageHead>
     <div className="banner banner-warn" role="note">Experimental paper account · rulebook v{s?.rulebook.version??1} ({s?.rulebook.hash??'…'}) · nothing here places real orders. The frozen paper account on the Paper page is unchanged.</div>
     <div className="grid">
-      <AccountsSection/>
       <div className="strip span-3" aria-label="Experimental account">
         <Stat label="Reference equity" value={money(a?.equity)} detail={a?`Started ${stamp(a.created)}`:'Starts with the first engine cycle'}/>
         <Stat label="Return" value={signedPct(a?.account_return)} tone={(a?.account_return??0)<0?'down':undefined} detail="After fees, slippage and funding"/>

@@ -24,7 +24,7 @@ async function setup(page:Page,options={available:true,legacy:false}){
     return route.fulfill({json:{data:key==='operations'?operations:values[key],
       provenance:{source:'Browser operations test fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
   });
-  await page.goto('/');await page.getByRole('button',{name:'System',exact:true}).click();
+  await page.goto('/');await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^System/}).click();
 }
 
 test('worker failure remains visible despite a recent checkpoint and full-ledger totals exceed the UI cap',async({page})=>{
@@ -44,7 +44,7 @@ test('monitoring outages are retryable and do not hide the paper ledger',async({
   await expect(page.getByText('MONITOR UNAVAILABLE',{exact:true})).toBeVisible();
   options.available=true;await page.getByRole('button',{name:'Retry monitor',exact:true}).click();
   await expect(page.getByRole('table',{name:'Recorded paper worker runs'})).toBeVisible();
-  options.available=false;await page.getByRole('button',{name:'Paper',exact:true}).click();
+  options.available=false;await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Old paper account/}).click();
   await expect(page.getByRole('heading',{name:'Execution ledger'})).toBeVisible();
 });
 

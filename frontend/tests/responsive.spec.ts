@@ -59,7 +59,7 @@ async function noOverflow(page:Page,where:string){
 
 const sizes=[[375,812,'phone'],[768,1024,'tablet portrait'],[1024,768,'tablet landscape'],[1366,768,'laptop'],
   [1280,600,'short window'],[1920,1080,'full HD'],[2560,1080,'ultra-wide']] as const;
-const pages=[['overview','Overview'],['chart','Chart'],['ask','Ask'],['research','Research'],['rules','Rule engine'],['paper','Paper trading'],
+const pages=[['overview','Home'],['bots','Bots'],['more','More'],['chart','Chart'],['ask','Ask'],['research','Research'],['rules','Rule engine'],['paper','Paper trading'],
   ['news','News'],['system','System health']] as const;
 
 for(const [width,height,name] of sizes){
@@ -86,7 +86,7 @@ test('maximizing, restoring and shrinking the window keeps the layout and the ch
   await mock(page);
   await page.setViewportSize({width:1920,height:1080});
   await page.goto('/#overview');
-  await expect(page.getByRole('heading',{name:'Overview',level:1})).toBeVisible({timeout:30_000});
+  await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible({timeout:30_000});
   const chart=page.getByRole('img',{name:'BTCUSDT five-minute candlestick and volume chart'});
   await expect(chart).toBeVisible();
   for(const [width,height] of [[800,600],[1366,768],[420,860],[2560,1440],[1100,700]] as const){
@@ -102,18 +102,19 @@ test('the command palette and keyboard shortcuts switch pages',async({page})=>{
   await mock(page);
   await page.setViewportSize({width:1366,height:768});
   await page.goto('/#overview');
-  await expect(page.getByRole('heading',{name:'Overview',level:1})).toBeVisible({timeout:30_000});
+  await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible({timeout:30_000});
   await page.keyboard.press('Control+k');
   const palette=page.getByRole('dialog',{name:'Command palette'});
   await expect(palette).toBeVisible();
   await page.keyboard.type('rul');
-  await expect(palette.getByRole('option')).toHaveCount(2);           // Go to Rules + Ask
+  await expect(palette.getByRole('option')).toHaveCount(2);           // Go to Rule engine + Ask
   await page.keyboard.press('Enter');
   await expect(palette).toBeHidden();
   await expect(page.getByRole('heading',{name:'Rule engine',level:1})).toBeVisible();
-  await page.keyboard.press('Alt+6');
-  await expect(page.getByRole('heading',{name:'Paper trading',level:1})).toBeVisible();
-  await page.getByRole('button',{name:'Open command palette'}).click();
+  await page.keyboard.press('Alt+2');
+  await expect(page.getByRole('heading',{name:'Bots',level:1})).toBeVisible();
+  await page.keyboard.press('Control+k');
+  await expect(palette).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(palette).toBeHidden();
 });
@@ -122,8 +123,8 @@ test('Escape closes the command palette even before its search box has focus',as
   await mock(page);
   await page.setViewportSize({width:1366,height:768});
   await page.goto('/#overview');
-  await expect(page.getByRole('heading',{name:'Overview',level:1})).toBeVisible({timeout:30_000});
-  await page.getByRole('button',{name:'Open command palette'}).click();
+  await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible({timeout:30_000});
+  await page.keyboard.press('Control+k');
   const palette=page.getByRole('dialog',{name:'Command palette'});
   await expect(palette).toBeVisible();
   await page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
@@ -135,16 +136,16 @@ test('the sidebar collapses, remembers it and the active marker follows the page
   await mock(page);
   await page.setViewportSize({width:1440,height:900});
   await page.goto('/#overview');
-  await expect(page.getByRole('heading',{name:'Overview',level:1})).toBeVisible({timeout:30_000});
+  await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible({timeout:30_000});
   const nav=page.getByRole('navigation',{name:'Main navigation'});
   const wide=(await nav.boundingBox())!.width;
   await page.getByRole('button',{name:'Collapse sidebar'}).click();
   await expect.poll(async()=>(await nav.boundingBox())!.width).toBeLessThan(wide-100);
   await page.reload();
   await expect(page.getByRole('button',{name:'Expand sidebar'})).toBeVisible({timeout:30_000});
-  await page.getByRole('button',{name:'Rules',exact:true}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Rule engine/}).click();
   const marker=page.locator('.nav-indicator');
-  await expect.poll(async()=>{const m=(await marker.boundingBox())!,b=(await page.getByRole('button',{name:'Rules',exact:true}).boundingBox())!;
+  await expect.poll(async()=>{const m=(await marker.boundingBox())!,b=(await page.getByRole('button',{name:'More',exact:true}).boundingBox())!;
     return Math.abs(m.y-b.y)}).toBeLessThan(2);
   await page.getByRole('button',{name:'Expand sidebar'}).click();
   await expect.poll(async()=>(await nav.boundingBox())!.width).toBeGreaterThan(wide-5);
