@@ -291,3 +291,45 @@ Two forward-only intraday families are registered now, before their data exists 
   - **Watch:** drift `WATCH`, a missing reference, or any data-check failure in the last 24 hours.
   - **OK:** otherwise.
 - **No automatic promotion.** A challenger, or any model change, goes live only by the owner's decision, as `accounts-v2` with a new amendment.
+
+**A10 — 2026-11-01, four trading styles for the paper accounts (accounts-v2). Registered before any of them was evaluated or run.**
+
+- **Why.** Accounts-v1 (A8) traded the same rulebook setups and differed only by score cutoff and size, so their trades coincided. The owner asked for four genuinely different styles, which replace the A8 accounts. On the owner's decision (2026-11-01), they go live on paper **at once**, and the history test below runs in parallel. A failed history test is reported; it never stops an account by itself.
+- **Shared rules.**
+  - $10,000 each, simulated in `futures-v1` (5 bps fee and 3 bps slippage per side, actual funding).
+  - Risk per trade: 1% of equity at the stop. Leverage cap: 2×.
+  - Daily brake 3%; floor $5,000.
+  - Entries are blocked during the macro blackout (30 min before to 15 min after a release) and the cascade halt.
+  - One position per account. No flips: an exit happens first, and an entry needs a later decision.
+  - Each account pauses after 30 trades for a review with the owner. Exception: the funding collector pauses after every 30 days of running.
+  - Parameters are fixed source defaults, and no parameter is searched. Each style is **one configuration**, so the history test adds 4 trials.
+- **The regime and band inputs** are computed exactly as `features.patterns` defines them, from 5m candles and on completed bars only:
+  - `atr_pct_1h`, `ret_4h`, `adx_1h`, `ema_stack_1h` and `band4_high`/`band4_low` (the 4h-block 80% band from the EWMA hourly volatility);
+  - the regime is `patterns.regime()`.
+
+| ID | Style | Decides | On when | Entry | Exit |
+|---|---|---|---|---|---|
+| T1 | Trend Rider | Each daily close (00:00 UTC), on daily bars | Always evaluated | Long when the 20-, 60- and 120-day returns are all > 0 and close > SMA(50). Short when all three are < 0 and close < SMA(50). Otherwise flat. Entry at the next bar open. Stop 3 × ATR(20d, Wilder) from entry, fixed. Size: 1% risk at the stop × min(1, 0.40 / σ30), where σ30 is the 30-day std of daily log returns × √365. After a stop-out, the same side needs one flat daily close first | At a daily close where the side's condition no longer holds, or the stop |
+| R1 | Range Trader | Each 15m close | `regime = RANGE` at that close | The 15m bar's low < `band4_low` and close > `band4_low` → long. High > `band4_high` and close < `band4_high` → short. Entry at the next bar open | Target = band midpoint (high + low)/2. Stop 0.5 × band width beyond the touched band. Time stop 4h |
+| B1 | Breakout Hunter | Each 15m close | `atr_pct_1h` ≤ 0.20 at any of the 4 hourly closes before the breakout bar | Breakout bar b (15m): close > the highest high of the 20 prior 15m bars and volume ≥ 2 × their mean volume → long (mirror for short). Decided at the close of b + 1. If a fair-value gap exists (long: low(b+1) > high(b−1)), limit at low(b+1); otherwise at the midpoint (open + close)/2 of b. The limit is valid for 4 bars (1h) | Stop at the low of b (long) or the high of b (short), at least 0.3% from entry. Target 2R. Time stop 24h |
+| C1 | Funding Collector | Each funding settlement (00, 08, 16 UTC) | Opens when flat and the mean of the last 21 funding rates is > 0 | Long spot plus short perp, equal BTC quantity; hedged notional 60% of equity, perp margin 40%. Fees: spot 10 bps + 3 bps slippage; perp 5 + 3 bps | Closes when the mean of the last 9 rates is < 0. Rebalances both legs back to 60/40 when perp margin falls below 40% or rises above 120% of perp notional |
+
+- **Time Machine (recorded, never a gate).** At each T1/R1/B1 entry:
+  - 2,000 simulated paths, seeded by the entry minute, built from 5m log returns drawn from the same time-of-day slot over the last 60 days, run to the style's time stop (T1: 30 days);
+  - recorded: the shares that reach the target first, the stop first, or neither (T1: stop within 30 days, and the median 30-day result in R);
+  - also recorded: the outcomes of the same style's development-history trades in the 2 years before the development cutoff.
+- **History test.**
+  - Spans:
+    - T1: Binance spot daily, 2017-08-18 → bars closing before 2025-10-20; funding is charged as in A1.
+    - R1 and B1: perp 5m candles, 2021-10-20 → before 2025-10-20, with 60 days of warm-up.
+    - C1: funding settlements, 2020-01-01 → before 2025-10-20.
+  - The holdout (2025-10-20 → 2026-10-19) stays untouched.
+  - No walk-forward selection is needed, since each style is one configuration. PBO is therefore not applicable, and the trial count for the deflated Sharpe is the cumulative registry count (all earlier trials plus these 4).
+- **Pass rule.** All must hold:
+  1. at least 100 trades (T1: 30; C1: 10 cycles);
+  2. the Wilson 95% lower bound of the win rate is above break-even;
+  3. mean net result per trade > 0, and deflated Sharpe ≥ 0.95;
+  4. mean > 0 in at least 60% of the years with ≥ 5 trades;
+  5. **Berdondini binomial check:** on the independent trades (the BEF selection: same-outcome consecutive pairs), P(≥ k wins | p = 0.5) < 1%.
+
+  C1 has no win/lose prediction, so it is judged on items 3–4 and on the net annual return against holding cash. Every style is also shown against buy-and-hold BTC.

@@ -7,6 +7,10 @@ and target counts as the stop; a gap through the stop fills at the open. Liquida
 price under isolated margin (maintenance approximation). Stops only tighten and targets only move
 closer; no adding, averaging down or same-step reversal. State is plain JSON for persistence.
 See docs/design/specs/2026-10-20-trading-agent-step-a-design.md.
+
+Optional plan fields added for the A10 styles (absent in older plans, whose behaviour is unchanged):
+`limit` + `expires` rest an entry until the price trades through it (filled at the limit, or at a better open,
+without slippage); `max_hold_hours` replaces the 24-hour time exit; `target` None means a stop-only trade.
 """
 from __future__ import annotations
 
@@ -66,16 +70,16 @@ def _close(s, price, time, reason):
     s['position'] = None
 
 
-def _open(s, plan, open_price, time):
+def _open(s, plan, open_price, time, at_limit=False):
     side = 1 if plan['side'] == 'long' else -1
     slippage = float(plan.get('slippage') or SLIPPAGE)   # research may stress slippage around anomalies
-    fill = open_price*(1+side*slippage)
-    ratio = reward_risk(plan['side'], fill, plan['stop'], plan['target'], plan['cost_fraction'])
+    fill = open_price if at_limit else open_price*(1+side*slippage)
+    target = plan.get('target')
     minimum = plan.get('min_reward_risk', PLAN_RULES['min_reward_risk'])
-    if minimum is None:   # A8 accounts: the score replaced the minimum; the levels must still bracket the fill
-        if side*(fill-float(plan['stop'])) <= 0 or side*(float(plan['target'])-fill) <= 0:
+    if minimum is None:   # A8/A10 accounts: no minimum; the levels must still bracket the fill
+        if side*(fill-float(plan['stop'])) <= 0 or (target is not None and side*(float(target)-fill) <= 0):
             return _reject(s, time, 'enter', 'INVALIDATED_AT_FILL')
-    elif ratio is None or ratio < minimum:
+    elif target is None or (ratio := reward_risk(plan['side'], fill, plan['stop'], target, plan['cost_fraction'])) is None             or ratio < minimum:
         return _reject(s, time, 'enter', 'INVALIDATED_AT_FILL')
     quantity, leverage = float(plan['quantity']), float(plan.get('leverage', PLAN_RULES['leverage']))
     margin = quantity*fill/leverage
@@ -83,14 +87,16 @@ def _open(s, plan, open_price, time):
         return _reject(s, time, 'enter', 'INSUFFICIENT_MARGIN')
     fee = quantity*fill*FEE
     s['cash'] -= fee
+    target = None if target is None else float(target)
     s['position'] = dict(side=side, quantity=quantity, entry=fill, entry_time=time, stop=float(plan['stop']),
-                         target=float(plan['target']), initial_stop=float(plan['stop']),
-                         initial_target=float(plan['target']), leverage=leverage, margin=margin,
+                         target=target, initial_stop=float(plan['stop']), max_hold_hours=plan.get('max_hold_hours'),
+                         initial_target=target, leverage=leverage, margin=margin,
                          liquidation=liquidation_price(side, fill, leverage), entry_fee=fee, funding=0.0,
                          equity_at_entry=s['equity'], max_favorable=0.0, max_adverse=0.0, protection_changes=[],
                          slippage=slippage,
                          plan={k: plan.get(k) for k in ('side', 'stop', 'target', 'reward_risk', 'rules_version',
-                                                         'context_cutoff', 'playbook', 'hit_id')})
+                                                         'context_cutoff', 'playbook', 'hit_id', 'style',
+                                                         'max_hold_hours', 'limit')})
 
 
 def _modify(s, kind, price, open_price, time):
@@ -100,7 +106,7 @@ def _modify(s, kind, price, open_price, time):
         ok = side*(price-p['stop']) > 0 and side*(open_price-price) > 0     # closer to the price, never past it
         key, reason = 'stop', 'INVALID_STOP_CHANGE'
     else:
-        ok = side*(p['target']-price) > 0 and side*(price-open_price) > 0   # closer to the price, never past it
+        ok = p['target'] is not None and side*(p['target']-price) > 0 and side*(price-open_price) > 0
         key, reason = 'target', 'INVALID_TARGET_CHANGE'
     if not ok:
         return _reject(s, time, kind, reason)
@@ -118,7 +124,16 @@ def _execute_pending(s, event, time):
             return _reject(s, time, kind, 'POSITION_OPEN')
         if s['halted_day'] or s['drawdown_halt'] or s['paused'] or s.get('floor_hit'):
             return _reject(s, time, kind, 'ACCOUNT_HALTED')
-        return _open(s, order['plan'], o, time)
+        plan = order['plan']
+        if plan.get('limit') is None:
+            return _open(s, plan, o, time)
+        if plan.get('expires') and pd.Timestamp(time) > pd.Timestamp(plan['expires']):
+            return _reject(s, time, kind, 'LIMIT_EXPIRED')
+        limit, long = float(plan['limit']), plan['side'] == 'long'
+        if not (float(event['low']) <= limit if long else float(event['high']) >= limit):
+            s['pending'] = order    # still resting
+            return
+        return _open(s, plan, min(o, limit) if long else max(o, limit), time, at_limit=True)
     if not s['position']:
         return _reject(s, time, kind, 'NO_POSITION')
     if kind == 'exit':
@@ -140,14 +155,15 @@ def _protect(s, event, time):
     if side*(p['stop']-o) >= 0:
         return _close(s, o, time, 'STOP')                       # gapped through the stop: fill at the open
     stopped = l <= p['stop'] if side == 1 else h >= p['stop']
-    reached = h >= p['target'] if side == 1 else l <= p['target']
+    reached = p['target'] is not None and (h >= p['target'] if side == 1 else l <= p['target'])
     if stopped:
         return _close(s, p['stop'], time, 'STOP')
     if reached:
         return _close(s, p['target'], time, 'TARGET')
     if side*(mark-p['liquidation']) <= 0:
         return _close(s, mark, time, 'LIQUIDATION')
-    if pd.Timestamp(time)-pd.Timestamp(p['entry_time']) >= MAX_HOLD:
+    hold = pd.Timedelta(hours=p['max_hold_hours']) if p.get('max_hold_hours') else MAX_HOLD
+    if pd.Timestamp(time)-pd.Timestamp(p['entry_time']) >= hold:
         return _close(s, c, time, 'TIME_EXIT')
 
 
@@ -197,6 +213,10 @@ def _action(s, event):
     kind = event['action']
     s['decisions'].append(dict(time=pd.Timestamp(event['time']).isoformat(), action=kind))
     if kind in ('hold', 'wait'):
+        return
+    if kind == 'cancel':    # withdraw a resting limit entry
+        if s['pending'] and s['pending']['action'] == 'enter':
+            s['pending'] = None
         return
     if s['pending']:
         return _reject(s, event['time'], kind, 'ORDER_PENDING')
