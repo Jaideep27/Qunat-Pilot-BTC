@@ -530,7 +530,8 @@ def _style_rules(account, round_length):
         review, shared = f"Pauses every {account.get('review_days', 30)} days for a review with the owner.", SHARED_STYLE_RULES[:1]
     else:
         review, shared = f'Pauses after {round_length} trades for a review with the owner.', SHARED_STYLE_RULES
-    return dict(rules=list(module.RULES)+shared+[review], watches=[], style_name=module.NAME)
+    rules = [r for r in module.RULES if account.get('park', True) or 'idle money' not in r.lower()]
+    return dict(rules=rules+shared+[review], watches=[], style_name=module.NAME)
 
 
 def _position_view(account, state, f, extra):

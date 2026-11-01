@@ -14,12 +14,14 @@ accounts:
   risk: 0.01
   leverage: 2.0
   daily_brake: 0.03
+  park: false        # A13: no idle-money hedge (its switching costs exceeded the funding)
 - id: acct-trend-bot
   name: Trend-Led Bot
   style: X2
   risk: 0.01
   leverage: 2.0
   daily_brake: 0.03
+  park: false        # A13: no idle-money hedge (its switching costs exceeded the funding)
 - id: acct-trend
   name: Trend Rider
   style: T1

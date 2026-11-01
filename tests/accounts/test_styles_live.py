@@ -218,3 +218,21 @@ def test_the_trend_led_bot_enters_with_the_daily_trend_when_another_member_agree
     assert plan['side'] == 'long' and plan['target'] is None and plan['playbook'] == 'T1' and acct['active']['on']
     d = [r for r in account_journal.decisions(account, 'acct-trend-bot') if r['decision'] == 'TAKEN'][0]
     assert d['payload']['chosen']['agreements'] == ['PB08L'] and d['payload']['style'] == 'X2'
+
+
+def test_with_parking_off_the_bot_keeps_idle_money_as_cash_and_closes_an_open_hedge(account, market):
+    from quantpilot.simulation import carry as ledger
+    off = cfg5()
+    off['accounts'][0]['park'] = False
+    t = START+pd.Timedelta(days=30, minutes=1)
+    step(account, market, t, config=off)
+    step(account, market, t+pd.Timedelta(days=1, hours=9), config=off)
+    acct = journal.load_account(account, 'acct-combined')
+    assert not acct['hedge'] and not acct['cycles']
+    h = ledger.initial(acct['futures']['equity'])                 # a hedge left open from before the switch
+    ledger.open_(h, 80_000.0, t)
+    acct['hedge'] = h
+    journal.save_account(account, 'acct-combined', acct, t)
+    step(account, market, t+pd.Timedelta(days=1, hours=9, minutes=5), config=off)
+    acct = journal.load_account(account, 'acct-combined')
+    assert acct['hedge'] is None and acct['cycles'][-1]['reason'] == 'PARKING_OFF'

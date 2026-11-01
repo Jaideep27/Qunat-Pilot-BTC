@@ -321,6 +321,11 @@ def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, da
     before = len(s['trades'])
     rates = _rates(frames.get('funding'))
     stopped = acct['status'] in STOPPED
+    park = account.get('park', True)      # A13: both bots run with park: false
+    hedge = acct.get('hedge')
+    if not park and hedge and hedge.get('open'):
+        price = float(new.close.iloc[0]) if len(new) else hedge.get('last_price')
+        bot._close_hedge(acct, price, now, 'PARKING_OFF')
     previous = pd.Timestamp(acct['last_funding']) if acct['last_funding'] else pd.Timestamp(now)-SETTLEMENT
     for bar in new.itertuples():
         t = bar.available_at
@@ -329,7 +334,7 @@ def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, da
         bot.on_bar(acct, t, bar.open, bar.high, bar.low, bar.close, position_rates)
         for row in (due.itertuples() if due is not None else []):
             history_rates = rates[rates.event_time <= row.event_time].funding_rate.astype(float).iloc[-21:].tolist()
-            bot.on_settlement(acct, t, float(row.funding_rate), bar.close, history_rates, allow_park=not stopped)
+            bot.on_settlement(acct, t, float(row.funding_rate), bar.close, history_rates, allow_park=park and not stopped)
             previous = row.available_at
             acct['last_funding'] = pd.Timestamp(row.available_at).isoformat()
         acct['last_bar'] = t.isoformat()

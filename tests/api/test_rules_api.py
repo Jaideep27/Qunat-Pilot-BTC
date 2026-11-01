@@ -46,6 +46,7 @@ def test_accounts_endpoint_lists_the_four_styles_with_rules_text(account):
     assert [a['style'] for a in data['accounts']] == ['X1', 'X2', 'T1', 'R1', 'B1', 'C1']
     x = data['accounts'][0]
     assert x['name'] == 'Combined Bot' and any('second opinion' in line for line in x['rules']) and 'members' in x
+    assert not any('idle money' in line.lower() for line in x['rules'])          # A13: parking is off
     assert any('Trend Rider decides the direction' in line for line in data['accounts'][1]['rules'])
     a = data['accounts'][3]
     assert a['name'] == 'Range Trader' and a['status'] == 'NOT_STARTED' and a['equity'] == 10_000 and a['round_length'] == 30

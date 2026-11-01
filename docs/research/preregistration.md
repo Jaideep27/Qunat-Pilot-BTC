@@ -382,3 +382,13 @@ Two forward-only intraday families are registered now, before their data exists 
 - **Exits.** The stop, or a daily close where the vote no longer holds the side. After a stop-out, the same side waits until the vote has been off it at one daily close.
 - **Idle money.** As A11: after ≥ 24h flat with positive 7-day funding, the C1 hedge, closed before any entry or when 3-day funding turns negative.
 - **Accounting.** One trial. Pass rule as A10, swing track (≥ 30 trades). Same development span; the holdout stays untouched.
+
+**A13 — 2026-11-01, idle parking switched off for the two bots (owner's decision).**
+- The A11/A12 history tests showed the idle hedge losing money in both bots:
+  - Trend-Led Bot: 95 cycles, funding +$545, switching costs −$2,211;
+  - Combined Bot: 101 cycles, −$1,746.
+- On the owner's decision, `acct-combined` and `acct-trend-bot` no longer park idle money (`park: false` in accounts-v2). A hedge open at the switch is closed at the next minute's price (reason `PARKING_OFF`).
+- Nothing else in A11/A12 changes. The Funding Collector (C1) keeps its own hedge.
+- The history results without parking are already reported:
+  - Combined Bot without parking: −50% (A11, second trial).
+  - Trend-Led Bot: its price trades alone made +$143.
