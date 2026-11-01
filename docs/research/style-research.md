@@ -49,3 +49,32 @@ uv run quantpilot research-styles --output artifacts/style-research/<new dir>
 ```
 
 Per-style trades and verdicts are in `artifacts/style-research/run-20261101/runs/`, and the summary in `report.json`. The run takes about 5 minutes and reads the funding archive, the daily and hourly research panels, and the PostgreSQL 5m candles.
+
+## The Combined Bot (A11)
+
+The bot listens to every member and holds one trade at a time. Same span and costs as the styles above. Holdout untouched.
+
+| Version | Price trades | Win rate (break-even) | Account | Worst drop | Idle-hedge cycles | Pass rule |
+|---|---|---|---|---|---|---|
+| With idle money parked (live version) | 314 | 46% (56%) | **−50%** (floor hit in 2023) | −51% | 101, +$109 funding | fail on every item |
+| Without parking | 405 | 45% (57%) | **−50%** (floor hit in 2023) | −52% | — | fail on every item |
+
+**Who led the 395 trades of the live version:**
+
+| Leader | Trades |
+|---|---|
+| Range Trader | 220 |
+| Breakout Hunter | 141 |
+| Trend Rider | 19 |
+| Rulebook setups | 15 |
+
+**Filtered out:**
+- 470 leaders had no second opinion;
+- 255 trades were vetoed by the daily trend;
+- 153 signals came from members that were not allowed to lead.
+
+**What it means:**
+- The rules did what they were written to do: one trade at a time, no counter-trend trades, two sources behind every entry.
+- But most entries were still led by the two losing members, and the extra filters did not turn their losses into gains.
+- The idle hedge earned little: it parked only after a full flat day, and most of its funding went to switching costs.
+- A bot led only by the members that made money in history (Trend Rider, plus the hedge) is an obvious next idea. It would be chosen after seeing these results, so it would need a new amendment and a forward test, and only if the owner wants it.

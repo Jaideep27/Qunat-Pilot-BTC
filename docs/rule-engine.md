@@ -84,6 +84,17 @@ The owner noticed that the four A8 accounts copied each other: they traded the s
   - Funding Collector: +13.9% over 5.8 years, not proven.
   - Range Trader and Breakout Hunter: each lost half the account.
 
+## The Combined Bot (amendment A11, accounts-v2, 2026-11-01)
+
+One more account, `acct-combined`, listens to every strategy and holds a single trade:
+- **Who leads:** the regime picks it (trend signals in a trend, range signals when sideways, crowd setups when wild).
+- **Veto:** the Trend Rider's daily vote vetoes counter-trend trades.
+- **Second opinion:** a leader needs one, from another source within the hour or from price at a confirmed support or resistance.
+- **Idle money:** after a flat day it earns funding in the hedge, which closes before the next trade.
+- **Code:** `strategies/combined.py` (rules) and `strategies/bot.py` (the one book). The live path is the `X1` branch of `accounts/styles_live.py`.
+
+**History test:** it lost half the account (floor hit in 2023). Range Trader and Breakout Hunter led most of its trades, and the filters did not turn their losses around. Details are in `docs/research/style-research.md`.
+
 ## Four paper accounts (amendment A8, 2026-10-22; retired 2026-11-01)
 At the owner's request, four extra paper futures accounts ($10,000 each) trade the same rulebook v2 setups live.
 - **What they share:** playbooks, triggers, checklists, stops, targets and management.
