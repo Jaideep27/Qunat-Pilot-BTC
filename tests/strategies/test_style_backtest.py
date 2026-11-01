@@ -87,3 +87,11 @@ def test_the_combined_bot_trades_only_vetted_leaders_and_parks_idle_money():
     assert s['decisions'] >= s['chosen'] and {'vetoed', 'no_second_opinion', 'not_leader'} <= set(s)
     verdict = sb.judge('X1', park, registries=[])
     assert 'not_luck' in verdict['criteria']
+
+
+def test_the_trend_led_bot_trades_only_with_the_daily_trend():
+    candles, daily, rates, hits, start, end = combined_inputs()
+    out = sb.run_combined(candles, daily, rates, hits, start, end, macro_events=[], stops={'PB08L': 12}, park=True, mode='X2')
+    assert out['style'] == 'X2' and out['trades']
+    assert all(t['side'] == 1 and t['plan']['playbook'] == 'T1' and t['initial_target'] is None for t in out['trades'])
+    assert sb.judge('X2', out, registries=[])['criteria']['enough_trades'] is False      # swing track: 30 trades

@@ -83,3 +83,27 @@ def test_the_plain_reason_names_the_leaders_and_the_veto():
     assert on and 'trend' in reason.lower() and 'shorts' in reason.lower()
     on, reason = combined.active('RANGE', 0)
     assert on and 'sideways' in reason.lower()
+
+
+TREND_ROW = dict(atr20=4000.0, sigma30=.5, close=100_000.0)
+
+
+def test_the_trend_led_bot_needs_a_vote_and_a_confirmation_on_that_side():
+    row = dict(ROW, close=100_000.0, atr_1h=500.0, support_1h=90_000.0, support_4h=80_000.0)
+    long_hit = cand('PB08L', ref=100_000.0)
+    assert combined.trend_led(0, TREND_ROW, [long_hit], [], row, T)['chosen'] is None             # no trend, no trade
+    assert combined.trend_led(1, TREND_ROW, [], [], row, T)['chosen'] is None                     # trend but no timing
+    assert combined.trend_led(-1, TREND_ROW, [long_hit], [], row, T)['chosen'] is None            # confirmation on the wrong side
+    out = combined.trend_led(1, TREND_ROW, [long_hit], [], row, T)
+    c = out['chosen']
+    assert c['source'] == 'T1' and c['side'] == 'long' and c['agreements'] == ['PB08L'] and c['target'] is None
+    assert c['stop'] == pytest.approx(100_000.0-3*4000.0) and c['risk_scale'] == pytest.approx(.8)
+
+
+def test_the_trend_led_bot_takes_a_support_as_timing_and_a_recent_signal():
+    near = dict(ROW, close=100_000.0, atr_1h=500.0, support_1h=99_800.0)
+    assert combined.trend_led(1, TREND_ROW, [], [], near, T)['chosen']['agreements'] == ['support_1h']
+    recent = [cand('R1', ref=100_000.0, t=T-pd.Timedelta(minutes=45))]
+    far = dict(ROW, close=100_000.0, atr_1h=500.0, support_1h=90_000.0, support_4h=80_000.0)
+    assert combined.trend_led(1, TREND_ROW, [], recent, far, T)['chosen']['agreements'] == ['R1']
+    assert combined.trend_led(1, TREND_ROW, [], [], far, T, blocked='long')['chosen'] is None      # waiting after a stop-out

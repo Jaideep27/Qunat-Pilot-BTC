@@ -367,3 +367,18 @@ Two forward-only intraday families are registered now, before their data exists 
 - **Trials and pass rule.** Two configurations, with and without idle parking. The live account uses parking. Pass rule as A10 (intraday track, ≥ 100 price trades).
   - Spans: 2021-10-20 → bars closing before 2025-10-20. The holdout stays untouched.
   - Reported against each member and against buy-and-hold.
+
+**A12 — 2026-11-01, the Trend-Led Bot. Chosen AFTER the A10/A11 results were seen (post-hoc), on the owner's request; its history test is therefore optimistic by construction and only a forward record can judge it.**
+
+- **Why.** The A11 Combined Bot lost half the account in history because the losing members (R1, B1) led most of its trades. Only T1 and the funding hedge made money. The owner asked for a second bot that only Trend Rider may lead. It is a sixth paper account beside the A11 bot.
+- **Direction.** T1's latest daily vote: long only at +1, short only at −1, no trades at 0.
+- **Entry timing (second opinion).** At a 15m close, when flat and the side is allowed, the entry needs one confirmation on that side:
+  - any member candidate (R1, B1, or a confirmed rulebook hit, as in A11) at this close or in the 4 closes before;
+  - or price at a confirmed support (long) or resistance (short) within 0.5 × ATR(1h).
+- **Plan.** T1's own:
+  - stop 3 × ATR(20d) from the entry close, using the ATR at the last daily close;
+  - no target and no time stop;
+  - size: 1% risk × min(1, 0.40 / σ30), 2× cap.
+- **Exits.** The stop, or a daily close where the vote no longer holds the side. After a stop-out, the same side waits until the vote has been off it at one daily close.
+- **Idle money.** As A11: after ≥ 24h flat with positive 7-day funding, the C1 hedge, closed before any entry or when 3-day funding turns negative.
+- **Accounting.** One trial. Pass rule as A10, swing track (≥ 30 trades). Same development span; the holdout stays untouched.

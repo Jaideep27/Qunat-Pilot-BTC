@@ -21,8 +21,8 @@ DEV_START, DEV_END = pd.Timestamp('2021-10-20', tz='UTC'), pd.Timestamp('2025-10
 TREND_START, CARRY_START = pd.Timestamp('2017-08-18', tz='UTC'), pd.Timestamp('2020-01-01', tz='UTC')
 WARMUP = pd.Timedelta(days=60)
 BALANCE = 10_000.0
-MIN_TRADES = dict(T1=30, R1=100, B1=100, C1=10, X1=100)
-TRACK = dict(T1='swing', R1='intraday', B1='intraday', C1='swing', X1='intraday')
+MIN_TRADES = dict(T1=30, R1=100, B1=100, C1=10, X1=100, X2=30)
+TRACK = dict(T1='swing', R1='intraday', B1='intraday', C1='swing', X1='intraday', X2='swing')
 SIGNALS = dict(R1=range_trader.signals, B1=breakout.signals)
 REGISTRIES = ('artifacts/strategy-research/run-20261020/trials.jsonl', 'artifacts/agent-research/run-20261020/trials.jsonl',
               'artifacts/rule-engine/research-20261021/trials.jsonl', 'artifacts/rule-engine/research-v2-20261021/trials.jsonl')
@@ -137,7 +137,7 @@ def run_carry(rates, price, start, end):
     return dict(style='C1', trades=s['trades'], account=acct)
 
 
-def run_combined(candles, daily, rates, hits, start, end, macro_events=(), stops=None, park=True):
+def run_combined(candles, daily, rates, hits, start, end, macro_events=(), stops=None, park=True, mode='X1'):
     """X1 (A11): every member's candidates, the regime boss, the daily veto and a second opinion; one book,
     with idle money in the hedge when `park`. Funding `rates` (8-hourly) drive both the position and the hedge."""
     sf = market.style_frame(candles)
@@ -151,16 +151,18 @@ def run_combined(candles, daily, rates, hits, start, end, macro_events=(), stops
         for row in h.to_dict('records'):
             t = pd.Timestamp(row['time'])
             cands.setdefault(t, []).append(combined.from_hit(row, stops or {}))
-    for t in f.index[f.vote != 0]:
-        it = trend.intent(f, t)
-        if it is not None:
-            cands.setdefault(t, []).append(combined.from_trend(it))
+    if mode == 'X1':      # X2 takes its direction from the vote instead of a T1 candidate
+        for t in f.index[f.vote != 0]:
+            it = trend.intent(f, t)
+            if it is not None:
+                cands.setdefault(t, []).append(combined.from_trend(it))
     c = market.candles_of(candles)
     c = c[(c.available_at >= start) & (c.available_at < end)]
     rates = rates.sort_index()
     st, curve, previous, recent = bot.new(BALANCE, now=start, bar_minutes=5), [], None, []
     stats = dict(decisions=0, chosen=0, vetoed=0, no_second_opinion=0, not_leader=0, led_by={})
     daily_closes = set(f.index)
+    blocked, seen = None, 0
     for bar in c.itertuples():
         t = bar.available_at
         due = rates[(rates.index > previous) & (rates.index <= t)] if previous is not None else rates.iloc[0:0]
@@ -175,9 +177,29 @@ def run_combined(candles, daily, rates, hits, start, end, macro_events=(), stops
         if t in daily_closes and st['leader'] == 'T1' and s['position'] and s['pending'] is None and \
                 not trend.holds(f, t, 'long' if s['position']['side'] == 1 else 'short'):
             bot.exit_(st, t)
+        for tr in s['trades'][seen:]:
+            if mode == 'X2' and tr['reason'] == 'STOP':
+                blocked = 'long' if tr['side'] == 1 else 'short'
+        seen = len(s['trades'])
+        if blocked and t in daily_closes and vote != (1 if blocked == 'long' else -1):
+            blocked = None
         current = cands.get(t, [])
         recent = [x for x in recent if x['time'] >= t-combined.WINDOW]
-        if current and bot.flat(st) and not s['paused'] and not s['halted_day'] and not s.get('floor_hit') \
+        if mode == 'X2' and vote and bot.flat(st) and not s['paused'] and not s['halted_day'] and not s.get('floor_hit') \
+                and not base.in_blackout(t, macro_events) and t in sf.index:
+            row = sf.loc[t].to_dict()
+            drow = f.loc[f.index[f.index <= t][-1]].to_dict()
+            out = combined.trend_led(vote, drow, current, recent, row, t, blocked)
+            stats['decisions'] += 1
+            if out['status'] == 'NO_SECOND_OPINION':
+                stats['no_second_opinion'] += 1
+            if out['chosen']:
+                ch = out['chosen']
+                stats['chosen'] += 1
+                for a in ch['agreements']:
+                    stats['led_by'][a] = stats['led_by'].get(a, 0)+1
+                bot.enter(st, combined.to_plan(ch, s['equity'], t), bar.close, t, leader='T1')
+        elif mode == 'X1' and current and bot.flat(st) and not s['paused'] and not s['halted_day'] and not s.get('floor_hit') \
                 and not base.in_blackout(t, macro_events) and t in sf.index:
             row = sf.loc[t].to_dict()
             out = combined.decide(row['regime'], vote, current, recent, row)
@@ -200,7 +222,7 @@ def run_combined(candles, daily, rates, hits, start, end, macro_events=(), stops
     hold = float(c.close.iloc[-1]/c.open.iloc[0]-1) if len(c) else None
     account = _account(st['futures']['equity'], curve, st['futures']['trades'], hold)
     account.update(funding=float(sum(x['funding'] for x in st['cycles'])), hedge_cycles=len(st['cycles']), parked=park)
-    return dict(style='X1', trades=st['futures']['trades'], cycles=st['cycles'], stats=stats, account=account,
+    return dict(style=mode, trades=st['futures']['trades'], cycles=st['cycles'], stats=stats, account=account,
                 rejections=len(st['futures']['rejections']))
 
 
@@ -242,15 +264,16 @@ def research(output, engine=None, combined_bot=False):
     folder = Path(output)
     (folder/'runs').mkdir(parents=True, exist_ok=True)
     results = {}
-    names = ('C1', 'T1', 'R1', 'B1')+(('X1', 'X1-nopark') if combined_bot else ())
+    names = ('C1', 'T1', 'R1', 'B1')+(('X1', 'X1-nopark', 'X2') if combined_bot else ())
     for style in names:
         path = folder/'runs'/f'{style}.json'
         if path.exists():
             results[style] = json.loads(path.read_text(encoding='utf-8'))
             continue
-        if style.startswith('X1'):
-            result = _run_combined_dev(settings, engine, park=style == 'X1')
-            result['verdict'] = judge('X1', result)
+        if style.startswith('X'):
+            mode = style[:2]
+            result = _run_combined_dev(settings, engine, park=style != 'X1-nopark', mode=mode)
+            result['verdict'] = judge(mode, result)
             path.write_text(json.dumps(_plain(result)), encoding='utf-8')
             results[style] = _plain(result)
             continue
@@ -278,7 +301,7 @@ def research(output, engine=None, combined_bot=False):
     return report
 
 
-def _run_combined_dev(settings, engine=None, park=True):
+def _run_combined_dev(settings, engine=None, park=True, mode='X1'):
     from quantpilot.data.macro import events as load_macro
     from quantpilot.research.event_study import load_market
     from quantpilot.research.playbooks import load_hits
@@ -297,7 +320,7 @@ def _run_combined_dev(settings, engine=None, park=True):
     candles = frames['candles'][pd.to_datetime(frames['candles'].available_at, utc=True) < DEV_END]
     del frames
     return run_combined(candles, daily, rates, hits, DEV_START, DEV_END, load_macro(database()),
-                        stops=combined.time_stops(rulebook.cached()), park=park)
+                        stops=combined.time_stops(rulebook.cached()), park=park, mode=mode)
 
 
 def _carry_inputs(settings, engine=None):

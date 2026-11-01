@@ -152,3 +152,39 @@ def to_plan(c, equity, t):
     plan = base.plan(intent, equity)
     plan['playbook'] = c['source']
     return plan
+
+
+# ---- A12 Trend-Led Bot: only Trend Rider leads; the others time the entry ----------------------------------------
+
+TREND_CODE, TREND_NAME = 'X2', 'Trend-Led Bot'
+TREND_RULES = [
+    'One account, one trade at a time, and only Trend Rider decides the direction: long while BTC trends up over 20, 60 and 120 days, short while it trends down, nothing otherwise.',
+    'The other strategies only time the entry: it buys when Range Trader, Breakout Hunter or a rulebook setup agrees within the hour, or when price sits at support (resistance for shorts).',
+    "It uses Trend Rider's wide stop (3 x the 20-day range), holds days to weeks, and leaves when the trend agreement breaks.",
+    'Risks 1% of the account, less when BTC is unusually volatile.',
+    'When it has had no trade for a day and funding is positive, idle money earns funding in the hedge until the next trade.',
+    'Chosen after seeing the history results, so its history looks better than it may be; the live record is the real test.',
+]
+
+
+def trend_led(vote, daily_row, current, recent, row, t, blocked=None):
+    """A12: the side comes from the daily vote; any member on that side (now or within the hour) or a level times
+    the entry; the plan is Trend Rider's."""
+    t = pd.Timestamp(t)
+    if vote not in (1, -1):
+        return dict(chosen=None, status='NO_TREND', considered=[dict(c, status='NO_TREND') for c in current])
+    side = 'long' if vote == 1 else 'short'
+    if blocked == side:
+        return dict(chosen=None, status='WAITING_AFTER_STOP', considered=[dict(c, status='WAITING_AFTER_STOP') for c in current])
+    window = [c for c in list(current)+list(recent) if c['side'] == side and t-WINDOW <= pd.Timestamp(c['time']) <= t]
+    agreements = sorted({c['source'] for c in window})+at_level(side, row)
+    considered = [dict(c, status='CONFIRMS' if c['side'] == side else 'WRONG_SIDE') for c in current]
+    if not agreements:
+        return dict(chosen=None, status='NO_SECOND_OPINION', considered=considered)
+    price = float(row['close'])
+    stop = price-vote*3.0*float(daily_row['atr20'])
+    scale = min(1.0, .40/float(daily_row['sigma30'])) if daily_row.get('sigma30') else 1.0
+    chosen = candidate('T1', t, side, price, stop, None, 24*3650, f'Daily trend {side}; timed by {", ".join(agreements)}',
+                       risk_scale=scale)
+    chosen['agreements'] = agreements
+    return dict(chosen=chosen, status='CHOSEN', considered=considered)
