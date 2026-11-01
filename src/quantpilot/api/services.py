@@ -535,9 +535,12 @@ def _style_rules(account, round_length):
 
 def _position_view(account, state, f, extra):
     p = f.get('position')
+    hedge = state.get('hedge')
+    if account.get('style') == 'X1' and not p and hedge and hedge.get('open'):
+        f, p = hedge, hedge.get('position') or {}
     if not p:
         return None
-    if account.get('style') == 'C1':
+    if account.get('style') in ('C1', 'X1') and p.get('kind') == 'hedge':
         cycle = f.get('cycle') or {}
         return dict(kind='hedge', side='hedge', entry=cycle.get('entry', p.get('entry')), entry_time=p.get('entry_time'),
                     spot_qty=f.get('spot_qty'), perp_qty=f.get('perp_qty'), margin=f.get('margin'),
@@ -558,6 +561,9 @@ def _account_view(cfg, account, state, expectations, reviews, engine=None):
     extra = state.get('extra') or {}
     own = [r for r in reviews if r['account'] == account['id']]
     equity = f.get('equity', cfg['balance'])
+    if account.get('style') == 'X1' and f:
+        from quantpilot.strategies import bot
+        equity = bot.equity(dict(state, futures=f))
     report = None
     if engine is not None:
         try:
@@ -581,6 +587,8 @@ def _account_view(cfg, account, state, expectations, reviews, engine=None):
                 review={k: own[0][k] for k in ('id', 'round', 'status')} if own else None, **text)
     if style:
         view.update(style=style, active=state.get('active'), history_test=_style_history(style))
+        if style == 'X1':
+            view.update(members=state.get('members'), round_unit='trades')
         if style == 'C1':
             started = state.get('round_started')
             days = (pd.Timestamp.now(tz='UTC')-pd.Timestamp(started)).days if started else 0

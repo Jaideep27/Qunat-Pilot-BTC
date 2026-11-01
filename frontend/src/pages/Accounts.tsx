@@ -13,7 +13,8 @@ type Account={id:string;name:string;status:string;equity:number;balance:number;a
   leverage:number;risk:number|null;percentile:number|null;cutoff_score:number|null;full_risk_score:number|null;daily_brake:number|null;halted_day:boolean;floor_hit:boolean;
   position:Position|null;pending:boolean;last:Last|null;expectations:{trades_per_week:number;win_rate:number|null;mean_r:number|null}|null;
   review:{id:string;round:number;status:string}|null;rules:string[];watches:string[];report?:Report|null;
-  style?:string;active?:{on:boolean;reason:string}|null;history_test?:HistoryTest;round_unit?:string};
+  style?:string;active?:{on:boolean;reason:string}|null;history_test?:HistoryTest;round_unit?:string;
+  members?:{regime:string|null;vote:number;leaders:string[];hedge:boolean;range_trader?:string;breakout?:string}|null};
 type Report={trades:number;wins:number;win_rate:number|null;account_return:number;avg_win:number|null;avg_loss:number|null;
   profit_factor:number|null;max_drawdown:number;longest_drawdown_hours:number;longest_losing_streak:number;hold_return?:number;vs_hold?:number};
 type Accounts={accounts:Account[];config_hash:string;model_hash:string;overlay_time:string|null;note:string;watch_now:{key:string;label:string;value:number|null}[]};
@@ -40,8 +41,16 @@ type Health={overall:'OK'|'WATCH'|'ALARM'|'UNKNOWN';reasons:string[];reference:s
 
 const words=(s:string)=>s.replaceAll('_',' ').toLowerCase();
 // accounts-v2 (A10): four different styles
-const STYLE:Record<string,string>={T1:'Trend · holds days to weeks',R1:'Range · holds up to 4 hours',B1:'Breakout · holds up to a day',C1:'Funding · no bet on direction'};
-const FILTERS={All:'',Trend:'acct-trend',Range:'acct-range',Breakout:'acct-breakout',Funding:'acct-carry',A:'acct-a',B:'acct-b',C:'acct-c',D:'acct-d'} as const;
+const STYLE:Record<string,string>={X1:'All strategies · one trade at a time',T1:'Trend · holds days to weeks',R1:'Range · holds up to 4 hours',B1:'Breakout · holds up to a day',C1:'Funding · no bet on direction'};
+const MEMBER:Record<string,string>={T1:'Trend Rider',R1:'Range Trader',B1:'Breakout Hunter'};
+function Members({m}:{m:NonNullable<Account['members']>}){
+  return <>
+    <p className="account-last">Leads now: {m.leaders.length?m.leaders.map(l=>MEMBER[l]??l).join(', '):'nobody (warming up)'}</p>
+    <p className="account-last">Daily trend: {m.vote===1?'up (shorts vetoed)':m.vote===-1?'down (longs vetoed)':'no clear trend (no veto)'}</p>
+    {m.hedge&&<p className="account-last">Idle money is earning funding in the hedge until the next trade.</p>}
+  </>;
+}
+const FILTERS={All:'',Bot:'acct-combined',Trend:'acct-trend',Range:'acct-range',Breakout:'acct-breakout',Funding:'acct-carry',A:'acct-a',B:'acct-b',C:'acct-c',D:'acct-d'} as const;
 type Filter=keyof typeof FILTERS;
 const CRITERIA:Record<string,string>={enough_trades:'too few trades',beats_break_even:'wins not above break-even',positive_mean:'loses on average',
   deflated_sharpe:'could be luck (Sharpe)',most_years_positive:'not positive in most years',not_luck:'could be luck (coin-flip test)',beats_cash:'did not beat cash'};
@@ -134,6 +143,7 @@ function AccountCard({a,watchNow,onReview,onResume,busy}:{a:Account;watchNow:Acc
     <p className="account-tier">{a.style?<>{STYLE[a.style]??a.style}{a.risk!=null?` · ${a.leverage}× · risks ${pct(a.risk,1)}`:''}</>
       :<>Best {100-(a.percentile??0)}% of setups · {a.leverage}× · risks {pct(a.risk,1)}</>}</p>
     {a.active&&<p className="account-last"><Pill tone={a.active.on?'ok':'muted'}>{a.active.on?'On':'Off'}</Pill> {a.active.reason}</p>}
+    {a.members&&<Members m={a.members}/>}
     <div className="account-figures">
       <div><span>Equity</span><strong>{money(a.equity)}</strong></div>
       <div><span>Return</span><strong className={a.account_return<0?'tone-down':a.account_return>0?'tone-up':''}>{signedPct(a.account_return)}</strong></div>
@@ -227,10 +237,10 @@ export default function AccountsSection(){
     catch(e){setMessage(`${a.name}: ${(e as Error).message}`)}finally{setBusy(false)}};
   const review=list(reviews.data?.reviews).find(r=>r.id===open);
   const styled=!!data?.accounts.some(a=>a.style);
-  const options:Filter[]=styled?['All','Trend','Range','Breakout','Funding']:['All','A','B','C','D'];
+  const options:Filter[]=styled?['All','Bot','Trend','Range','Breakout','Funding']:['All','A','B','C','D'];
   return <>
     <div className="banner span-3" role="status">{styled
-      ?'Four paper accounts, $10,000 each, each with a different style: Trend Rider follows long trends, Range Trader works sideways markets, Breakout Hunter waits for quiet spells to break, and the Funding Collector earns funding without betting on direction. Each says when it is on or off, and pauses for a review with you. Paper money only.'
+      ?'Five paper accounts, $10,000 each. The Combined Bot listens to every strategy and holds one trade at a time. Beside it, each strategy also trades on its own: Trend Rider follows long trends, Range Trader works sideways markets, Breakout Hunter waits for quiet spells to break, and the Funding Collector earns funding without betting on direction. Each says when it is on or off, and pauses for a review with you. Paper money only.'
       :`Four paper accounts, $10,000 each, from careful to aggressive. Each takes the rulebook's confirmed setups whose score clears its cutoff, sizes by its own risk and leverage, and pauses after ${data?.accounts[0]?.round_length??30} trades for a review. Paper money only.`}
       {message&&<strong> {message}</strong>}</div>
     {!data?<Card title="Paper accounts" className="span-3"><Loading/></Card>

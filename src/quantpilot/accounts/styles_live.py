@@ -18,9 +18,10 @@ from quantpilot.accounts import review as account_review
 from quantpilot.rules import journal
 from quantpilot.simulation import carry as ledger
 from quantpilot.simulation import futures
-from quantpilot.strategies import base, breakout, carry, market, range_trader, timemachine, trend
+from quantpilot.strategies import base, bot, breakout, carry, combined, market, range_trader, timemachine, trend
 
-MODULES = dict(T1=trend, R1=range_trader, B1=breakout, C1=carry)
+MODULES = dict(T1=trend, R1=range_trader, B1=breakout, C1=carry, X1=combined)
+HIT_OK = ('TAKEN', 'SKIPPED_LOWER_PRIORITY', 'POSITION_OPEN')     # A11: setups whose plan was valid
 STOPPED = ('PAUSED_FOR_REVIEW', 'FLOOR_HIT')
 FRESH = pd.Timedelta(minutes=5)
 DAILY_FRESH = pd.Timedelta(hours=1)
@@ -29,6 +30,12 @@ _cache: dict = {}
 
 
 def new_state(cfg, account, now, last_bar):
+    if account['style'] == 'X1':
+        st = bot.new(cfg['balance'], now=now, daily_brake=account['daily_brake'], floor=cfg['floor'], bar_minutes=1)
+        iso = pd.Timestamp(now).isoformat()
+        return dict(st, style='X1', status='RUNNING', round=1, in_round=0, number=0, last_bar=last_bar, last_decision=None,
+                    last_funding=None, recent=[], members=None, extra={}, created=iso, round_started=iso, active=None,
+                    config=cfg.get('hash'))
     if account['style'] == 'C1':
         state = ledger.initial(cfg['balance'])
     else:
@@ -273,6 +280,135 @@ def _step_carry(engine, account, acct, frames, new, now, review_days, last_close
     acct['active'] = dict(on=on, reason=reason, as_of=pd.Timestamp(now).isoformat())
 
 
+def _rates(funding):
+    if funding is None or not len(funding):
+        return None
+    f = funding.assign(event_time=pd.to_datetime(funding.event_time, utc=True),
+                       available_at=pd.to_datetime(funding.available_at, utc=True)).sort_values('event_time')
+    return f.drop_duplicates('event_time', keep='last')
+
+
+def _plain_candidate(c):
+    return {k: (pd.Timestamp(v).isoformat() if k == 'time' else v) for k, v in c.items()}
+
+
+def _candidates(sf, t15, hits, stops, f, daily_close):
+    out = []
+    for source, module in (('R1', range_trader), ('B1', breakout)):
+        sig = module.signals(sf.loc[:t15])
+        if t15 in sig.index:
+            out += combined.from_signals(sig.loc[[t15]], source).get(t15, [])
+    for h in hits or []:
+        if h.get('plan') and h.get('status') in HIT_OK and pd.Timestamp(h['time']) == t15:
+            out.append(combined.from_hit(dict(h, time=t15), stops))
+    if daily_close is not None and f is not None:
+        it = trend.intent(f, daily_close)
+        if it is not None:
+            out.append(combined.from_trend(dict_intent(it, t15)))
+    return out
+
+
+def dict_intent(it, t):
+    it.time = pd.Timestamp(t)
+    return it
+
+
+def _step_combined(engine, account, acct, sf, frames, new, now, macro_events, daily, history, market_engine, hits,
+                   round_length):
+    s = acct['futures']
+    before = len(s['trades'])
+    rates = _rates(frames.get('funding'))
+    stopped = acct['status'] in STOPPED
+    previous = pd.Timestamp(acct['last_funding']) if acct['last_funding'] else pd.Timestamp(now)-SETTLEMENT
+    for bar in new.itertuples():
+        t = bar.available_at
+        due = rates[(rates.available_at > previous) & (rates.available_at <= t)] if rates is not None else None
+        position_rates = due.funding_rate.astype(float).tolist() if due is not None else []
+        bot.on_bar(acct, t, bar.open, bar.high, bar.low, bar.close, position_rates)
+        for row in (due.itertuples() if due is not None else []):
+            history_rates = rates[rates.event_time <= row.event_time].funding_rate.astype(float).iloc[-21:].tolist()
+            bot.on_settlement(acct, t, float(row.funding_rate), bar.close, history_rates, allow_park=not stopped)
+            previous = row.available_at
+            acct['last_funding'] = pd.Timestamp(row.available_at).isoformat()
+        acct['last_bar'] = t.isoformat()
+    _record(engine, account, acct, before, round_length)
+    for cycle in acct['cycles']:      # idle-hedge cycles: journaled, not counted toward the review
+        account_journal.add_trade(engine, account['id'], acct['round'], 0, cycle)
+    if acct['status'] not in STOPPED:
+        acct['status'] = 'RUNNING'
+    closes = sf.index[sf.index <= now]
+    if not len(closes):
+        return
+    t15 = closes[-1]
+    f = trend.frame(daily) if daily is not None and len(daily) else None
+    vote = int(f.vote.asof(t15)) if f is not None and t15 >= f.index[0] else 0
+    row = sf.loc[t15].to_dict()
+    regime = row.get('regime')
+    on, reason = combined.active(regime, vote)
+    acct['active'] = dict(on=on, reason=reason, as_of=t15.isoformat())
+    hedge = acct.get('hedge')
+    acct['members'] = dict(regime=regime, vote=vote, leaders=list(combined.LEADERS.get(regime, ())),
+                           hedge=bool(hedge and hedge['open']), as_of=t15.isoformat(),
+                           range_trader=range_trader.active(sf, t15)[1], breakout=breakout.active(sf, t15)[1])
+    if acct['last_decision'] and t15 <= pd.Timestamp(acct['last_decision']):
+        return
+    acct['last_decision'] = t15.isoformat()
+    if now-t15 > FRESH:
+        return
+    daily_close = t15 if f is not None and t15 in f.index else None
+    p = s['position']
+    if daily_close is not None and acct.get('leader') == 'T1' and p and s['pending'] is None and             not trend.holds(f, daily_close, 'long' if p['side'] == 1 else 'short'):
+        bot.exit_(acct, t15)
+    from quantpilot.rules import rulebook
+    current = _candidates(sf, t15, hits, combined.time_stops(rulebook.cached()), f, daily_close)
+    recent = [dict(c, time=pd.Timestamp(c['time'])) for c in acct.get('recent') or []]
+    recent = [c for c in recent if c['time'] >= t15-combined.WINDOW]
+    acct['recent'] = [_plain_candidate(c) for c in recent+current]
+    if not current:
+        return
+    out = combined.decide(regime, vote, current, recent, row)
+    chosen = out['chosen']
+    if chosen is None:
+        status = sorted((c['status'] for c in out['considered']),
+                        key=['NO_SECOND_OPINION', 'VETOED', 'NOT_LEADER'].index)[0]
+    elif acct['status'] in STOPPED or s['paused']:
+        status = 'PAUSED'
+    elif s['halted_day'] or s.get('floor_hit'):
+        status = 'HALTED'
+    elif not bot.flat(acct):
+        status = 'POSITION_OPEN'
+    elif base.in_blackout(t15, macro_events):
+        status = 'MACRO_BLACKOUT'
+    else:
+        status = 'TAKEN'
+    sizing, tm = None, None
+    hit_id = f'X1:{t15.isoformat()}'
+    if status == 'TAKEN':
+        plan = combined.to_plan(chosen, s['equity'], t15)
+        plan['hit_id'] = hit_id
+        ref = chosen['limit'] if chosen['limit'] is not None else chosen['ref']
+        sizing = dict(quantity=plan['quantity'], leverage=plan['leverage'], risk_fraction=base.RISK*chosen['risk_scale'],
+                      risk_amount=plan['quantity']*abs(ref-chosen['stop']), notional=plan['quantity']*ref)
+        try:
+            hours = 24*30 if chosen['source'] == 'T1' else chosen['max_hold_hours']
+            tm = timemachine.odds(_closes(history, market_engine, t15), t15, chosen['side'], ref, chosen['stop'],
+                                  chosen['target'], hours)
+        except Exception as exc:
+            tm = dict(error=f'{type(exc).__name__}: {exc}'[:200])
+        acct['extra'][hit_id] = dict(time_machine=tm, reason=f"{chosen['source']}: {chosen['reason']}",
+                                     agreements=chosen['agreements'])
+        price = float(new.close.iloc[-1]) if len(new) else float(row.get('close'))
+        bot.enter(acct, plan, price, t15, leader=chosen['source'])
+    plain = lambda c: {k: v for k, v in _plain_candidate(c).items() if k not in ('reason',)} | dict(reason=c.get('reason'))
+    account_journal.add_decisions(engine, [dict(
+        account=account['id'], hit_id=hit_id, time=t15, decision=status, score=None, confidence=None, cutoff=None,
+        trade_id=f"{account['id']}:{hit_id}" if status == 'TAKEN' else None,
+        payload=dict(style='X1', regime=regime, vote=vote, leaders=out['leaders'], considered=[plain(c) for c in out['considered']],
+                     chosen=plain(chosen) if chosen else None, side=chosen['side'] if chosen else None,
+                     reason=f"{chosen['source']} led, backed by {', '.join(chosen['agreements'])}" if chosen else None,
+                     sizing=sizing, time_machine=tm, snapshot=_snapshot(row, frames.get('funding')), active=acct['active']))])
+
+
 def retire(engine, ids, now):
     """Mark the A8 accounts RETIRED (closing any open paper position at its last price). Their journal stays."""
     for account_id in ids or []:
@@ -286,13 +422,13 @@ def retire(engine, ids, now):
         journal.save_account(engine, account_id, acct, now)
 
 
-def step_all(engine, frames, fast, now, macro_events, cfg=None, daily=None, history=None, market_engine=None):
+def step_all(engine, frames, fast, now, macro_events, cfg=None, daily=None, history=None, market_engine=None, hits=None):
     """One minute for every accounts-v2 account. Returns {account id: summary}."""
     cfg = cfg or accounts.load()
     now = pd.Timestamp(now)
     retire(engine, cfg.get('retired'), now)
     sf = _frame(frames)
-    if daily is None and market_engine is not None and any(a['style'] == 'T1' for a in cfg['accounts']):
+    if daily is None and market_engine is not None and any(a['style'] in ('T1', 'X1') for a in cfg['accounts']):
         daily = _daily(market_engine, now)
     out = {}
     for account in cfg['accounts']:
@@ -301,7 +437,10 @@ def step_all(engine, frames, fast, now, macro_events, cfg=None, daily=None, hist
             last = fast.available_at.max().isoformat() if len(fast) else now.floor('min').isoformat()
             acct = new_state(cfg, account, now, last)
         new = fast[fast.available_at > pd.Timestamp(acct['last_bar'])] if acct['last_bar'] else fast.iloc[0:0]
-        if account['style'] == 'C1':
+        if account['style'] == 'X1':
+            _step_combined(engine, account, acct, sf, frames, new, now, macro_events, daily, history, market_engine or engine,
+                           hits, cfg['round_length'])
+        elif account['style'] == 'C1':
             acct['floor'] = cfg['floor']
             _step_carry(engine, account, acct, frames, new, now, account.get('review_days', 30),
                         float(fast.close.iloc[-1]) if len(fast) else None)
@@ -311,7 +450,8 @@ def step_all(engine, frames, fast, now, macro_events, cfg=None, daily=None, hist
         s = acct['futures']
         s['decisions'], s['rejections'] = s.get('decisions', [])[-500:], s.get('rejections', [])[-500:]
         journal.save_account(engine, account['id'], acct, now)
-        out[account['id']] = dict(style=account['style'], status=acct['status'], equity=s['equity'], trades=acct['number'],
+        equity = bot.equity(acct) if account['style'] == 'X1' else s['equity']
+        out[account['id']] = dict(style=account['style'], status=acct['status'], equity=equity, trades=acct['number'],
                                   active=(acct.get('active') or {}).get('on'))
     try:
         out['diagnosed'] = account_review.diagnose_trades(engine, fast, now)

@@ -1,4 +1,5 @@
 """Rule engine read API: rulebook, live account, journal, research and chart overlays."""
+import pytest
 from fastapi.testclient import TestClient
 
 import pandas as pd
@@ -41,14 +42,16 @@ def test_rules_endpoints_after_cycles(account):
 def test_accounts_endpoint_lists_the_four_styles_with_rules_text(account):
     with TestClient(app) as client:
         data = client.get('/api/v1/rules/accounts').json()['data']
-    assert [a['id'] for a in data['accounts']] == ['acct-trend', 'acct-range', 'acct-breakout', 'acct-carry']
-    assert [a['style'] for a in data['accounts']] == ['T1', 'R1', 'B1', 'C1']
-    a = data['accounts'][1]
+    assert [a['id'] for a in data['accounts']] == ['acct-combined', 'acct-trend', 'acct-range', 'acct-breakout', 'acct-carry']
+    assert [a['style'] for a in data['accounts']] == ['X1', 'T1', 'R1', 'B1', 'C1']
+    x = data['accounts'][0]
+    assert x['name'] == 'Combined Bot' and any('second opinion' in line for line in x['rules']) and 'members' in x
+    a = data['accounts'][2]
     assert a['name'] == 'Range Trader' and a['status'] == 'NOT_STARTED' and a['equity'] == 10_000 and a['round_length'] == 30
     assert any('sideways' in line for line in a['rules']) and any('Paper money' in line for line in a['rules'])
     assert a['leverage'] == 2 and a['risk'] == .01 and 'history_test' in a and 'active' in a
     assert a['report']['trades'] == 0 and a['report']['win_rate'] is None and 'max_drawdown' in a['report']
-    carry = data['accounts'][3]
+    carry = data['accounts'][4]
     assert carry['round_unit'] == 'days' and carry['round_length'] == 30
     assert data['config_hash'] and data['retired'] and data['retired'][0]['id'] == 'acct-a'
 
@@ -64,7 +67,7 @@ def test_an_open_style_position_shows_its_time_machine_and_a_stop_only_trend(acc
                                                     plan=dict(playbook='T1', hit_id=hit, style='T1')))),
         pd.Timestamp.now(tz='UTC'))
     with TestClient(app) as client:
-        a = client.get('/api/v1/rules/accounts').json()['data']['accounts'][0]
+        a = client.get('/api/v1/rules/accounts').json()['data']['accounts'][1]
     assert a['position']['target'] is None and a['position']['time_machine']['stop_first'] == .3
     assert a['active']['reason'] == 'On: up'
 
@@ -98,3 +101,20 @@ def test_model_health_endpoint(account):
         body = client.get('/api/v1/rules/model-health').json()
     assert body['data']['overall'] in ('OK', 'WATCH', 'ALARM') and body['data']['reasons']
     assert {'card', 'calibration', 'drift', 'data_checks', 'challenger'} <= set(body['data'])
+
+
+def test_the_combined_bot_shows_its_idle_hedge_and_counts_it_in_equity(account):
+    from quantpilot.rules import journal
+    from quantpilot.simulation import carry as ledger
+    from quantpilot.strategies import bot
+    st = bot.new(10_000.0, now=pd.Timestamp('2026-11-01', tz='UTC'))
+    h = ledger.initial(10_000.0)
+    ledger.open_(h, 80_000.0, pd.Timestamp('2026-11-02', tz='UTC'))
+    ledger.fund(h, .0005, 80_000.0, pd.Timestamp('2026-11-02 08:00', tz='UTC'))
+    st['hedge'] = h
+    journal.save_account(account, 'acct-combined', dict(st, status='RUNNING', round=1, in_round=0, number=0, style='X1',
+                                                        members=dict(regime='RANGE', vote=0, hedge=True)), pd.Timestamp.now(tz='UTC'))
+    with TestClient(app) as client:
+        x = client.get('/api/v1/rules/accounts').json()['data']['accounts'][0]
+    assert x['position']['kind'] == 'hedge' and x['position']['funding'] > 0
+    assert x['equity'] == pytest.approx(bot.equity(st)) and x['members']['regime'] == 'RANGE'

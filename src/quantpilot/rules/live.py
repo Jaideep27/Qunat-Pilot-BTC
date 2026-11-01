@@ -352,7 +352,8 @@ def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None
         cfg = accounts_cfg or accounts_config.load()
         if cfg.get('version', 1) >= 2:     # accounts-v2 (A10): four different styles
             from quantpilot.accounts import styles_live
-            accounts = styles_live.step_all(engine, frames, fast, now, macro_events, cfg=cfg, market_engine=market_engine)
+            accounts = styles_live.step_all(engine, frames, fast, now, macro_events, cfg=cfg, market_engine=market_engine,
+                                            hits=decision['hits'] if decision else None)
         else:                              # accounts-v1 (A8, retired): the score-model fan-out
             accounts = account_live.step_all(engine, book, pf, table, fast, decision, inputs, now, frames, macro_events,
                                              news_events, cfg=cfg, scorer=scorer)

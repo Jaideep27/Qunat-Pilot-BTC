@@ -124,3 +124,68 @@ def test_the_funding_collector_opens_earns_and_pauses_for_review_after_its_days(
     step(account, market, t+pd.Timedelta(days=3, minutes=5), config=cfg(review_days=3))
     acct = journal.load_account(account, 'acct-carry')
     assert acct['status'] == 'PAUSED_FOR_REVIEW' and acct['futures']['open'] is True   # the hedge is kept
+
+
+def cfg5():
+    c = cfg()
+    c['accounts'] = [dict(id='acct-combined', name='Combined Bot', style='X1', risk=.01, leverage=2.0, daily_brake=.03)]+c['accounts']
+    return c
+
+
+def sideways(monkeypatch):
+    real = live._frame
+
+    def frame(frames):
+        sf = real(frames).copy()
+        sf['regime'] = 'RANGE'
+        return sf
+    monkeypatch.setattr(live, '_frame', frame)
+
+
+def test_the_combined_bot_takes_a_backed_leader_and_records_every_view(account, market, monkeypatch):
+    sideways(monkeypatch)
+    t15 = START+pd.Timedelta(days=40, hours=12)
+
+    def fake(sf):
+        if t15 not in sf.index:
+            return pd.DataFrame(columns=['side'])
+        c = sf.close[t15]
+        return pd.DataFrame(dict(side=['long'], stop=[c*.99], target=[c*1.01], max_hold_hours=[4.0], reason=['dip'], ref=[c],
+                                 limit=[None], valid_minutes=[None], risk_scale=[1.0]), index=[t15])
+    monkeypatch.setattr(range_trader, 'signals', fake)
+    price = float(market['candles'].close[market['candles'].available_at <= t15].iloc[-1])
+    hit = dict(playbook='PB10L', side='long', time=t15, status='SKIPPED_LOWER_PRIORITY',
+               plan=dict(entry=price, stop=price*.99, target=price*1.02, reward_risk=2.0))
+    step(account, market, t15-pd.Timedelta(minutes=30), config=cfg5())
+    step(account, market, t15+pd.Timedelta(seconds=30), config=cfg5(), hits=[hit])
+    rows = account_journal.decisions(account, 'acct-combined')
+    d = next(r for r in rows if r['hit_id'] == f'X1:{t15.isoformat()}')
+    assert d['decision'] == 'TAKEN' and d['payload']['regime'] == 'RANGE'
+    assert {c['source'] for c in d['payload']['considered']} == {'R1', 'PB10L'}
+    assert d['payload']['chosen']['agreements'] and d['payload']['sizing']['risk_amount'] > 0
+    acct = journal.load_account(account, 'acct-combined')
+    assert acct['futures']['pending']['action'] == 'enter' and acct['active']['on']
+    assert acct['members']['regime'] == 'RANGE'
+
+
+def test_a_lonely_leader_is_skipped_and_logged(account, market, monkeypatch):
+    sideways(monkeypatch)
+    t15 = START+pd.Timedelta(days=40, hours=15)
+    monkeypatch.setattr(range_trader, 'signals', lambda sf: pd.DataFrame(columns=['side']))
+    price = float(market['candles'].close[market['candles'].available_at <= t15].iloc[-1])
+    hit = dict(playbook='PB10L', side='long', time=t15, status='TAKEN',
+               plan=dict(entry=price, stop=price*.99, target=price*1.02, reward_risk=2.0))
+    monkeypatch.setattr(live.combined, 'at_level', lambda side, row: [])
+    step(account, market, t15-pd.Timedelta(minutes=30), config=cfg5())
+    step(account, market, t15+pd.Timedelta(seconds=30), config=cfg5(), hits=[hit])
+    d = next(r for r in account_journal.decisions(account, 'acct-combined') if r['hit_id'] == f'X1:{t15.isoformat()}')
+    assert d['decision'] == 'NO_SECOND_OPINION'
+    assert not journal.load_account(account, 'acct-combined')['futures']['pending']
+
+
+def test_the_combined_bot_parks_idle_money_after_a_flat_day(account, market):
+    t = START+pd.Timedelta(days=30, minutes=1)
+    step(account, market, t, config=cfg5())
+    step(account, market, t+pd.Timedelta(days=1, hours=9), config=cfg5())
+    acct = journal.load_account(account, 'acct-combined')
+    assert acct['hedge'] and acct['hedge']['open'] and acct['futures']['position'] is None

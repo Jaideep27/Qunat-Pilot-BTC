@@ -208,3 +208,27 @@ test('the style cards fit a phone screen',async({page})=>{
   const width=await page.evaluate(()=>({doc:document.documentElement.clientWidth,scroll:document.scrollingElement!.scrollWidth}));
   expect(width.scroll).toBeLessThanOrEqual(width.doc+1);
 });
+
+const withBot={...styles,accounts:[style('acct-combined','Combined Bot','X1',{
+  active:{on:true,reason:'Sideways: follows range signals (sideways market). Every trade needs a second opinion.'},
+  members:{regime:'RANGE',vote:1,leaders:['R1','PB03','PB09','PB10','PB11','B1'],hedge:true,range_trader:'On: the market is sideways.',breakout:'Off: the market is not quiet.'},
+  position:{kind:'hedge',side:'hedge',entry:80000,entry_time:'2026-11-02T08:00:30+00:00',spot_qty:.075,perp_qty:.075,margin:4000,funding:3.2,rebalances:0,target:null,stop:null,playbook:'C1'}}),
+  ...styles.accounts]};
+
+test('the combined bot says who leads, the veto, and that idle money earns funding',async({page})=>{
+  await page.route('**/api/v1/**',route=>{
+    const key=new URL(route.request().url()).pathname.split('/').at(-1)!;
+    const values:Record<string,unknown>={accounts:withBot,'account-trades':{trades:[]},decisions:{decisions:[]},reviews:{reviews:[]},
+      rules:{rulebook:{hash:'x',version:2,name:'x'},layers:{},modes:{},playbooks:[],account:null,checklist:[],research:null,provenance_note:'paper',accounts:[]},
+      journal:{hits:[],trades:[],triggers:[]},research:{status:'not_run'},candles:[],indicators:{}};
+    return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
+  });
+  await page.goto('/#rules');
+  const x=page.getByRole('region',{name:'Account Combined Bot'});
+  await expect(x).toContainText('All strategies · one trade at a time',{timeout:30000});
+  await expect(x).toContainText('Leads now: Range Trader, PB03, PB09, PB10, PB11, Breakout Hunter');
+  await expect(x).toContainText('Daily trend: up (shorts vetoed)');
+  await expect(x).toContainText('Idle money is earning funding');
+  await expect(x).toContainText('$3.20');
+  await expect(page.getByRole('group',{name:'Account filter'}).getByText('Bot')).toBeVisible();
+});
