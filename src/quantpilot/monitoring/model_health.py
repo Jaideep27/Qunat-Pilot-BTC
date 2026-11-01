@@ -346,7 +346,7 @@ def status(engine, now=None):
     from quantpilot.accounts import config as accounts
     from quantpilot.rules import meta
     now = _utc(now or pd.Timestamp.now(tz='UTC'))
-    cfg = accounts.load()
+    cfg = accounts.load(accounts.V1)
     model = account_score.load_model()
     report = _json(account_score.report_path())
     ref = load_reference(cfg['model']['hash'])

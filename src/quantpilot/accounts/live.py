@@ -204,7 +204,7 @@ def _decide(cfg, account, acct, book, pf, table, hits, features, scores, t15, ma
 def step_all(engine, book, pf, table, fast, decision, features, now, frames, macro_events, news_events, cfg=None,
              scorer=None):
     """One minute for every account. Returns {account id: summary}."""
-    cfg = cfg or accounts.load()
+    cfg = cfg or accounts.load(accounts.V1)
     if scorer is None:
         scorer = default_scorer()
         if scorer is not None and getattr(scorer, 'hash', None) != cfg['model']['hash']:

@@ -294,7 +294,7 @@ def _diagnose(engine, book, frames, fast, now):
 
 def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None, news_events=None, layers=None,
           modes=None, client=None, market_engine=None, manager=None, accounts_cfg=None, scorer=None):
-    """One minute of the live rule engine (reference account, then the four A8 accounts). Returns a summary."""
+    """One minute of the live rule engine (reference account, then the four accounts-v2 styles). Returns a summary."""
     now = pd.Timestamp(now or pd.Timestamp.now(tz='UTC'))
     book = book or rules.cached()
     market_engine = market_engine or engine
@@ -347,9 +347,15 @@ def cycle(engine, now=None, book=None, frames=None, fast=None, macro_events=None
     state['decisions'], state['rejections'] = state['decisions'][-500:], state['rejections'][-500:]
     journal.save_account(engine, ACCOUNT_ID, acct, now)
     inputs = decision.pop('features', {}) if decision else {}
-    try:   # the four A8 accounts; a failure there never stops the reference account
-        accounts = account_live.step_all(engine, book, pf, table, fast, decision, inputs, now, frames, macro_events,
-                                         news_events, cfg=accounts_cfg, scorer=scorer)
+    try:   # the four paper accounts; a failure there never stops the reference account
+        from quantpilot.accounts import config as accounts_config
+        cfg = accounts_cfg or accounts_config.load()
+        if cfg.get('version', 1) >= 2:     # accounts-v2 (A10): four different styles
+            from quantpilot.accounts import styles_live
+            accounts = styles_live.step_all(engine, frames, fast, now, macro_events, cfg=cfg, market_engine=market_engine)
+        else:                              # accounts-v1 (A8, retired): the score-model fan-out
+            accounts = account_live.step_all(engine, book, pf, table, fast, decision, inputs, now, frames, macro_events,
+                                             news_events, cfg=cfg, scorer=scorer)
     except Exception as exc:
         accounts = dict(error=f'{type(exc).__name__}: {exc}'[:300])
     diagnosed = _diagnose(engine, book, frames, fast, now)

@@ -146,3 +146,46 @@ def test_run_pending_builds_one_review_per_paused_round(account):
     assert account_review.run_pending(account, T, **kw)['reviews'] == ['acct-a']
     assert account_review.run_pending(account, T, **kw)['reviews'] == []
     assert aj.reviews(account, 'acct-a')[0]['status'] == 'ready'
+
+
+def carry_trade(k=0):
+    entry = T+pd.Timedelta(days=3*k)
+    return dict(side=1, quantity=0.0, entry=80_000.0, exit=82_000.0, entry_time=entry.isoformat(),
+                exit_time=(entry+pd.Timedelta(days=2)).isoformat(), reason='FUNDING_TURNED', pnl=-5.0, fees=9.0,
+                funding=20.0, net=6.0, return_on_equity=.0006, rebalances=0, max_favorable=0.0, max_adverse=0.0,
+                initial_stop=None, initial_target=None, protection_changes=[], version='carry-v1',
+                plan=dict(side='hedge', playbook='C1', style='C1', hit_id=f'C1:{entry.isoformat()}'))
+
+
+def test_a_funding_cycle_is_recorded_without_a_price_diagnosis(account):
+    aj.add_trade(account, 'acct-carry', 1, 1, carry_trade())
+    assert account_review.diagnose_trades(account, window(24*4), T+pd.Timedelta(days=4)) == 1
+    t = aj.trades(account, 'acct-carry')[0]
+    assert t['diagnosis'] == 'FUNDING_CYCLE' and t['playbook'] == 'C1'
+
+
+def test_run_pending_reviews_a_style_account_with_its_own_rules(account):
+    for k in range(3):
+        aj.add_trade(account, 'acct-range', 1, k+1, dict(trade(f'R1:h{k}', 25.0 if k else -40.0, k),
+                                                          plan=dict(playbook='R1', style='R1', hit_id=f'R1:h{k}')))
+    journal.save_account(account, 'acct-range', dict(status='PAUSED_FOR_REVIEW', round=1, in_round=30, number=30,
+                                                     style='R1', futures=dict(paused=True)), T)
+    cfg = dict(version=2, round_length=30, accounts=[dict(id='acct-range', name='Range Trader', style='R1', risk=.01)])
+    seen = {}
+
+    def runner(system, prompt, schema):
+        seen['prompt'] = prompt
+        return summary_runner(system, prompt, schema)
+    out = account_review.run_pending(account, T, runner=runner, cfg=cfg, bars=None)
+    assert out['reviews'] == ['acct-range']
+    review = aj.reviews(account, 'acct-range')[0]['payload']
+    assert review['learner']['available'] is False and review['manager']['available'] is False
+    assert 'sideways' in seen['prompt']
+
+
+def test_resuming_the_collector_restarts_its_thirty_day_clock(account):
+    journal.save_account(account, 'acct-carry', dict(status='PAUSED_FOR_REVIEW', round=1, in_round=0, number=2, style='C1',
+                                                     round_started=T.isoformat(), futures=dict(paused=True)), T)
+    account_review.resume(account, 'acct-carry', T+pd.Timedelta(days=31))
+    state = journal.load_account(account, 'acct-carry')
+    assert state['round_started'] == (T+pd.Timedelta(days=31)).isoformat() and state['round'] == 2

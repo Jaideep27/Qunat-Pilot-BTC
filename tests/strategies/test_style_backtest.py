@@ -47,3 +47,10 @@ def test_carry_backtest_earns_positive_funding_and_stays_flat_when_negative():
     bad = sb.run_carry(pd.Series(-.0002, index=times), price, times[0], times[-1])
     assert good['account']['final_equity'] > 10_000 and good['account']['funding'] > 0
     assert bad['account']['final_equity'] == pytest.approx(10_000) and not bad['trades']
+
+
+def test_judge_reads_mixed_timestamp_formats():
+    trades = [dict(entry_time='2020-03-26T08:00:00+00:00', net=1.0, return_on_equity=.001),
+              dict(entry_time='2020-03-26T08:00:00.002000+00:00', net=-1.0, return_on_equity=-.001)]
+    verdict = sb.judge('C1', dict(trades=trades, account=dict(final_equity=10_000.0)), registries=[])
+    assert verdict['report']['calls'] == 2

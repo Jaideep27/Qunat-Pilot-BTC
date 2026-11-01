@@ -38,15 +38,35 @@ def test_rules_endpoints_after_cycles(account):
         assert levels['overlay']['vwap'] > 0 and levels['markers']
 
 
-def test_accounts_endpoint_lists_four_with_rules_text(account):
+def test_accounts_endpoint_lists_the_four_styles_with_rules_text(account):
     with TestClient(app) as client:
         data = client.get('/api/v1/rules/accounts').json()['data']
-    assert [a['id'] for a in data['accounts']] == ['acct-a', 'acct-b', 'acct-c', 'acct-d']
-    a = data['accounts'][0]
-    assert a['status'] == 'NOT_STARTED' and a['equity'] == 10_000 and a['in_round'] == 0 and a['round_length'] == 30
-    assert any('Leverage 2×' in line for line in a['rules']) and a['watches'] and a['leverage'] == 2
-    assert data['config_hash'] and 'expectations' in a
+    assert [a['id'] for a in data['accounts']] == ['acct-trend', 'acct-range', 'acct-breakout', 'acct-carry']
+    assert [a['style'] for a in data['accounts']] == ['T1', 'R1', 'B1', 'C1']
+    a = data['accounts'][1]
+    assert a['name'] == 'Range Trader' and a['status'] == 'NOT_STARTED' and a['equity'] == 10_000 and a['round_length'] == 30
+    assert any('sideways' in line for line in a['rules']) and any('Paper money' in line for line in a['rules'])
+    assert a['leverage'] == 2 and a['risk'] == .01 and 'history_test' in a and 'active' in a
     assert a['report']['trades'] == 0 and a['report']['win_rate'] is None and 'max_drawdown' in a['report']
+    carry = data['accounts'][3]
+    assert carry['round_unit'] == 'days' and carry['round_length'] == 30
+    assert data['config_hash'] and data['retired'] and data['retired'][0]['id'] == 'acct-a'
+
+
+def test_an_open_style_position_shows_its_time_machine_and_a_stop_only_trend(account):
+    from quantpilot.rules import journal
+    hit = 'T1:2026-11-01T00:00:00+00:00'
+    journal.save_account(account, 'acct-trend', dict(
+        status='RUNNING', round=1, in_round=0, number=0, style='T1', active=dict(on=True, reason='On: up'),
+        extra={hit: dict(time_machine=dict(stop_first=.3, target_first=0.0, neither=.7, median_r=.2))},
+        futures=dict(equity=10_100.0, position=dict(side=1, quantity=.1, entry=80_000.0, stop=74_000.0, target=None,
+                                                    leverage=2.0, liquidation=40_000.0, entry_time='2026-11-01T00:01:00+00:00',
+                                                    plan=dict(playbook='T1', hit_id=hit, style='T1')))),
+        pd.Timestamp.now(tz='UTC'))
+    with TestClient(app) as client:
+        a = client.get('/api/v1/rules/accounts').json()['data']['accounts'][0]
+    assert a['position']['target'] is None and a['position']['time_machine']['stop_first'] == .3
+    assert a['active']['reason'] == 'On: up'
 
 
 def test_decisions_and_trades_filter_by_account(account):

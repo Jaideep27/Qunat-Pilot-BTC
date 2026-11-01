@@ -15,7 +15,8 @@ import yaml
 from quantpilot.simulation import tradeplan
 from quantpilot.simulation.futures import liquidation_price
 
-CONFIG = Path(__file__).resolve().parents[3]/'rulebook'/'accounts-v1.yaml'
+V1 = Path(__file__).resolve().parents[3]/'rulebook'/'accounts-v1.yaml'      # A8, retired 2026-11-01
+CONFIG = Path(__file__).resolve().parents[3]/'rulebook'/'accounts-v2.yaml'  # A10, the four styles
 PERCENT = lambda x: f'{100*x:g}%'
 
 

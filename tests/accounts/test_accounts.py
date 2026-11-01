@@ -6,7 +6,7 @@ from quantpilot.accounts import config as accounts
 
 @pytest.fixture(scope='module')
 def cfg():
-    return {a['id']: a for a in accounts.load()['accounts']}
+    return {a['id']: a for a in accounts.load(accounts.V1)['accounts']}
 
 
 def plan(stop, entry=80_000.0, side='long'):
@@ -16,7 +16,7 @@ def plan(stop, entry=80_000.0, side='long'):
 def test_config_has_the_registered_accounts(cfg):
     assert [cfg[k]['leverage'] for k in ('acct-a', 'acct-b', 'acct-c', 'acct-d')] == [2, 3, 4, 5]
     assert [cfg[k]['risk'] for k in ('acct-a', 'acct-b', 'acct-c', 'acct-d')] == [.01, .015, .02, .025]
-    loaded = accounts.load()
+    loaded = accounts.load(accounts.V1)
     assert len(loaded['hash']) == 12 and loaded['round_length'] == 30 and loaded['floor'] == 5000
 
 
@@ -71,3 +71,11 @@ def test_watch_items_for_a_long():
     assert not items['liquidations_against']['ok'] and not items['news_latest']['ok'] and not items['macro_next']['ok']
     quiet = {w['name']: w for w in accounts.watch_items('short', {}, None, None)}
     assert quiet['book_imbalance']['ok'] is None and quiet['macro_next']['ok']
+
+
+def test_v2_config_runs_four_different_styles_and_retires_the_a8_accounts():
+    v2 = accounts.load()
+    assert v2['version'] == 2 and [a['style'] for a in v2['accounts']] == ['T1', 'R1', 'B1', 'C1']
+    assert v2['retired'] == ['acct-a', 'acct-b', 'acct-c', 'acct-d'] and len(v2['hash']) == 12
+    assert all(a['risk'] == .01 and a['leverage'] == 2.0 for a in v2['accounts'] if a['style'] != 'C1')
+    assert all(len(a['id']) <= 16 for a in v2['accounts'])      # the journal's account column

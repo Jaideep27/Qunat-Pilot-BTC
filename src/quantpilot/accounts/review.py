@@ -35,6 +35,12 @@ def diagnose_trades(engine, window, now):
         exit_time = pd.Timestamp(trade['exit_time'])
         if exit_time+POST > now:
             continue
+        if (trade['payload'].get('plan') or {}).get('style') == 'C1':    # a funding cycle has no stop or target
+            account_journal.diagnose(engine, trade['id'], 'FUNDING_CYCLE', dict(
+                code='FUNDING_CYCLE', funding=trade['payload'].get('funding'), fees=trade['payload'].get('fees'),
+                rebalances=trade['payload'].get('rebalances')), now)
+            done += 1
+            continue
         after = window[(times > exit_time) & (times <= exit_time+POST)]
         outcome = diagnosis.from_trade(trade['payload'], float(after.high.max()) if len(after) else None,
                                        float(after.low.min()) if len(after) else None)
@@ -236,6 +242,8 @@ def resume(engine, account_id, now):
         raise ValueError('account is not paused for review')
     finished = acct['round']
     acct.update(round=finished+1, in_round=0, status='RUNNING')
+    if acct.get('round_started') is not None:     # the funding collector's review clock (A10)
+        acct['round_started'] = pd.Timestamp(now).isoformat()
     acct['futures']['paused'] = False
     journal.save_account(engine, account_id, acct, now)
     account_journal.mark_resumed(engine, account_id, finished, now)
@@ -276,10 +284,11 @@ def run_pending(engine, now, runner=claude_json, cfg=None, learner_stats=DEFAULT
         acct = journal.load_account(engine, account['id'])
         if not acct or acct.get('status') not in STOPPED or f"{account['id']}:round-{acct['round']}" in existing:
             continue
-        if learner_stats is DEFAULT:
+        style = account.get('style')
+        if style is None and learner_stats is DEFAULT:
             from quantpilot.rules import learner
             learner_stats = learner.load() if learner.STATS.exists() else {}
-        if manager is DEFAULT:
+        if style is None and manager is DEFAULT:
             from quantpilot.rules import rl_manage
             manager = rl_manage.live_manager()
         trades = [t for t in account_journal.trades(engine, account['id'], limit=10_000) if t['round'] == acct['round']]
@@ -287,11 +296,16 @@ def run_pending(engine, now, runner=claude_json, cfg=None, learner_stats=DEFAULT
         if window is DEFAULT:
             window = _bars(engine, pd.Timestamp(trades[0]['entry_time'])-pd.Timedelta(minutes=10),
                            pd.Timestamp(trades[-1]['exit_time'])+pd.Timedelta(days=1)) if trades else None
-        stops = {pb['id']: pb['time_stop_hours'] for pb in rules.cached()['playbooks']}
-        text = accounts_module.describe(account, cfg.get('round_length', 30))['rules'] if 'cutoff_score' in account else None
-        review = build_review(engine, account['id'], acct['round'], account, expectations=_expectations().get(account['id']),
-                              runner=runner, learner_stats=learner_stats, manager=manager, bars=window, time_stops=stops,
-                              rules_text=text)
+        if style:     # A10 styles: their own rules; the playbook learner and RL manager do not apply
+            from quantpilot.accounts.styles_live import MODULES
+            review = build_review(engine, account['id'], acct['round'], account, runner=runner, learner_stats=None,
+                                  manager=None, bars=None, rules_text=list(MODULES[style].RULES))
+        else:
+            stops = {pb['id']: pb['time_stop_hours'] for pb in rules.cached()['playbooks']}
+            text = accounts_module.describe(account, cfg.get('round_length', 30))['rules'] if 'cutoff_score' in account else None
+            review = build_review(engine, account['id'], acct['round'], account, expectations=_expectations().get(account['id']),
+                                  runner=runner, learner_stats=learner_stats, manager=manager, bars=window, time_stops=stops,
+                                  rules_text=text)
         review['stopped_because'] = acct['status']
         account_journal.save_review(engine, account['id'], acct['round'], review, 'ready', now)
         done.append(account['id'])

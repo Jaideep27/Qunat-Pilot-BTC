@@ -147,3 +147,64 @@ test('model health shows status, calibration and data checks',async({page})=>{
   await page.goto('/#overview');
   await expect(page.getByRole('region',{name:'Paper accounts'})).toContainText('Model: Watch');
 });
+
+const hist=(extra:object={})=>({status:'failed',passed:false,failed:['beats_break_even','not_luck'],trades:412,win_rate:.47,account_return:-.08,
+  max_drawdown:-.12,buy_and_hold:1.9,...extra});
+const style=(id:string,name:string,code:string,extra:object={})=>({...acct(id,name,2),style:code,percentile:null,cutoff_score:null,full_risk_score:null,
+  expectations:null,watches:[],round_unit:'trades',active:{on:true,reason:'On: watching.'},history_test:hist(),
+  rules:[`${name} rule one.`,'Paper money only: nothing here places a real order.'],...extra});
+const styles={...accounts,model_hash:null,retired:[{id:'acct-a',status:'RETIRED',retired_at:'2026-11-01T18:00:00+00:00',equity:10000,trades:0}],
+  accounts:[
+    style('acct-trend','Trend Rider','T1',{position:{side:'long',quantity:.1,entry:80000,stop:74000,target:null,liquidation:40200,leverage:2,
+      entry_time:'2026-11-01T00:01:00+00:00',playbook:'T1',style:'T1',reason:'every trend measure points up',
+      time_machine:{paths:2000,days:60,stop_first:.31,target_first:0,neither:.69,median_r:.4,history:{available:true,trades:12,win_rate:.5}}}}),
+    style('acct-range','Range Trader','R1',{active:{on:false,reason:'Off: the market is trend up, and Range Trader only trades sideways markets.'}}),
+    style('acct-breakout','Breakout Hunter','B1',{history_test:hist({status:'passed',passed:true,failed:[]})}),
+    style('acct-carry','Funding Collector','C1',{round_unit:'days',in_round:4,leverage:1,risk:null,history_test:{status:'running',note:'The history test (2021-2025) is still running.'},
+      position:{kind:'hedge',side:'hedge',entry:80000,entry_time:'2026-11-01T08:00:30+00:00',spot_qty:.075,perp_qty:.075,margin:4000,funding:12.5,rebalances:0,target:null,stop:null,playbook:'C1'}})]};
+
+async function mockStyles(page:Page){
+  await page.route('**/api/v1/**',route=>{
+    const url=new URL(route.request().url());
+    const key=url.pathname.split('/').at(-1)!;
+    const values:Record<string,unknown>={accounts:styles,'account-trades':{trades:[]},decisions:{decisions:[]},reviews:{reviews:[]},'model-health':health,
+      rules:{rulebook:{hash:'db3d684ff71c',version:2,name:'x'},layers:{},modes:{},playbooks:[],account:null,checklist:[],research:null,provenance_note:'paper',accounts:[]},
+      journal:{hits:[],trades:[],triggers:[]},research:{status:'not_run'},candles:[],indicators:{}};
+    return route.fulfill({json:{data:values[key]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
+  });
+}
+
+test('four style accounts say what they trade, whether they are on, and how their history test went',async({page})=>{
+  await mockStyles(page);
+  await page.goto('/#rules');
+  const t=page.getByRole('region',{name:'Account Trend Rider'});
+  await expect(t).toContainText('Trend · holds days to weeks',{timeout:30000});
+  await expect(t).toContainText('No fixed target');
+  await expect(t).toContainText('Time Machine');
+  await expect(t).toContainText('stop first 31%');
+  await expect(t).toContainText('History test (2021–2025): failed');
+  const r=page.getByRole('region',{name:'Account Range Trader'});
+  await expect(r).toContainText('Off');
+  await expect(r).toContainText('only trades sideways markets');
+  await expect(page.getByRole('region',{name:'Account Breakout Hunter'})).toContainText('History test (2021–2025): passed');
+  const c=page.getByRole('region',{name:'Account Funding Collector'});
+  await expect(c).toContainText('Day 4 / 30');
+  await expect(c).toContainText('Hedge');
+  await expect(c).toContainText('$12.50');
+  await expect(c).toContainText('still running');
+  await expect(page.getByRole('region',{name:'Model health'})).toHaveCount(0);
+  await expect(page.getByRole('group',{name:'Account filter'}).getByText('Funding')).toBeVisible();
+  await page.goto('/#overview');
+  const strip=page.getByRole('region',{name:'Paper accounts'});
+  await expect(strip).toContainText('Funding Collector');
+  await expect(strip).not.toContainText('Model:');
+});
+
+test('the style cards fit a phone screen',async({page})=>{
+  await mockStyles(page);
+  await page.setViewportSize({width:375,height:812});
+  await page.goto('/#rules');
+  await expect(page.getByRole('region',{name:'Account Funding Collector'})).toBeVisible({timeout:30000});
+  const width=await page.evaluate(()=>({doc:document.documentElement.clientWidth,scroll:document.scrollingElement!.scrollWidth}));
+  expect(width.scroll).toBeLessThanOrEqual(width.doc+1);
+});

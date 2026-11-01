@@ -501,18 +501,61 @@ WATCH_NOW = (('global_ratio', 'Long/short ratio (all traders)'), ('top_position_
              ('liq_short_usd_15m', 'Shorts liquidated, 15m ($)'), ('fear_greed', 'Fear & Greed'))
 
 
+SHARED_STYLE_RULES = ['Paper money only: nothing here places a real order.',
+                      'One position at a time; the stop is set before entry. Risks 1% per trade, leverage 2x at most.',
+                      'Stops for the day after losing 3%; stops early for review below $5,000.']
+
+
+def _style_history(style):
+    """The A10 history-test verdict for a style, from the latest run (a 'running' note until it exists)."""
+    import json as _json
+    from pathlib import Path as _Path
+    from quantpilot.config import settings
+    runs = sorted((_Path(settings.artifact_dir)/'style-research').glob('run-*/runs/'+style+'.json'))
+    if not runs:
+        return dict(status='running', note='The history test (2021-2025) is still running.')
+    result = _json.loads(runs[-1].read_text(encoding='utf-8'))
+    v, a = result['verdict'], result['account']
+    failed = [k for k, ok in v['criteria'].items() if not ok]
+    return dict(status='passed' if v['passed'] else 'failed', passed=v['passed'], failed=failed, trades=a['trades'],
+                win_rate=a.get('win_rate'), account_return=a['account_return'], max_drawdown=a['max_drawdown'],
+                buy_and_hold=a.get('buy_and_hold'), annual_return=a.get('annual_return'),
+                luck_p=v.get('luck', {}).get('p_value'), deflated_sharpe=v.get('deflated_sharpe'))
+
+
+def _style_rules(account, round_length):
+    from quantpilot.accounts.styles_live import MODULES
+    module = MODULES[account['style']]
+    if account['style'] == 'C1':
+        review, shared = f"Pauses every {account.get('review_days', 30)} days for a review with the owner.", SHARED_STYLE_RULES[:1]
+    else:
+        review, shared = f'Pauses after {round_length} trades for a review with the owner.', SHARED_STYLE_RULES
+    return dict(rules=list(module.RULES)+shared+[review], watches=[], style_name=module.NAME)
+
+
+def _position_view(account, state, f, extra):
+    p = f.get('position')
+    if not p:
+        return None
+    if account.get('style') == 'C1':
+        cycle = f.get('cycle') or {}
+        return dict(kind='hedge', side='hedge', entry=cycle.get('entry', p.get('entry')), entry_time=p.get('entry_time'),
+                    spot_qty=f.get('spot_qty'), perp_qty=f.get('perp_qty'), margin=f.get('margin'),
+                    funding=cycle.get('funding'), rebalances=cycle.get('rebalances'), target=None, stop=None, playbook='C1')
+    info = extra.get(p['plan'].get('hit_id')) or {}
+    return dict(side='long' if p['side'] == 1 else 'short', quantity=p['quantity'], entry=p['entry'], stop=p['stop'],
+                target=p.get('target'), liquidation=p.get('liquidation'), leverage=p.get('leverage'),
+                entry_time=p['entry_time'], playbook=p['plan'].get('playbook'), style=p['plan'].get('style'),
+                score=info.get('score'), time_machine=info.get('time_machine'), reason=info.get('reason'))
+
+
 def _account_view(cfg, account, state, expectations, reviews, engine=None):
     from quantpilot.accounts import journal as account_journal
     from quantpilot.accounts import report as account_report
     from quantpilot.accounts import config as accounts
     state = state or {}
     f = state.get('futures') or {}
-    p = f.get('position')
     extra = state.get('extra') or {}
-    position = p and dict(side='long' if p['side'] == 1 else 'short', quantity=p['quantity'], entry=p['entry'], stop=p['stop'],
-                          target=p['target'], liquidation=p.get('liquidation'), leverage=p.get('leverage'),
-                          entry_time=p['entry_time'], playbook=p['plan'].get('playbook'),
-                          score=(extra.get(p['plan'].get('hit_id')) or {}).get('score'))
     own = [r for r in reviews if r['account'] == account['id']]
     equity = f.get('equity', cfg['balance'])
     report = None
@@ -524,16 +567,26 @@ def _account_view(cfg, account, state, expectations, reviews, engine=None):
         report = account_report.report(account_journal.trades(engine, account['id'], limit=10_000), cfg['balance'],
                                        equity, held)
         report['hold'] = held
-    return dict(id=account['id'], report=report, name=account['name'], status=state.get('status', 'NOT_STARTED'), equity=equity,
+    style = account.get('style')
+    text = _style_rules(account, cfg['round_length']) if style else accounts.describe(account, cfg['round_length'])
+    view = dict(id=account['id'], report=report, name=account['name'], status=state.get('status', 'NOT_STARTED'), equity=equity,
                 balance=cfg['balance'], account_return=equity/cfg['balance']-1, round=state.get('round', 1),
-                in_round=state.get('in_round', 0), round_length=cfg['round_length'], number=state.get('number', 0),
-                leverage=account['leverage'], risk=account['risk'], percentile=account['percentile'],
-                cutoff_score=account['cutoff_score'], full_risk_score=account['full_risk_score'],
-                daily_brake=account['daily_brake'], halted_day=bool(f.get('halted_day')), floor_hit=bool(f.get('floor_hit')),
-                position=position, pending=bool(f.get('pending')), last=state.get('last'),
+                in_round=state.get('in_round', 0), round_length=cfg['round_length'], round_unit='trades',
+                number=state.get('number', 0), leverage=account.get('leverage'), risk=account.get('risk'),
+                percentile=account.get('percentile'), cutoff_score=account.get('cutoff_score'),
+                full_risk_score=account.get('full_risk_score'), daily_brake=account.get('daily_brake'),
+                halted_day=bool(f.get('halted_day')), floor_hit=bool(f.get('floor_hit')),
+                position=_position_view(account, state, f, extra), pending=bool(f.get('pending')), last=state.get('last'),
                 expectations=expectations.get(account['id']),
-                review={k: own[0][k] for k in ('id', 'round', 'status')} if own else None,
-                **accounts.describe(account, cfg['round_length']))
+                review={k: own[0][k] for k in ('id', 'round', 'status')} if own else None, **text)
+    if style:
+        view.update(style=style, active=state.get('active'), history_test=_style_history(style))
+        if style == 'C1':
+            started = state.get('round_started')
+            days = (pd.Timestamp.now(tz='UTC')-pd.Timestamp(started)).days if started else 0
+            view.update(round_unit='days', round_length=account.get('review_days', 30), in_round=days, leverage=1.0,
+                        risk=None)
+    return view
 
 
 def _accounts_summary():
@@ -551,15 +604,21 @@ def rules_accounts():
     from quantpilot.rules import journal
     from quantpilot.rules import live as rule_live
     engine, cfg = _rules_db(), accounts.load()
-    expectations, reviews = account_review._expectations(), account_journal.reviews(engine)
+    expectations = account_review._expectations() if cfg.get('version', 1) < 2 else {}
+    reviews = account_journal.reviews(engine)
     states = {a['id']: journal.load_account(engine, a['id']) for a in cfg['accounts']}
     overlay = (journal.load_account(engine, rule_live.ACCOUNT_ID) or {}).get('overlay') or {}
+    retired = []
+    for account_id in cfg.get('retired') or []:
+        old = journal.load_account(engine, account_id) or {}
+        retired.append(dict(id=account_id, status=old.get('status', 'RETIRED'), retired_at=old.get('retired_at'),
+                            equity=(old.get('futures') or {}).get('equity'), trades=old.get('number', 0)))
     data = dict(accounts=[_account_view(cfg, a, states[a['id']], expectations, reviews, engine) for a in cfg['accounts']],
-                config_hash=cfg['hash'], model_hash=cfg['model']['hash'], overlay_time=overlay.get('time'),
-                watch_now=[dict(key=k, label=label, value=overlay.get(k)) for k, label in WATCH_NOW],
-                note='Paper money only. Each account pauses after its round of trades until the owner resumes it.')
+                config_hash=cfg['hash'], model_hash=(cfg.get('model') or {}).get('hash'), overlay_time=overlay.get('time'),
+                watch_now=[dict(key=k, label=label, value=overlay.get(k)) for k, label in WATCH_NOW], retired=retired,
+                note='Paper money only. Four accounts, four different styles. Each pauses for a review until the owner resumes it.')
     observed = max((s['last_bar'] for s in states.values() if s and s.get('last_bar')), default=None)
-    return envelope(data, observed, 'QuantPilot four paper accounts (A8)', max_age=180)
+    return envelope(data, observed, 'QuantPilot four paper accounts (A10 styles)', max_age=180)
 
 
 def rules_model_health():

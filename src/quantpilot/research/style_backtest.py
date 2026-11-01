@@ -141,7 +141,7 @@ def judge(style, result, registries=REGISTRIES):
     """The A10 pass rule on the style's closed trades (per-trade result = net / equity at entry)."""
     trades = result['trades']
     calls = pd.DataFrame(dict(net=[t['return_on_equity'] for t in trades],
-                              entry_time=pd.to_datetime([t['entry_time'] for t in trades], utc=True)))
+                              entry_time=pd.to_datetime([t['entry_time'] for t in trades], utc=True, format='ISO8601')))
     rep = selective.report(calls, max(len(trades), 1))
     track = TRACK[style]
     trials = selective.trial_count(list(registries), track)+4
