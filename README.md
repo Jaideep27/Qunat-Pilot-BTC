@@ -89,6 +89,7 @@ uv sync --locked --extra dev
 npm --prefix frontend ci
 node scripts/start.cjs          # PostgreSQL, API (127.0.0.1:8000), dashboard (localhost:5173), data supervisor
 node scripts/start.cjs --check  # readiness without restarting anything
+node scripts/stop.cjs           # stop everything (the watchdog and nightly backup pause until the next start)
 ```
 
 On first run the launcher creates a private PostgreSQL cluster on port 55432 and writes a git-ignored `.env`; see [`.env.example`](.env.example). The watchdog, backups and alerts are described in [operations](docs/operations/operations.md).

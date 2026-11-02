@@ -27,6 +27,21 @@ RESTARTS, WINDOW = 3, pd.Timedelta(hours=2)
 REMIND = pd.Timedelta(hours=6)
 
 
+STOPPED = 'stopped.json'    # written by scripts/stop.cjs, removed by scripts/start.cjs
+
+
+def stopped_by_owner(ops_dir):
+    """The owner's 'stopped on purpose' note (its contents, {} if unreadable), or None while services should run."""
+    path = Path(ops_dir)/STOPPED
+    if not path.exists():
+        return None
+    try:
+        import json
+        return json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+
+
 def _minutes(delta):
     return int(delta.total_seconds()//60)
 

@@ -209,3 +209,43 @@ def test_the_watchdog_probe_reads_readiness_json(monkeypatch):
     p = wd.probes({'first_run': NOW.isoformat()}, NOW)
     assert p['ready'] == body and p['candle_age_s'] == 42.0 and seen['timeout'] >= 30
     assert all(x['key'] != 'api' for x in ops.check(p, NOW))
+
+
+def _script(name):
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[2]/'scripts'/'ops'/f'{name}.py'
+    spec = importlib.util.spec_from_file_location(f'{name}_under_test', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_stopped_by_owner_reads_the_note(tmp_path):
+    assert ops.stopped_by_owner(tmp_path) is None
+    (tmp_path/'stopped.json').write_text('{"stopped_at": "2026-11-02T12:00:00+00:00"}', encoding='utf-8')
+    assert ops.stopped_by_owner(tmp_path) == {'stopped_at': '2026-11-02T12:00:00+00:00'}
+    (tmp_path/'stopped.json').write_text('not json', encoding='utf-8')
+    assert ops.stopped_by_owner(tmp_path) == {}            # a damaged note still means "stopped on purpose"
+
+
+def test_the_watchdog_does_nothing_while_the_owner_has_stopped_the_services(tmp_path, monkeypatch):
+    wd = _script('watchdog')
+    monkeypatch.setattr(wd, 'OPS', tmp_path)
+    (tmp_path/'stopped.json').write_text('{"stopped_at": "2026-11-02T12:00:00+00:00"}', encoding='utf-8')
+    called = []
+    monkeypatch.setattr(wd, 'probes', lambda *a: called.append('probes'))
+    monkeypatch.setattr(wd, 'restart', lambda *a: called.append('restart'))
+    wd.main()
+    assert called == [] and 'stopped by the owner' in (tmp_path/'watchdog.log').read_text(encoding='utf-8')
+    assert not (tmp_path/'state.json').exists()
+
+
+def test_the_nightly_backup_skips_while_the_owner_has_stopped_the_services(tmp_path, monkeypatch):
+    backup = _script('backup')
+    monkeypatch.setattr(backup, 'ROOT', tmp_path)
+    (tmp_path/'data'/'ops').mkdir(parents=True)
+    (tmp_path/'data'/'ops'/'stopped.json').write_text('{}', encoding='utf-8')
+    monkeypatch.setattr(backup.ops, 'backup', lambda *a, **k: (_ for _ in ()).throw(AssertionError('backup ran')))
+    backup.main()
+    assert 'stopped by the owner' in (tmp_path/'data'/'ops'/'backup.log').read_text(encoding='utf-8')

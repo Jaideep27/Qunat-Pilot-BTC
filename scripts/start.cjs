@@ -31,6 +31,9 @@ function run(command,args){const result=spawnSync(command,args,{cwd:root,windows
     return;
   }
   if(!fs.existsSync(python))throw new Error('Install dependencies with uv sync --locked --extra dev --extra rl first.');
+  // A start resumes the watchdog and the nightly backup that `node scripts/stop.cjs` paused.
+  const stopped=path.join(root,'data','ops','stopped.json');
+  if(fs.existsSync(stopped)){fs.rmSync(stopped);console.log('Watchdog and nightly backup resumed.')}
   if(process.argv.includes('--restart-data')||process.argv.includes('--restart-services'))run(python,['scripts/ops/stop_data_supervisor.py']);
   if(process.argv.includes('--restart-services'))run(python,['scripts/ops/stop_data_supervisor.py','--api']);
   const pg='C:/Program Files/PostgreSQL/18/bin';

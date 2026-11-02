@@ -20,6 +20,11 @@ PG_BIN = Path('C:/Program Files/PostgreSQL/18/bin')
 def main():
     ops_dir = ROOT/'data'/'ops'
     ops_dir.mkdir(parents=True, exist_ok=True)
+    if ops.stopped_by_owner(ops_dir) is not None:     # the database is off on purpose: skip, no alarm email
+        with open(ops_dir/'backup.log', 'a', encoding='utf-8') as log:
+            log.write(json.dumps(dict(time=pd.Timestamp.now(tz='UTC').isoformat(), skipped='stopped by the owner'))+'\n')
+        print("Services were stopped by the owner; tonight's backup is skipped.")
+        return 0
     # All live data is in PostgreSQL; a SQLite app database is copied only when it is the configured one.
     sqlite = settings.database_url.removeprefix('sqlite:///') if settings.database_url.startswith('sqlite:///') else None
     now = pd.Timestamp.now(tz='UTC')
@@ -38,7 +43,7 @@ def main():
     if not result['ok'] or result['offsite'] != 'copied':
         problem = result['error'] or f"the OneDrive copy was not made ({result['offsite']})"
         ok, error = ops.send_email('QuantPilot: backup problem', f'Tonight\'s backup had a problem: {problem}\n'
-                                   'Older backups are kept. Paper trading only.\n',
+                                   'Older backups are kept.\n',
                                    dict(email=settings.alert_email, password=settings.alert_app_password))
         if not ok:
             with open(ops_dir/'alerts.log', 'a', encoding='utf-8') as log:

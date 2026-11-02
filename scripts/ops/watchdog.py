@@ -81,6 +81,10 @@ def restart(now):
 def main():
     OPS.mkdir(parents=True, exist_ok=True)
     now = pd.Timestamp.now(tz='UTC')
+    if ops.stopped_by_owner(OPS) is not None:     # `node scripts/stop.cjs`: no checks, restarts or alerts
+        _append(OPS/'watchdog.log', json.dumps(dict(time=now.isoformat(), status='stopped by the owner')))
+        print('Services were stopped by the owner; the watchdog waits until node scripts/start.cjs.')
+        return
     state = _read(OPS/'state.json', {})
     p = probes(state, now)
     problems = ops.check(p, now)
