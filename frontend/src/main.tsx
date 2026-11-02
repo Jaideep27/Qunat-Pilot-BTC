@@ -9,7 +9,6 @@ import './styles/styles.css';
 import './styles/analysis.css';
 
 const Overview=lazy(()=>import('./pages/Overview'));
-const Bots=lazy(()=>import('./pages/Bots'));
 const Indicators=lazy(()=>import('./pages/Indicators'));
 const Strategies=lazy(()=>import('./pages/Strategies'));
 const Archive=lazy(()=>import('./pages/Archive'));
@@ -17,8 +16,6 @@ const More=lazy(()=>import('./pages/More'));
 const TradingWorkspace=lazy(()=>import('./components/TradingWorkspace'));
 const Ask=lazy(()=>import('./pages/Ask'));
 const Research=lazy(()=>import('./pages/Research'));
-const Paper=lazy(()=>import('./pages/Paper'));
-const Rules=lazy(()=>import('./pages/Rules'));
 const News=lazy(()=>import('./pages/News'));
 const System=lazy(()=>import('./pages/System'));
 
@@ -122,7 +119,7 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
 }
 
 // Fetch the other pages' code once the first page is idle, so switching tabs is instant.
-const prefetch=()=>[()=>import('./pages/Indicators'),()=>import('./pages/Strategies'),()=>import('./pages/Archive'),()=>import('./pages/More'),()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/Paper'),()=>import('./pages/Rules'),()=>import('./pages/News'),
+const prefetch=()=>[()=>import('./pages/Indicators'),()=>import('./pages/Strategies'),()=>import('./pages/Archive'),()=>import('./pages/More'),()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/News'),
   ()=>import('./pages/System'),()=>import('./components/TradingWorkspace')].forEach(load=>void load().catch(()=>{}));
 
 function App(){
@@ -173,8 +170,8 @@ function App(){
         <Boundary name="The price ticker"><LivePrice/></Boundary>
         {!publicView&&<AskBox onAsk={ask}/>}
       </header>
-      {publicView&&<div role="note" aria-label="Public view" className="banner banner-warn">Public read-only view · Paper trading only, no real money · Not financial advice</div>}
-      {preview&&<div className="banner banner-warn">INTERFACE PREVIEW · Synthetic values. No released model, measured results or paper trades.</div>}
+      {publicView&&<div role="note" aria-label="Public view" className="banner banner-warn">Public read-only view · Analysis only, nothing trades · Not financial advice</div>}
+      {preview&&<div className="banner banner-warn">INTERFACE PREVIEW · Synthetic values, not real market data.</div>}
       {health.error&&<div role="alert" className="banner banner-bad">QuantPilot services unavailable. Check the backend connection.
         <button type="button" onClick={health.reload}>Retry</button></div>}
       <main className="content">
@@ -183,20 +180,17 @@ function App(){
             {route==='overview'&&<Overview go={go} ask={ask}/>}
             {route==='indicators'&&<Indicators/>}
             {route==='strategies'&&<Strategies/>}
-            {route==='archive'&&<Archive go={go}/>}
-            {route==='bots'&&<Bots/>}
+            {route==='archive'&&<Archive/>}
             {route==='more'&&<More go={go}/>}
             {route==='chart'&&<><div className="page-head"><div><h1>Chart</h1><p>Live Bitcoin price with indicators and drawing tools.</p></div></div><TradingWorkspace/></>}
             {route==='ask'&&!publicView&&<Ask seed={seed}/>}
             {route==='research'&&<Research/>}
-            {route==='rules'&&<Rules/>}
-            {route==='paper'&&<Paper/>}
             {route==='news'&&<News/>}
             {route==='system'&&<System/>}
           </div>
         </Suspense></Boundary>
       </main>
-      <footer className="footer"><span>QuantPilot · BTCUSDT USD-M perpetual · research and paper simulation only</span>
+      <footer className="footer"><span>QuantPilot · BTCUSDT USD-M perpetual · analysis and research only</span>
         <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">Charts by TradingView Lightweight Charts™</a></footer>
     </div>
     <Palette open={palette} onClose={()=>setPalette(false)} go={go} ask={ask}/>

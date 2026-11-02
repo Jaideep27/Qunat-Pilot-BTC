@@ -1,5 +1,7 @@
 # Rule engine: event-triggered playbooks (results and how to use it)
 
+> **Status (2026-11-02, A15):** the live rule engine, its paper accounts and the trading code described below were removed when the project became an analysis app. The rulebook, triggers, arbiter and research harness remain; the rulebook is shown read-only on the Strategies page. Results below are kept as the research record.
+
 Branch `rule-engine` (from `trading-agent`). Design: `docs/design/specs/2026-10-21-rule-engine-design.md`. Pre-registration: amendments A6 and A7 in `docs/research/preregistration.md`. Paper only: nothing places or sizes real orders.
 
 ## What it does

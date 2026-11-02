@@ -1,10 +1,9 @@
 import {Database} from 'lucide-react';
 import type {Coverage} from '../lib/api';
-import PaperOperations from '../components/PaperOperations';
-import {Card,Collapsible,Loading,PageHead,Pill,Term,Updated,ago,num,stamp,until,useResource} from '../components/ui';
+import {Card,Collapsible,Loading,PageHead,Pill,Term,Updated,ago,num,stamp,useResource} from '../components/ui';
 
 type Ready={ready:boolean;checked_at:string;checks:Record<string,{ok:boolean;status:string;age_seconds?:number}>;
-  collector:{status:string;age_seconds:number|null;poll_interval_seconds:number};worker:{status:string;next_scheduled_at:string}};
+  collector:{status:string;age_seconds:number|null;poll_interval_seconds:number}|null};
 type Strategy={forward:Record<string,{rows:number;first:string|null;last:string|null}>};
 const label=(s:string)=>s.replaceAll('_',' ');
 
@@ -15,7 +14,7 @@ export default function System(){
   const r=ready.data,c=coverage.data;
   const coverageStatus=c?(c.release_ready?(c.strict_release_ready===false?'ELIGIBLE WITH QUARANTINE':'VERIFIED'):'RELEASE BLOCKED'):'';
   return <>
-    <PageHead title="System health" description="Is everything collecting, scoring and running? Readiness, the paper worker, data coverage and the forward-only collectors.">
+    <PageHead title="System health" description="Is everything collecting, scoring and running? Readiness, the analysis snapshot, data coverage and the forward-only collectors.">
       <Updated resource={ready}/>
     </PageHead>
     <div className="grid">
@@ -28,7 +27,7 @@ export default function System(){
         {!r?<Loading/>:<dl className="facts">
           <div><dt>Market collector</dt><dd>{r.collector?.status??'—'} · last poll {r.collector?.age_seconds==null?'—':Math.round(r.collector.age_seconds)+'s ago'}</dd></div>
           <div><dt>Poll interval</dt><dd>{r.collector?.poll_interval_seconds??'—'}s</dd></div>
-          <div><dt>Paper worker</dt><dd>{r.worker?.status??'—'} · next run {until(r.worker?.next_scheduled_at)}</dd></div>
+          <div><dt>Analysis snapshot</dt><dd>{label(r.checks?.analysis_snapshot?.status??'—')} · built {ago((r.checks?.analysis_snapshot as {built_at?:string}|undefined)?.built_at)}</dd></div>
           <div><dt>Checked</dt><dd>{ago(r.checked_at)}</dd></div></dl>}
       </Card>
       <Card title="Forward-only collectors" label="Forward-only collectors" className="span-1">
@@ -37,7 +36,6 @@ export default function System(){
           <dd>{num(f.rows,0)} {name==='depth'?'snapshots':'minutes'} · {f.last?'latest '+ago(f.last):'none yet'}</dd></div>)}</dl>}
         <p className="source">Recorded live; gaps while the computer is off are permanent.</p>
       </Card>
-      <div className="span-3"><PaperOperations/></div>
       <div className="span-3"><Collapsible title="Historical coverage" label="Historical coverage" defaultOpen
         summary={coverageStatus&&<Pill tone={c?.release_ready?'ok':'bad'}>{coverageStatus}</Pill>}>
         {!c?<Loading/>:<>

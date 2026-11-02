@@ -1,6 +1,6 @@
 # Analysis app (amendment A15, 2026-11-02)
 
-The owner switched QuantPilot from paper trading to analysis. The app now explains what Bitcoin is doing: every indicator and every strategy, what each one says now, and a written analysis by Claude. **Nothing trades.** The trading code, accounts and journals are kept and archived.
+The owner switched QuantPilot from paper trading to analysis. The app now explains what Bitcoin is doing: every indicator and every strategy, what each one says now, and a written analysis by Claude. **Nothing trades.** On 2026-11-02 the paper-trading code was removed (it stays in git history); the accounts' records are kept in the database and listed under Trading history.
 
 ## What runs
 
@@ -9,8 +9,7 @@ The owner switched QuantPilot from paper trading to analysis. The app now explai
 | Analysis snapshot (`analysis/snapshot.py`) | One JSON with price, market type, about 30 indicator readings on 15m/1h/4h/1d, group summaries, support/resistance, the likely 4h range, every strategy's live view, the calendar and headlines | Every 5 minutes, stored for 24 hours (`analysis_snapshots`) |
 | Market brief (`analysis/ai.py`) | Claude **Haiku** writes a brief from the compact snapshot | Every 4 hours, plus after a CPI, jobs or FOMC release (`analysis_briefs`) |
 | Explain this (`analysis/ai.py`) | Claude **Sonnet** explains one indicator, strategy, news item or chart view | On request; cached per snapshot; at most 30 an hour (`analysis_explanations`) |
-| Data, news, macro, forecasts, live recorder | Unchanged | As before |
-| Paper trading (old paper worker, rule engine, trade reviews) | **Off** unless `QUANTPILOT_TRADING_ENABLED=true` | — |
+| Data, news, macro, forecasts, live recorder, outlook | Unchanged | As before |
 
 Claude runs on the owner's subscription through `claude -p` (no tools, hooks or MCP; API keys stripped). It may only use the snapshot's numbers, never tells the reader to trade, and every text is labelled "AI analysis, not financial advice".
 
@@ -25,20 +24,16 @@ Claude runs on the owner's subscription through `claude -p` (no tools, hooks or 
   Each also carries its history-test record.
 - **`analysis/snapshot.py`**: builds the snapshot, saves it, and produces the compact form that Claude reads.
 - **`analysis/ai.py`**: briefs, explanations, the cache and the rate limit.
-- **API (read):** `GET /api/v1/analysis/snapshot`, `/analysis/catalogue`, `/analysis/briefs`, `/analysis/explanations`. These are also on the public link.
+- **API (read):** `GET /api/v1/analysis/snapshot`, `/analysis/levels` (chart lines), `/analysis/summary` (compact, for the chat), `/analysis/catalogue`, `/analysis/briefs`, `/analysis/explanations` and `/archive` (past accounts). These are also on the public link.
 - **API (this computer only):** `POST /api/v1/analysis/explain` and `POST /api/v1/analysis/brief`. The public gateway never forwards them.
 - **Dashboard:**
   - tabs: Home, Indicators, Strategies, Chart, More;
-  - under More: News, Ask, Research, Trading history (archived) and System;
-  - the Rule engine and Old paper account pages are reached from Trading history.
-- **Trading switched off:**
-  - `settings.trading_enabled` (default off) decides which supervisor threads run;
-  - `rulebook/accounts-v4.yaml` has no accounts;
-  - `quantpilot retire-trading` retires the Master Bot and pauses the reference and old paper accounts.
+  - under More: News, Ask, Research, Trading history (the past accounts) and System.
+- **Trading removed (clean-up, 2026-11-02):** the paper accounts, the live rule engine, the paper worker, the old model's serving, model health, the news-impact layer and the old release scripts. The research code that produced every result stays.
 - **Health checks:**
-  - With trading off, readiness no longer waits for the paper worker.
+  - Readiness checks the database and fresh candles, and reports the analysis snapshot's age.
   - The watchdog's heartbeat is the analysis snapshot (15-minute window).
-  - The readiness candle query uses the index; it took 5–50 s when the laptop was short of memory.
+  - The readiness and collector candle queries use the index; full-table scans made the laptop slow when memory was short.
 
 ## Honest limits
 

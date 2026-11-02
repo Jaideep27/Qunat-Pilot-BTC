@@ -1,23 +1,16 @@
 import {test,expect} from '@playwright/test';
 
-test('market to prediction to research to paper audit, with honest unreleased states',async({page})=>{
+test('home, research and system show honest states in the preview',async({page})=>{
   await page.goto('/?preview=1');
   await expect(page.getByText('INTERFACE PREVIEW',{exact:false})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible();
   await expect(page.getByRole('img',{name:'BTCUSDT five-minute candlestick and volume chart'})).toBeVisible();
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Old paper account/}).click();
-  await expect(page.getByRole('heading',{name:'Decision gates'})).toBeVisible();
-  await expect(page.getByText('MODEL RELEASE BLOCKED',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Research/}).click();
   await page.getByText('Original release model (2026)').click();
   await expect(page.getByText('Research has not been released')).toBeVisible();
   await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^System/}).click();
   await expect(page.getByText('Historical coverage',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Old paper account/}).click();
-  await expect(page.getByRole('heading',{name:'Execution ledger'})).toBeVisible();
-  await expect(page.getByText('No fills recorded')).toBeVisible();
-  await expect(page.getByText('$10,000.00')).toBeVisible();
-  await page.screenshot({path:'test-results/paper-audit.png',fullPage:true});
+  await page.screenshot({path:'test-results/preview-system.png',fullPage:true});
 });
 
 test('mobile navigation remains usable',async({page})=>{
@@ -40,11 +33,10 @@ test('backend failure is explicit and retryable',async({page})=>{
 
 test('coverage distinguishes missing source timestamps from invalid values',async({page})=>{
   const data:Record<string,unknown>={candles:[],indicators:{},positioning:[],sentiment:[],
-    predictions:{action:'NO_TRADE',reasons:['MODEL_RELEASE_BLOCKED']},
     coverage:{release_ready:true,strict_release_ready:false,quarantine:{source_rows:62,source_fraction:.00028,feature_lookback_bars:12,status:'accepted'},families:{positioning:{rows:221755,missing_windows:57,
       native_missing_count:5,invalid_rows:57,issues:['invalid numeric values','5 missing native observations']}}},
     backtests:{status:'blocked',comparisons:[],benchmarks:{}},
-    portfolio:{equity:10000,position:null,paused:true,fills:[],decisions:[]}};
+    };
   await page.route('**/api/v1/**',route=>{
     const key=new URL(route.request().url()).pathname.split('/').at(-1)!;
     return route.fulfill({json:{data:data[key],provenance:{source:'Browser test fixture',observed_at:null,

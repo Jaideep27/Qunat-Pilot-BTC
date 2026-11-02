@@ -38,13 +38,13 @@ def client(dist, upstream, **options):
 
 def test_allowed_reads_reach_the_api_with_their_query(dist):
     upstream = Upstream()
-    response = client(dist, upstream).get('/api/v1/rules/decisions?account=acct-a&limit=5')
+    response = client(dist, upstream).get('/api/v1/analysis/explanations?kind=indicator&ref=rsi_14')
     assert response.status_code == 200 and response.json() == {'data': {'n': 1}}
-    assert upstream.calls == ['http://api.test/api/v1/rules/decisions?account=acct-a&limit=5']
+    assert upstream.calls == ['http://api.test/api/v1/analysis/explanations?kind=indicator&ref=rsi_14']
 
 
-@pytest.mark.parametrize('path', ['/api/v1/rules/accounts/acct-a/resume', '/api/v1/chat', '/api/v1/ask',
-                                  '/api/v1/outlook', '/api/v1/answers/x/ai-view', '/api/v1/rules/accounts'])
+@pytest.mark.parametrize('path', ['/api/v1/analysis/explain', '/api/v1/analysis/brief', '/api/v1/chat', '/api/v1/ask',
+                                  '/api/v1/outlook', '/api/v1/answers/x/ai-view', '/api/v1/archive'])
 def test_writes_are_refused_before_they_reach_the_api(dist, path):
     upstream = Upstream()
     web = client(dist, upstream)
@@ -54,7 +54,7 @@ def test_writes_are_refused_before_they_reach_the_api(dist, path):
 
 
 @pytest.mark.parametrize('path', ['/api/v1/chat/threads', '/api/v1/chat/threads/abc', '/api/v1/answers',
-                                  '/docs', '/openapi.json', '/api/v1/rules/accounts/acct-a/resume', '/api/v1/unknown'])
+                                  '/docs', '/openapi.json', '/api/v1/portfolio', '/api/v1/unknown'])
 def test_private_and_unlisted_reads_are_not_found(dist, path):
     upstream = Upstream()
     assert client(dist, upstream).get(path).status_code == 404
@@ -64,10 +64,10 @@ def test_private_and_unlisted_reads_are_not_found(dist, path):
 def test_reads_are_cached_briefly_so_visitors_cannot_load_the_laptop(dist):
     upstream, clock = Upstream(), Clock()
     web = client(dist, upstream, clock=clock, ttl=15)
-    assert web.get('/api/v1/portfolio').json() == web.get('/api/v1/portfolio').json()
+    assert web.get('/api/v1/archive').json() == web.get('/api/v1/archive').json()
     assert len(upstream.calls) == 1
     clock.now += 16
-    assert web.get('/api/v1/portfolio').json() == {'data': {'n': 2}}
+    assert web.get('/api/v1/archive').json() == {'data': {'n': 2}}
 
 
 def test_failed_reads_are_not_cached(dist):
@@ -90,7 +90,7 @@ def test_each_visitor_is_rate_limited_on_reads_that_reach_the_api(dist):
 def test_cached_reads_do_not_use_up_the_limit(dist):
     """Without a forwarded address every visitor shares one key, so only API calls may count against it."""
     web = client(dist, Upstream(), per_minute=2)
-    assert {web.get('/api/v1/portfolio').status_code for _ in range(20)} == {200}
+    assert {web.get('/api/v1/archive').status_code for _ in range(20)} == {200}
 
 
 def test_an_unreachable_api_is_a_clean_503(dist):

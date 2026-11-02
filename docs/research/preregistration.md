@@ -412,3 +412,4 @@ Two forward-only intraday families are registered now, before their data exists 
 - The analysis app shows each indicator and strategy as a live read-out (what it says now) next to its existing history verdict. Read-outs are not trading signals and are not scored as trials.
 - Claude writes briefs and explanations from the snapshot's numbers only. They are labelled AI analysis, not advice, and are not used for any decision.
 - The holdout year (2025-10-20 → 2026-10-19) stays untouched.
+- Later the same day the owner chose to remove the switched-off trading code (it stays in git history). No research code or result was removed, and no trials were added.

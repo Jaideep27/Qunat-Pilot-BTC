@@ -1,12 +1,11 @@
 import {test,expect} from '@playwright/test';
 
-test('overview avoids downloading research and portfolio until their views are opened',async({page})=>{
+test('home avoids downloading research until the Research page is opened',async({page})=>{
   const requested:string[]=[];
   const data:Record<string,unknown>={candles:[],indicators:{},positioning:[],sentiment:[],
-    predictions:{action:'NO_TRADE',reasons:['MODEL_RELEASE_BLOCKED']},
     coverage:{release_ready:false,families:{}},
     backtests:{status:'blocked',comparisons:[],benchmarks:{}},
-    portfolio:{equity:10000,position:null,paused:true,fills:[],decisions:[]}};
+    };
   await page.route('**/api/v1/**',route=>{
     const key=new URL(route.request().url()).pathname.split('/').at(-1)!;
     requested.push(key);
@@ -18,13 +17,8 @@ test('overview avoids downloading research and portfolio until their views are o
   await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible();
   await expect.poll(()=>requested.includes('candles')).toBe(true);
   expect(requested).not.toContain('backtests');
-  expect(requested).not.toContain('portfolio');
   await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Research/}).click();
   await expect.poll(()=>requested.includes('backtests')).toBe(true);
   await page.getByText('Original release model (2026)').click();
   await expect(page.getByText('Research has not been released')).toBeVisible();
-  expect(requested).not.toContain('portfolio');
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Old paper account/}).click();
-  await expect.poll(()=>requested.includes('portfolio')).toBe(true);
-  await expect(page.getByRole('heading',{name:'Execution ledger'})).toBeVisible();
 });

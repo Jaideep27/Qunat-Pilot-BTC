@@ -5,35 +5,17 @@ const candles=Array.from({length:60},(_,i)=>({event_time:new Date(Date.UTC(2026,
   available_at:new Date(Date.UTC(2026,9,20,8,i*5+5)).toISOString(),open:80000+i*10,high:80050+i*10,low:79950+i*10,close:80010+i*10,volume:10}));
 const forecast=(horizon:string,p:number)=>({horizon,cutoff:'2026-10-20T09:00:00+00:00',status:'no_validated_skill',probability_up:p,base_rate:p,
   return_q10:-.01,return_q90:.012,range_status:'model',drop5_risk:.05,regime:'ranging',volatility:{ewma:.004},champion:{group:'constant',training:null}});
-const playbook=(id:string)=>({id,name:'Flush rebound with a deliberately long name to test wrapping',family:'dump',side:'long',source:['R11'],
-  thesis:'A flush into support.',priority:1,shadow_only:false,trigger:{any:['DUMP'],within_bars:6,min_bars:1},regimes:['RANGE'],
-  conditions:['trigger.oi_change <= -0.005'],abort:[],stop:{anchor:'trigger.low',buffer_atr:.25},target:{candidates:['vwap'],cap:'band4_high',fallback_r:2},
-  time_stop_hours:12,breakeven_at_r:1,may_flip:false});
 const values:Record<string,unknown>={
-  candles,indicators:{rsi_14:55,'1h_rsi_14':61,adx:22,relative_volume:1.3,funding_rate:.0001,open_interest:94000,global_ratio:1.5,top_position_ratio:1.8,fear_greed:58},
+  candles,
   forecasts:{latest:[forecast('1h',.505),forecast('4h',.51),forecast('24h',.519)],forward:{},champions:{},backtest_overfitting:{},status:'running'},
   macro:{upcoming:{fomc:{id:'fomc',kind:'fomc',label:'FOMC rate decision',scheduled_at:'2099-01-01T18:00:00+00:00'},cpi:null,jobs:null},recent:[]},
   news:{items:[{id:'n1',title:'Bitcoin climbs as ETF flows return',url:'https://example.com/n1',source:'coindesk',available_at:'2026-10-20T08:00:00+00:00',published_at:null,excerpt:'Flows returned.'}],runs:[],providers:{},feeds:[{source:'coindesk',status:'ok',checked_at:'2026-10-20T08:00:00+00:00'}],total_items:1,model:'fixture',scope:'Fixture.'},
   'strategy-research':{status:'complete',trials:{swing:81,intraday:113},passing:[],holdout_evaluated:false,next_test:'2027-04-20',families:[],forward:{}},
-  ready:{ready:true,checks:{database:{ok:true,status:'connected'}},collector:{status:'connected',age_seconds:3},worker:{status:'healthy'}},
+  ready:{ready:true,checks:{database:{ok:true,status:'connected'}},collector:{status:'connected',age_seconds:3,poll_interval_seconds:5}},
   health:{status:'ok'},threads:[],answers:{history:[],scoreboard:{}},
-  portfolio:{cash:10000,equity:10000,position:null,fees:0,realized_pnl:0,funding_total:0,fills:[],decisions:[],paused:false,halted:false},
-  predictions:{action:'NO_TRADE',reasons:['WEAK_FORECAST'],probability:.51},
-  rules:{rulebook:{hash:'db3d684ff71c',version:2,name:'QuantPilot'},layers:{ml:'shadow',news:'shadow',learner:'shadow',manage_rl:'shadow'},modes:{},
-    playbooks:[playbook('PB01'),playbook('PB02')],account:null,checklist:[],research:null,provenance_note:'paper'},
-  journal:{hits:[],trades:[],triggers:[]},research:{status:'not_run'},levels:{overlay:null,markers:[]},
-  accounts:{config_hash:'x',model_hash:'y',overlay_time:null,note:'paper',watch_now:[{key:'global_ratio',label:'Long/short ratio (all traders)',value:1.99}],
-    accounts:['Careful','Steady','Bold','Aggressive'].map((name,i)=>({id:'acct-'+'abcd'[i],name,status:i===1?'PAUSED_FOR_REVIEW':'RUNNING',equity:10000-i*123.45,
-      balance:10000,account_return:-i*.0123,round:1,in_round:i*9,round_length:30,number:i*9,leverage:i+2,risk:.01+i*.005,percentile:90-i*10,cutoff_score:.2,
-      full_risk_score:.3,daily_brake:.03,halted_day:false,floor_hit:false,position:i===0?{side:'long',quantity:.123,entry:80123.45,stop:79200,target:81600,
-      liquidation:40200,leverage:2,entry_time:'2026-10-22T09:01:00+00:00',playbook:'PB08L',score:.4}:null,pending:false,
-      last:{time:'2026-10-22T09:00:00+00:00',hit_id:'PB08L:x',playbook:'PB08L',side:'long',decision:'BELOW_CUTOFF',score:.1,cutoff:.2,confidence:.5,passed:5,total:6},
-      expectations:{trades_per_week:1.4,win_rate:.49,mean_r:-.11},review:i===1?{id:'acct-b:round-1',round:1,status:'ready'}:null,
-      rules:['Takes a confirmed rulebook setup only when its score is at least +0.21 R: the top 10% of setups over 2021–2025.','Leverage 2× at most.'],
-      watches:['Order-book imbalance and spread (recorded, not scored).']}))},
-  'account-trades':{trades:[]},decisions:{decisions:[]},reviews:{reviews:[]},
+  archive:{accounts:[{id:'acct-master',status:'RETIRED',retired_at:'2026-11-02T10:00:00+00:00',equity:10000,trades:0}]},
   backtests:{status:'blocked',comparisons:[],benchmarks:{}},studies:{catalogue:[],series:{}},
-  storage:{engine:'postgresql',markets:[],feeds:[]},operations:{runs:[],ready:true},
+  storage:{engine:'postgresql',markets:[],feeds:[]},
 };
 
 async function mock(page:Page){
@@ -59,7 +41,7 @@ async function noOverflow(page:Page,where:string){
 
 const sizes=[[375,812,'phone'],[768,1024,'tablet portrait'],[1024,768,'tablet landscape'],[1366,768,'laptop'],
   [1280,600,'short window'],[1920,1080,'full HD'],[2560,1080,'ultra-wide']] as const;
-const pages=[['overview','Home'],['indicators','Indicators'],['strategies','Strategies'],['archive','Trading history'],['more','More'],['chart','Chart'],['ask','Ask'],['research','Research'],['rules','Rule engine'],['paper','Paper trading'],
+const pages=[['overview','Home'],['indicators','Indicators'],['strategies','Strategies'],['archive','Trading history'],['more','More'],['chart','Chart'],['ask','Ask'],['research','Research'],
   ['news','News'],['system','System health']] as const;
 
 for(const [width,height,name] of sizes){
@@ -106,11 +88,11 @@ test('the command palette and keyboard shortcuts switch pages',async({page})=>{
   await page.keyboard.press('Control+k');
   const palette=page.getByRole('dialog',{name:'Command palette'});
   await expect(palette).toBeVisible();
-  await page.keyboard.type('rul');
-  await expect(palette.getByRole('option')).toHaveCount(2);           // Go to Rule engine + Ask
+  await page.keyboard.type('tradi');
+  await expect(palette.getByRole('option').first()).toHaveText(/Go to Trading history/);
   await page.keyboard.press('Enter');
   await expect(palette).toBeHidden();
-  await expect(page.getByRole('heading',{name:'Rule engine',level:1})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Trading history',level:1})).toBeVisible();
   await page.keyboard.press('Alt+2');
   await expect(page.getByRole('heading',{name:'Indicators',level:1})).toBeVisible();
   await page.keyboard.press('Control+k');
@@ -143,7 +125,7 @@ test('the sidebar collapses, remembers it and the active marker follows the page
   await expect.poll(async()=>(await nav.boundingBox())!.width).toBeLessThan(wide-100);
   await page.reload();
   await expect(page.getByRole('button',{name:'Expand sidebar'})).toBeVisible({timeout:30_000});
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Rule engine journal/}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();
   const marker=page.locator('.nav-indicator');
   await expect.poll(async()=>{const m=(await marker.boundingBox())!,b=(await page.getByRole('button',{name:'More',exact:true}).boundingBox())!;
     return Math.abs(m.y-b.y)}).toBeLessThan(2);

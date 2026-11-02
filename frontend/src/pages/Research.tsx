@@ -14,7 +14,7 @@ function Release(){
   return <Collapsible title="Original release model (2026)" label="Original release model"
     summary={research?.comparisons?.length?`${research.comparisons.length} feature groups · holdout ROC-AUC ${num(research.comparisons.find(c=>c.group==='full')?.holdout.roc_auc,3)} · 0 trades`:'Codex-era frozen model'}>
     {!research?<Loading/>:!research.comparisons?.length?<Empty title="Research has not been released">{research.reason??'Run the coverage audit and reproducible training workflow first.'}</Empty>:<>
-      <p className="note">The frozen 60-minute direction model behind the paper account, evaluated on an untouched holdout (Aug–Sep 2026). It never cleared its own trading gates.</p>
+      <p className="note">The frozen 60-minute direction model (2026), evaluated on an untouched holdout (Aug–Sep 2026). It never cleared its own trading gates and was retired with paper trading.</p>
       <div className="table-scroll"><table aria-label="Feature group comparison"><thead><tr><th>Features</th><th>Model</th><th><Term k="brier">Brier ↓</Term></th><th>ROC-AUC</th><th>Balanced accuracy</th><th>Net return</th><th>Drawdown</th></tr></thead>
         <tbody>{research.comparisons.map(c=><tr key={c.group} className={group===c.group?'selected-row':''} onClick={()=>setGroup(c.group)}>
           <td><button type="button" className="link" onClick={()=>setGroup(c.group)}>{c.group}</button></td><td>{c.kind}</td><td>{num(c.holdout.brier,4)}</td>

@@ -19,7 +19,7 @@ async function mock(page:Page,posted:{path:string;body:unknown}[]=[]){
     if(route.request().method()==='POST'){posted.push({path,body:route.request().postDataJSON()});
       return route.fulfill({json:{data:path==='analysis/explain'?explanation:brief}})}
     const values:Record<string,unknown>={'analysis/snapshot':snapshot,'analysis/catalogue':catalogueFixture(),'analysis/briefs':{briefs:[brief],every_hours:4},
-      'analysis/explanations':explanation,candles:[],news:{items:[]},macro:{upcoming:{},recent:[]},'rules/accounts':{accounts:[],retired:[
+      'analysis/explanations':explanation,candles:[],news:{items:[]},macro:{upcoming:{},recent:[]},archive:{accounts:[
         {id:'acct-master',status:'RETIRED',retired_at:'2026-11-02T10:00:00+00:00',equity:10000,trades:0}]}};
     return route.fulfill({json:{data:values[path]??{},provenance:{source:'fixture',freshness:'fresh',observed_at:null},model_version:null,config_version:'fixture'}});
   });
@@ -90,7 +90,7 @@ test('the public view can read Claude’s work but never call Claude',async({pag
   expect(posted).toEqual([]);
 });
 
-test('five tabs, More lists the extras, and the trading pages are archived',async({page})=>{
+test('five tabs, More lists the extras, and the old paper accounts are listed',async({page})=>{
   await mock(page);
   await page.goto('/#more');
   const nav=page.getByRole('navigation',{name:'Main navigation'});
@@ -101,8 +101,6 @@ test('five tabs, More lists the extras, and the trading pages are archived',asyn
   await more.getByRole('button',{name:/^Trading history/}).click();
   await expect(page.getByRole('heading',{name:'Trading history',level:1})).toBeVisible();
   await expect(page.getByRole('region',{name:'Past paper accounts'})).toContainText('Master Bot');
-  await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Rule engine journal/}).click();
-  await expect(page).toHaveURL(/#rules$/);
 });
 
 test('the analysis pages fit a phone screen',async({page})=>{

@@ -151,17 +151,6 @@ def test_subscription_env_strips_every_openai_variable(monkeypatch):
     assert env['CODEX_HOME'] == 'C:/codex'      # the saved login location is kept
 
 
-# 7. The release smoke check accepts the tools added after the release.
-def test_smoke_check_requires_the_release_tools_without_rejecting_later_ones():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location('smoke', 'scripts/release/smoke_release.py')
-    smoke = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(smoke)
-    listed = set(smoke.ROUTES) | {'get_strategy_research', 'ask_outlook'}
-    assert smoke.missing_release_tools(listed) == set()
-    assert smoke.missing_release_tools(listed-{'get_prediction'}) == {'get_prediction'}
-
-
 def test_claude_prompts_carry_the_direction_side():
     from quantpilot.ai import ask as ask_ai
     assert 'side' in ask_ai.PARSE_SYSTEM.split('touch')[0]          # direction questions set side up/down
