@@ -197,3 +197,23 @@ def test_the_analysis_engine_gets_its_own_heartbeat_window_and_name():
     assert ops.check(p, NOW) == []
     late = ops.check(dict(p, engine_at=NOW-pd.Timedelta(minutes=16)), NOW)
     assert [x['key'] for x in late] == ['engine'] and late[0]['text'].startswith('The data and analysis engine')
+
+
+def test_the_watchdog_probe_reads_readiness_json(monkeypatch):
+    """The probe must parse the /ready body: a Response object in `ready` crashed every watchdog run (2026-11-02)."""
+    import importlib.util
+    from pathlib import Path
+    import httpx
+    path = Path(__file__).resolve().parents[2]/'scripts'/'ops'/'watchdog.py'
+    spec = importlib.util.spec_from_file_location('watchdog_under_test', path)
+    wd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(wd)
+    body = dict(ready=True, checks=dict(completed_candles=dict(age_seconds=42.0)))
+    seen = {}
+    def get(url, timeout):
+        seen['timeout'] = timeout
+        return httpx.Response(200, json=dict(data=body), request=httpx.Request('GET', url))
+    monkeypatch.setattr(httpx, 'get', get)
+    p = wd.probes({'first_run': NOW.isoformat()}, NOW)
+    assert p['ready'] == body and p['candle_age_s'] == 42.0 and seen['timeout'] >= 30
+    assert all(x['key'] != 'api' for x in ops.check(p, NOW))

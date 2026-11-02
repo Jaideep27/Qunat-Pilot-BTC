@@ -42,7 +42,8 @@ def probes(state, now):
     import httpx
     p = dict(ready=None, engine_at=None, candle_age_s=None, model=None)
     try:
-        ready = httpx.get('http://127.0.0.1:8000/api/v1/ready', timeout=60)   # the laptop can be slow when memory is short.json()['data']
+        # 60 s: the laptop can be slow when memory is short.
+        ready = httpx.get('http://127.0.0.1:8000/api/v1/ready', timeout=60).json()['data']
         p['ready'] = ready
         p['candle_age_s'] = ((ready.get('checks') or {}).get('completed_candles') or {}).get('age_seconds')
     except Exception:
