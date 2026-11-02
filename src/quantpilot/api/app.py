@@ -15,30 +15,27 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title="QuantPilot BTC", version="0.1.0", lifespan=lifespan,
-              description="Read-only BTC perpetual research and paper ledger. No real-money execution.")
+              description="QuantPilot BTC analysis: market data, indicators, strategies and research. Nothing trades.")
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["GET", "POST"], allow_headers=["*"])
 
 @app.get("/api/v1/health")
 def health(): return services.health()
 
 @app.get('/api/v1/operations')
-def operational_status(limit: Annotated[int,Query(ge=1,le=100)]=20):
-    try:return services.operations(limit)
+def operational_status():
+    try:return services.operations()
     except SQLAlchemyError:raise HTTPException(status_code=503,detail='Operational database unavailable') from None
 
 @app.get('/api/v1/ready')
 def readiness():
     from fastapi.encoders import jsonable_encoder
     from fastapi.responses import JSONResponse
-    try:result=services.operations(1)
+    try:result=services.operations()
     except SQLAlchemyError:raise HTTPException(status_code=503,detail='Operational database unavailable') from None
     return JSONResponse(jsonable_encoder(result),status_code=200 if result['data']['ready'] else 503)
 
 @app.get("/api/v1/candles")
 def candles(limit: Annotated[int, Query(ge=1, le=2000)] = 288): return services.candles(limit)
-
-@app.get("/api/v1/indicators")
-def indicators(): return services.indicators()
 
 @app.get("/api/v1/positioning")
 def positioning(): return services.family("positioning")
@@ -55,41 +52,8 @@ def forecasts(): return services.shadow_forecasts()
 @app.get('/api/v1/strategy-research')
 def strategy_research(): return services.strategy_research()
 
-@app.get('/api/v1/rules')
-def rules_status(): return services.rules_status()
-
-@app.get('/api/v1/rules/journal')
-def rules_journal(limit: Annotated[int, Query(ge=1, le=500)] = 100, detail: bool = False):
-    return services.rules_journal(limit, detail)
-
-@app.get('/api/v1/rules/research')
-def rules_research(): return services.rules_research()
-
-@app.get('/api/v1/rules/accounts')
-def rules_accounts(): return services.rules_accounts()
-@app.get('/api/v1/rules/model-health')
-def rules_model_health(): return services.rules_model_health()
-
-
-@app.get('/api/v1/rules/decisions')
-def rules_decisions(account: Annotated[str | None, Query(max_length=16)] = None,
-                    limit: Annotated[int, Query(ge=1, le=500)] = 100):
-    return services.rules_decisions(account, limit)
-
-
-@app.get('/api/v1/rules/account-trades')
-def rules_account_trades(account: Annotated[str | None, Query(max_length=16)] = None,
-                         limit: Annotated[int, Query(ge=1, le=500)] = 100):
-    return services.rules_account_trades(account, limit)
-
-
-@app.get('/api/v1/rules/reviews')
-def rules_reviews(account: Annotated[str | None, Query(max_length=16)] = None):
-    return services.rules_reviews(account)
-
-
-@app.get('/api/v1/rules/levels')
-def rules_levels(): return services.rules_levels()
+@app.get('/api/v1/archive')
+def archive(): return services.archive()
 
 @app.get('/api/v1/macro')
 def macro(): return services.macro()
@@ -97,17 +61,8 @@ def macro(): return services.macro()
 @app.get("/api/v1/coverage")
 def coverage(): return services.coverage()
 
-@app.get("/api/v1/predictions")
-def predictions(): return services.prediction()
-
 @app.get("/api/v1/backtests")
 def backtests(detail: bool = False): return services.research(detail=detail)
-
-@app.get("/api/v1/portfolio")
-def portfolio(): return services.paper()
-
-@app.get("/api/v1/decisions")
-def decisions(index: Annotated[int, Query(ge=0, le=1999)] = 0): return services.explain_decision(index)
 
 @app.get('/api/v1/market/storage')
 def market_storage():
@@ -169,15 +124,6 @@ class ViewBody(BaseModel):
     probability: float = Field(ge=0, le=1)
     reasons: list[str] = Field(default_factory=list, max_length=5)
     run_id: str | None = None
-
-
-@app.post('/api/v1/rules/accounts/{account_id}/resume')
-def rules_resume(account_id: str, request: Request):
-    local_only(request)
-    try:
-        return services.rules_resume(account_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from None
 
 
 @app.post('/api/v1/ask')
@@ -250,6 +196,16 @@ def chat_thread_route(thread_id: str):
 @app.get('/api/v1/analysis/snapshot')
 def analysis_snapshot_route():
     return services.analysis_snapshot()
+
+
+@app.get('/api/v1/analysis/levels')
+def analysis_levels_route():
+    return services.analysis_levels()
+
+
+@app.get('/api/v1/analysis/summary')
+def analysis_summary_route():
+    return services.analysis_summary()
 
 
 @app.get('/api/v1/analysis/catalogue')

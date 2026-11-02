@@ -15,7 +15,6 @@ class Settings(BaseSettings):
     alert_app_password: SecretStr | None = None
     market_history_years: int = Field(5,ge=1,le=15)
     market_poll_seconds: float = Field(5,ge=1,le=60)
-    worker_max_age_seconds: int = Field(1800,ge=900,le=7200)
     news_poll_seconds: int = Field(300, ge=60, le=3600)
     news_daily_batches: int = Field(48, ge=1, le=200)
     news_analysis_interval_seconds: int = Field(900, ge=60, le=86400)
@@ -38,8 +37,6 @@ class Settings(BaseSettings):
     ask_daily_limit: int = Field(100, ge=1, le=1000)
     chat_daily_limit: int = Field(100, ge=1, le=1000)
     ask_scheduled_ai_per_day: int = Field(6, ge=0, le=48)
-    # Analysis app (A15, 2026-11-02): paper trading is switched off by the owner; the code and journals are kept.
-    trading_enabled: bool = False
     # Claude on the subscription: automatic market briefs (light) and on-demand "Explain this" (deeper).
     analysis_brief_model: str = 'claude-haiku-5-5'
     analysis_explain_model: str = 'claude-sonnet-5-5'

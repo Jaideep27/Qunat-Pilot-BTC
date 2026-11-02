@@ -275,15 +275,12 @@ def _supervisor():
     return module
 
 
-def test_trading_threads_only_run_when_trading_is_enabled(monkeypatch):
+def test_the_supervisor_runs_no_trading_threads():
     sup = _supervisor()
-    monkeypatch.setattr(settings, 'trading_enabled', False)
-    names = {j.__name__ for j in sup.jobs()}
-    assert 'analysis' in names and not names & {'paper', 'rule_engine', 'account_reviews'}
-    assert sup.collect in sup.jobs() and {'news_feeds', 'shadow_forecasts', 'forward_research'} <= names
-    monkeypatch.setattr(settings, 'trading_enabled', True)
-    assert {'paper', 'rule_engine', 'account_reviews'} <= {j.__name__ for j in sup.jobs()}
-    assert settings.model_fields['trading_enabled'].default is False
+    names = {j.__name__ for j in sup.JOBS}
+    assert 'analysis' in names and sup.collect in sup.JOBS
+    assert {'news_feeds', 'shadow_forecasts', 'forward_research', 'history'} <= names
+    assert not names & {'paper', 'rule_engine', 'account_reviews', 'news_layer'}
 
 
 def test_the_public_link_reads_analysis_but_cannot_call_claude():
@@ -306,13 +303,10 @@ def test_explain_is_local_only_and_reports_a_missing_snapshot(account, monkeypat
         assert local.get('/api/v1/analysis/catalogue').json()['data']['groups'][0] == 'Trend'
 
 
-def test_retirement_marks_the_master_retired_and_keeps_its_journal(account):
-    from quantpilot.accounts import config as accounts_config, styles_live
+def test_the_archive_lists_every_past_account(account):
     from quantpilot.rules import journal
     now = pd.Timestamp('2026-11-02 10:00', tz='UTC')
-    journal.save_account(account, 'acct-master', dict(status='RUNNING', futures=dict(position=None, trades=[1, 2])), now)
-    cfg = accounts_config.load()
-    assert cfg['version'] == 4 and cfg['accounts'] == [] and 'acct-master' in cfg['retired']
-    styles_live.retire(account, cfg['retired'], now)
-    state = journal.load_account(account, 'acct-master')
-    assert state['status'] == 'RETIRED' and state['futures']['trades'] == [1, 2]
+    journal.save_account(account, 'acct-master', dict(status='RETIRED', retired_at=now.isoformat(), number=0,
+                                                      futures=dict(equity=10_000.0, trades=[])), now)
+    rows = journal.accounts(account)
+    assert rows == [dict(id='acct-master', status='RETIRED', retired_at=now.isoformat(), equity=10_000.0, trades=0)]

@@ -9,7 +9,6 @@ from __future__ import annotations
 import math
 
 import numpy as np
-import pandas as pd
 
 from quantpilot.analysis import catalogue
 from quantpilot.features import patterns

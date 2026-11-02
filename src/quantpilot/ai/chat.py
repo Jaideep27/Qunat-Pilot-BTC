@@ -17,9 +17,9 @@ from quantpilot.ai import news
 from quantpilot.config import settings
 from quantpilot.storage.database import Base, database, serialized
 
-TOOLS = ['get_market_snapshot', 'get_indicators', 'get_market_positioning', 'get_sentiment', 'get_news_events',
-         'get_macro_calendar', 'check_data_coverage', 'get_prediction', 'get_shadow_forecasts', 'get_paper_portfolio',
-         'compare_backtests', 'get_answer_scoreboard', 'ask_outlook', 'record_ai_view']
+TOOLS = ['get_market_snapshot', 'get_market_analysis', 'get_market_positioning', 'get_sentiment', 'get_news_events',
+         'get_macro_calendar', 'check_data_coverage', 'get_shadow_forecasts', 'compare_backtests', 'get_answer_scoreboard',
+         'ask_outlook', 'record_ai_view']
 ALLOWED_TOOLS = [f'mcp__quantpilot__{t}' for t in TOOLS]
 MAX_MESSAGE, MAX_HISTORY = 2000, 20
 SYSTEM = ('You are QuantPilot, the owner\'s BTCUSDT research assistant. Use only the QuantPilot tools. Rules: every '

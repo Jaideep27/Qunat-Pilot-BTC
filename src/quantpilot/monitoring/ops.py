@@ -3,7 +3,7 @@
 The watchdog runs every 5 minutes from Windows Task Scheduler. A problem counts only when it is seen on two
 consecutive ticks; restart-worthy ones (API down, engine silent) restart the services at most 3 times in 2 hours.
 Emails go out when a problem starts, every 6 hours while it lasts, and when it is resolved. Nothing here touches
-trading, and no secret is ever printed or emailed.
+the market, and no secret is ever printed or emailed.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import pandas as pd
 
 from quantpilot.monitoring.process import NO_WINDOW
 
-ENGINE_STALE = pd.Timedelta(minutes=5)
+ENGINE_STALE = pd.Timedelta(minutes=15)   # the analysis snapshot reports every 5 minutes
 DATA_STALE_S = 20*60
 DISK_MIN_GB = 5.0
 BACKUP_STALE = pd.Timedelta(hours=36)
@@ -32,22 +32,19 @@ def _minutes(delta):
 
 
 def check(p, now):
-    """Problems in one look at the system. `p`: readiness, engine heartbeat, candle age, model health, disk, backup."""
+    """Problems in one look at the system. `p`: readiness, engine heartbeat, candle age, disk, backup."""
     now, out = pd.Timestamp(now), []
     ready = p.get('ready')
     if not ready or not ready.get('ready'):
         out.append(dict(key='api', restart=True, text='The QuantPilot server is not responding.'))
     engine_at = p.get('engine_at')
-    window = p.get('engine_window') or ENGINE_STALE      # the analysis engine reports every 5 minutes (A15)
-    engine_ok = engine_at is not None and now-pd.Timestamp(engine_at) <= window
+    engine_ok = engine_at is not None and now-pd.Timestamp(engine_at) <= ENGINE_STALE
     if not engine_ok:
         since = 'has never reported' if engine_at is None else f'has not reported for {_minutes(now-pd.Timestamp(engine_at))} minutes'
-        out.append(dict(key='engine', restart=True, text=f"{p.get('engine_name') or 'The trading and data engine'} {since}."))
+        out.append(dict(key='engine', restart=True, text=f'The data and analysis engine {since}.'))
     age = p.get('candle_age_s')
     if engine_ok and age is not None and age > DATA_STALE_S:
         out.append(dict(key='data', restart=False, text=f'Market data is {int(age//60)} minutes old (the exchange feed may be down).'))
-    if p.get('model') == 'ALARM':
-        out.append(dict(key='model', restart=False, text='Model health is on Alarm. Open the Rules page, Model health, for the reason.'))
     if p.get('disk_gb') is not None and p['disk_gb'] < DISK_MIN_GB:
         out.append(dict(key='disk', restart=False, text=f"Only {p['disk_gb']:.1f} GB of disk space is left."))
     backup_at = p.get('backup_at')

@@ -1,26 +1,13 @@
-"""Transactional state, immutable event IDs, and cross-process serialization."""
+"""Database engines, table creation and cross-process serialization."""
 from contextlib import contextmanager
 from functools import lru_cache
 from filelock import FileLock
-from sqlalchemy import JSON, Column, Integer, String, create_engine, select, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session
 from quantpilot.config import settings
-from quantpilot.simulation.engine import initial, reduce_event
-from quantpilot.data.archives import utc
 
 class Base(DeclarativeBase):
     pass
-
-class Account(Base):
-    __tablename__ = "accounts"
-    id = Column(Integer, primary_key=True)
-    state = Column(JSON, nullable=False)
-
-class LedgerEvent(Base):
-    __tablename__ = "ledger_events"
-    id = Column(String(160), primary_key=True)
-    event_time = Column(String(40), nullable=False, index=True)
-    payload = Column(JSON, nullable=False)
 
 def database(url=None):
     settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -33,24 +20,22 @@ def _database(url):
                          pool_pre_ping=True)
 
 def initialize(engine):
-    from quantpilot.storage import snapshots  # noqa: F401  register all operational tables
-    from quantpilot.storage import market as market_store  # noqa: F401  register durable historical/live market tables
-    from quantpilot.monitoring import operations  # noqa: F401  register persistent worker-run evidence
-    from quantpilot.ai import news  # noqa: F401  register versioned news and reasoning evidence
-    from quantpilot.data import macro  # noqa: F401  register the official macro release calendar
-    from quantpilot.research import forecaster  # noqa: F401  register shadow forecasts and their scored outcomes
-    from quantpilot.outlook import answers  # noqa: F401  register outlook answers and scores
-    from quantpilot.ai import chat  # noqa: F401  register in-app chat threads and messages
-    from quantpilot.rules import journal  # noqa: F401  register the rule engine journal
-    from quantpilot.accounts import journal as account_journal  # noqa: F401  register the four paper accounts (A8)
-    from quantpilot.ai import news_events  # noqa: F401  register crawled articles and news classifications
-    from quantpilot.analysis import snapshot as analysis_snapshot, ai as analysis_ai  # noqa: F401  analysis app (A15)
+    from quantpilot.storage import market as market_store  # noqa: F401  durable historical/live market tables
+    from quantpilot.ai import news, chat  # noqa: F401  news with its AI analysis, and in-app chat
+    from quantpilot.data import macro  # noqa: F401  the official macro release calendar
+    from quantpilot.research import forecaster  # noqa: F401  shadow forecasts and their scored outcomes
+    from quantpilot.outlook import answers  # noqa: F401  outlook answers and scores
+    from quantpilot.rules import journal  # noqa: F401  the archived rule engine journal (read-only now)
+    from quantpilot.analysis import snapshot, ai  # noqa: F401  analysis snapshots, briefs and explanations
     with serialized(engine) as session:
         Base.metadata.create_all(session.connection())
         if engine.dialect.name == "postgresql":
-            for table in Base.metadata.tables:
-                session.execute(text(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY"))
-        if not session.get(Account, 1): session.add(Account(id=1, state=initial()))
+            # Only tables without row-level security: ALTER TABLE takes an exclusive lock, and every service start
+            # runs this, so re-applying it to every table blocked readers of the big candle table.
+            missing = session.execute(text("SELECT relname FROM pg_class WHERE relkind='r' AND NOT relrowsecurity "
+                                           "AND relname = ANY(:names)"), dict(names=list(Base.metadata.tables))).scalars()
+            for table in missing:
+                session.execute(text(f'ALTER TABLE "{table}" ENABLE ROW LEVEL SECURITY'))
 
 @contextmanager
 def serialized(engine):
@@ -62,29 +47,3 @@ def serialized(engine):
         with FileLock(str(settings.data_dir / "worker.lock"), timeout=1):
             with Session(engine) as session, session.begin():
                 yield session
-
-def apply_events(engine, events):
-    with serialized(engine) as session:
-        account = session.execute(select(Account).where(Account.id == 1).with_for_update()).scalar_one()
-        state = account.state
-        for event in events:
-            if session.get(LedgerEvent, event["id"]): continue
-            # Historical reconciliations may not be inserted behind a checkpoint.
-            if event["kind"] != "control" and state["last_event"] and utc(event["time"]) < utc(state["last_event"]):
-                raise ValueError("out-of-order event would corrupt accounting")
-            counts = {name: len(state[name]) for name in ("fills", "funding", "decisions")}
-            state = reduce_event(state, event)
-            payload = {**event, "effects": {name: state[name][count:] for name, count in counts.items()},
-                       "balance_after": state["cash"], "equity_after": state["equity"], "position_after": state["position"]}
-            session.add(LedgerEvent(id=event["id"], event_time=event["time"], payload=payload))
-            session.flush()
-        for name in ("fills", "funding", "decisions", "curve"):
-            state[name] = state[name][-2000:]
-        account.state = state
-    return state
-
-def portfolio(engine):
-    with Session(engine) as session:
-        account = session.get(Account, 1)
-        return account.state if account else initial()
-

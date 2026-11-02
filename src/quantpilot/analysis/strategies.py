@@ -11,7 +11,6 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from quantpilot.config import settings

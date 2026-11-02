@@ -1,19 +1,19 @@
-"""Shared read services. API and MCP return these exact envelopes."""
+"""Read services for the API and the MCP tools: market data, news, research, the outlook and chat, and the analysis
+app. Every function returns the same envelope (data plus provenance). Nothing here trades."""
 from __future__ import annotations
 import json
+import threading
 from pathlib import Path
-from threading import Lock
-import joblib
 import numpy as np
 import pandas as pd
-from quantpilot.config import settings, RiskConfig
-from quantpilot.data.archives import load_frames, utc
-from quantpilot.features.core import build_features
-from quantpilot.simulation.engine import gate
-from quantpilot.storage.database import database, portfolio
+from quantpilot.config import settings
+from quantpilot.data.archives import utc
+from quantpilot.storage.database import database
 from quantpilot.ai import ask as ask_ai
 from quantpilot.ai import news as news_cli  # alias: services.news() is the news envelope service
-import threading
+
+APP_VERSION = 'analysis-v1'   # A15: the analysis app (2026-11-02)
+
 
 def clean(value):
     if isinstance(value, dict): return {str(k):clean(v) for k,v in value.items()}
@@ -29,26 +29,11 @@ def envelope(data, observed=None, source="QuantPilot", max_age=600):
     age = max(0, (now-utc(observed)).total_seconds()) if observed else None
     return clean(dict(data=data, provenance=dict(source=source, observed_at=observed, served_at=now.isoformat(),
                      age_seconds=age, freshness="missing" if age is None else ("fresh" if age <= max_age else "stale")),
-                      config_version=RiskConfig().identity, model_version=model_version()))
+                      config_version=APP_VERSION, model_version=None))
 
-def remote(name):
-    from quantpilot.storage.snapshots import read
-    cached = read(name)
-    if not cached: return None
-    cached = dict(cached)
-    p = cached["provenance"]
-    now = pd.Timestamp.now(tz="UTC")
-    p["served_at"] = now.isoformat()
-    if p.get("observed_at"):
-        p["age_seconds"] = max(0, (now-utc(p["observed_at"])).total_seconds())
-        limit = {"sentiment":172800,"positioning":900}.get(name,600)
-        p["freshness"] = "fresh" if p["age_seconds"] <= limit else "stale"
-    return cached
 
-def model_version():
-    p = settings.artifact_dir / "evaluation.json"
-    return json.loads(p.read_text(encoding="utf-8-sig")).get("metadata",{}).get("version") if p.exists() else None
-
+def _market_engine():
+    return database(settings.market_database_url) if settings.market_database_url else database()
 
 def news(limit=20, compact=False):
     from quantpilot.ai.news import snapshot
@@ -128,119 +113,30 @@ def strategy_research():
     return envelope(data, (report or {}).get('generated'), 'QuantPilot pre-registered strategy research',
                     max_age=400*86400)
 
-def market_root():
-    live = settings.data_dir / "live"
-    return live if (live / "candles.parquet").exists() else settings.data_dir
-
 def candles(limit=288):
-    if settings.market_database_url:
-        from quantpilot.storage.market import candles as stored_candles
-        rows=stored_candles(database(settings.market_database_url),limit=limit)
-        if rows:
-            return envelope(rows,rows[-1]['available_at'],'PostgreSQL durable exchange candles')
-    if not (market_root() / "candles.parquet").exists():
-        cached = remote("candles")
-        if cached:
-            cached["data"] = cached["data"][-limit:]
-            return cached
-    candle_path = market_root()/"candles.parquet"
-    d = pd.read_parquet(candle_path) if candle_path.exists() else pd.DataFrame()
-    if len(d): d = d.assign(ema21=d.close.ewm(span=21, adjust=False, min_periods=21).mean())
-    rows = d.tail(limit).to_dict("records") if len(d) else []
-    return envelope(rows, d.available_at.max().isoformat() if len(d) else None, "Binance USD-M perpetual archives / REST")
+    from quantpilot.storage.market import candles as stored_candles
+    rows = stored_candles(_market_engine(), limit=limit)
+    return envelope(rows, rows[-1]['available_at'] if rows else None, 'PostgreSQL durable exchange candles')
 
 def family(name, limit=1):
-    if settings.market_database_url:
-        from sqlalchemy import select
-        from quantpilot.storage.market import MarketObservation,PERP
-        with database(settings.market_database_url).connect() as connection:
-            observed=connection.execute(select(MarketObservation.__table__).where(MarketObservation.market==PERP,
-                MarketObservation.family==name,MarketObservation.available_at<=pd.Timestamp.now(tz='UTC').to_pydatetime())
-                .order_by(MarketObservation.event_time.desc()).limit(limit)).mappings().all()
-        if observed:
-            rows=[dict(event_time=utc(r['event_time']).isoformat(),available_at=utc(r['available_at']).isoformat(),
-                       received_at=utc(r['received_at']).isoformat(),source=r['source'],**r['values']) for r in reversed(observed)]
-            return envelope(rows,rows[-1]['available_at'],'PostgreSQL durable '+name,
-                            max_age={'sentiment':172800,'positioning':900}.get(name,600))
-    if not (market_root() / f"{name}.parquet").exists():
-        cached = remote(name)
-        if cached: return cached
-    family_path = market_root()/f"{name}.parquet"
-    d = pd.read_parquet(family_path) if family_path.exists() else pd.DataFrame()
-    if len(d): d = d[d.available_at <= pd.Timestamp.now(tz="UTC")]
-    return envelope(d.tail(limit).to_dict("records") if len(d) else [], d.available_at.max().isoformat() if len(d) else None,
-                    "Alternative.me (24h conservative lag)" if name == "sentiment" else "Binance public market data",
-                    max_age={"sentiment":172800,"positioning":900}.get(name,600))
-
-# API and MCP share one immutable-by-convention feature snapshot per file generation.
-_feature_lock = Lock()
-_feature_cache = {"key":None, "value":None}
-
-
-def feature_data():
-    root = market_root()
-    files = sorted(root.glob("*.parquet"))
-    key = tuple((str(p.resolve()),p.stat().st_mtime_ns,p.stat().st_size) for p in files)
-    with _feature_lock:
-        if key == _feature_cache["key"]:
-            return _feature_cache["value"]
-        frames = load_frames(root)
-        value = build_features(frames["candles"], frames) if "candles" in frames and not frames["candles"].empty else None
-        _feature_cache.update(key=key, value=value)
-        return value
-
-def indicators():
-    built = feature_data()
-    if built is None: return remote("indicators") or envelope({})
-    f, _, d = built
-    return envelope(f.iloc[-1].to_dict(), f.index[-1].isoformat(), "Causal indicators calculated from completed Binance bars")
+    """The latest observations of one external family (positioning, sentiment, funding, ...)."""
+    from sqlalchemy import select
+    from quantpilot.storage.market import MarketObservation, PERP
+    with _market_engine().connect() as connection:
+        observed = connection.execute(select(MarketObservation.__table__).where(
+            MarketObservation.market == PERP, MarketObservation.family == name,
+            MarketObservation.available_at <= pd.Timestamp.now(tz='UTC').to_pydatetime())
+            .order_by(MarketObservation.event_time.desc()).limit(limit)).mappings().all()
+    rows = [dict(event_time=utc(r['event_time']).isoformat(), available_at=utc(r['available_at']).isoformat(),
+                 received_at=utc(r['received_at']).isoformat(), source=r['source'], **r['values']) for r in reversed(observed)]
+    return envelope(rows, rows[-1]['available_at'] if rows else None, 'PostgreSQL durable '+name,
+                    max_age={'sentiment': 172800, 'positioning': 900}.get(name, 600))
 
 def coverage():
     path = settings.data_dir / "coverage.json"
-    if not path.exists():
-        cached = remote("coverage")
-        if cached: return cached
     return envelope(json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else
                     dict(release_ready=False, status="not_audited", reason="Run quantpilot audit; historical coverage is mandatory"),
                     source="Checksummed historical coverage audit")
-
-def prediction():
-    built = feature_data()
-    if built is None:
-        cached = remote("predictions")
-        if cached:
-            if cached["provenance"]["freshness"] != "fresh":
-                cached["data"] = {**cached["data"], "action":"NO_TRADE", "reasons":["STALE_DATA"]}
-            return cached
-    model_path = settings.artifact_dir / "released.joblib"
-    report = coverage()["data"]
-    missing = dict(action="NO_TRADE", reasons=["MODEL_RELEASE_BLOCKED"], probability=None, explanation=None)
-    if built is None or not model_path.exists() or not report.get("release_ready"):
-        return envelope(missing)
-    # Artifacts are local trusted outputs. Never load untrusted joblib files from requests.
-    bundle = joblib.load(model_path)
-    f, _, d = built
-    last = f.tail(1)
-    if set(bundle["columns"])-set(last.columns):
-        return envelope({**missing, "reasons":["MODEL_SCHEMA_MISMATCH"]}, f.index[-1].isoformat())
-    if last[bundle["columns"]].isna().any().any():
-        return envelope({**missing, "reasons":["MISSING_CRITICAL_INPUT"]}, f.index[-1].isoformat())
-    ingestion_status = market_root() / "ingestion-status.json"
-    if ingestion_status.exists() and json.loads(ingestion_status.read_text(encoding="utf-8")).get("errors"):
-        return envelope({**missing, "reasons":["MISSING_CRITICAL_INPUT"]}, f.index[-1].isoformat())
-    probability = float(bundle["model"].predict_proba(last[bundle["columns"]])[0,1])
-    t = f.index[-1]
-    forecast = dict(probability=probability, up_magnitude=bundle["up"], down_magnitude=bundle["down"],
-                    atr=float(last.atr.iloc[0]), observed_at=t.isoformat(), model_version=bundle["metadata"]["version"],
-                    funding_rate=float(d.funding_rate.iloc[-1]), funding_observable=True, complete=True, threshold=bundle["threshold"])
-    forecast["input_available_at"] = {c:str(d[c].iloc[-1]) for c in d if c.endswith("_available_at")}
-    state = paper()["data"]
-    c = RiskConfig(threshold=bundle["threshold"])
-    decision = gate(state, forecast, float(d.close.iloc[-1]), pd.Timestamp.now(tz="UTC"), c)
-    from quantpilot.research.walkforward import explanations
-    decision.update(forecast=forecast, regime="trending" if last.regime.iloc[0] else "ranging",
-                    explanation=explanations(bundle["model"], last[bundle["columns"]], bundle["kind"]))
-    return envelope(decision, t.isoformat(), "Frozen calibrated model, completed bars")
 
 MAX_CURVE_POINTS = 400
 
@@ -269,40 +165,23 @@ def _summarized(result):
 
 
 def research(groups=None, detail=False):
+    """The original (2026) release model's research: walk-forward comparisons and benchmarks."""
     p = settings.artifact_dir / "evaluation.json"
-    if not p.exists():
-        cached = remote("backtests")
-        if cached:
-            if groups: cached["data"]["comparisons"] = [r for r in cached["data"]["comparisons"] if r["group"] in groups]
-            return cached
     result = json.loads(p.read_text(encoding="utf-8-sig")) if p.exists() else dict(
         status="blocked", comparisons=[], benchmarks={}, reason="Audited historical data and a frozen experiment are required")
     if groups:
         result["comparisons"] = [r for r in result["comparisons"] if r["group"] in groups]
     return envelope(result if detail else _summarized(result), source="Purged walk-forward experiments and untouched holdout")
 
-def paper():
-    state = portfolio(database())
-    return envelope(state, state.get("last_worker"), "Transactional simulated USD-M isolated-margin ledger")
-
-def explain_decision(index=0):
-    state = paper()["data"]
-    decisions = state["decisions"]
-    return envelope(decisions[-1-index] if index < len(decisions) else
-                    dict(action="NO_TRADE", reasons=["NO_DECISION_RECORDED"]), state.get("last_worker"))
-
 def health():
-    p = paper()["data"]
-    cached = remote("predictions")
-    return envelope(dict(status="ok", model_released=(model_version() is not None or bool(cached and cached.get("model_version"))),
-                         worker_last_updated=p.get("last_worker"), coverage_ready=coverage()["data"].get("release_ready",False)))
+    return envelope(dict(status="ok", app=APP_VERSION))
 
 
-def operations(limit=20):
+def operations():
     from quantpilot.monitoring.operations import report
-    result=report(database(),database(settings.market_database_url),limit=limit,
-        model_version=model_version(),coverage_ready=coverage()['data'].get('release_ready',False))
-    return envelope(result,result['checked_at'],'Persistent worker runs and immutable paper ledger')
+    result = report(_market_engine())
+    return envelope(result, result['checked_at'], 'Readiness: database, candles and the analysis snapshot')
+
 
 def _compact_news(data):
     """Small enough for an agent's tool output: excerpts trimmed, analyses flattened, raw runs dropped."""
@@ -442,289 +321,16 @@ def chat_thread(thread_id):
     return envelope(thread(database(), thread_id), source='In-app chat')
 
 
-# Rule engine (experimental paper account driven by rulebook v1; nothing places real orders).
-RULES_NOTE = 'Experimental paper account driven by rulebook v1. Paper only: nothing here places or sizes real orders.'
+# ---- archive: the paper accounts (trading was removed on 2026-11-02, A15) -------------------------------------------
 
-
-def _rules_db():
-    return database(settings.market_database_url or settings.database_url)
-
-
-def layer_modes():
-    """Per-playbook live modes earned by the M3/M5 gates (artifacts/rule-engine/modes.json), else the rulebook's."""
-    path = settings.artifact_dir/'rule-engine'/'modes.json'
-    return json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
-
-
-def _latest_rule_report():
-    runs = sorted((settings.artifact_dir/'rule-engine').glob('*/report.json'), key=lambda p: p.stat().st_mtime)
-    return (runs[-1], json.loads(runs[-1].read_text(encoding='utf-8'))) if runs else (None, None)
-
-
-def rules_status():
+def archive():
     from quantpilot.rules import journal
-    from quantpilot.rules import live as rule_live
-    from quantpilot.rules import rulebook as rules
-    from quantpilot.rules.export import describe
-    book = rules.cached()
-    acct = journal.load_account(_rules_db(), rule_live.ACCOUNT_ID)
-    playbooks = [dict(id=p['id'], name=p['name'], family=p.get('family'), side=p['side'], source=p.get('source', []),
-                      thesis=p.get('thesis'), trigger=p['trigger'], regimes=p['regimes'], priority=p['priority'],
-                      shadow_only=bool(p.get('shadow_only')), time_stop_hours=p['time_stop_hours'],
-                      conditions=[describe(c) for c in p.get('conditions', [])], stop=p['stop'], target=p['target'],
-                      abort=[describe(c) for c in p.get('abort', [])], breakeven_at_r=p.get('breakeven_at_r'),
-                      may_flip=bool(p.get('may_flip'))) for p in book['playbooks']]
-    account = None
-    if acct:
-        f = acct['futures']
-        position = f['position'] and {k: f['position'].get(k) for k in (
-            'side', 'quantity', 'entry', 'stop', 'target', 'entry_time', 'max_favorable', 'max_adverse', 'plan')}
-        account = dict(equity=f['equity'], cash=f['cash'], balance=f['balance'], account_return=f['equity']/f['balance']-1,
-                       position=position, pending=f['pending'], trades=len(f['trades']), halted_day=f['halted_day'],
-                       drawdown_halt=f['drawdown_halt'], paused=f['paused'], last_bar=acct.get('last_bar'),
-                       last_decision=acct.get('last_decision'), created=acct.get('created'), rulebook=acct.get('rulebook'))
-    path, report = _latest_rule_report()
-    research = None if not report else dict(run=path.parent.name, generated=report.get('generated'),
-                                            passing=report.get('passing', []), trials=report.get('trials'),
-                                            combined=report['combined']['account'])
-    data = dict(rulebook=dict(hash=book['hash'], version=book['version'], name=book.get('name')), layers=book['layers'],
-                modes=layer_modes(), gates=book['gates'], defaults=book['defaults'], playbooks=playbooks, account=account,
-                checklist=(acct or {}).get('checklist', []), research=research, provenance_note=RULES_NOTE,
-                accounts=_accounts_summary(), model_health=_model_health_summary())
-    return envelope(data, (acct or {}).get('last_bar'), 'QuantPilot rule engine (experimental paper account)', max_age=180)
-
-
-WATCH_NOW = (('global_ratio', 'Long/short ratio (all traders)'), ('top_position_ratio', 'Long/short ratio (top traders)'),
-             ('funding_rate', 'Funding rate'), ('oi_change_1h', 'Open interest change, 1h'),
-             ('taker_share_1h', 'Market buys share, 1h'), ('imbalance_15bps', 'Order-book imbalance'),
-             ('spread_bps', 'Spread (bps)'), ('liq_long_usd_15m', 'Longs liquidated, 15m ($)'),
-             ('liq_short_usd_15m', 'Shorts liquidated, 15m ($)'), ('fear_greed', 'Fear & Greed'))
-
-
-SHARED_STYLE_RULES = ['Paper money only: nothing here places a real order.',
-                      'One position at a time; the stop is set before entry. Risks 1% per trade, leverage 2x at most.',
-                      'Stops for the day after losing 3%; stops early for review below $5,000.']
-
-
-def _style_history(style, park=True):
-    """The A10 history-test verdict for a style, from the latest run (a 'running' note until it exists)."""
-    import json as _json
-    from pathlib import Path as _Path
-    from quantpilot.config import settings
-    key = style if park or style not in ('X1', 'X2') else style+'-nopark'     # A13: bots without idle parking
-    runs = sorted((_Path(settings.artifact_dir)/'style-research').glob('run-*/runs/'+key+'.json'))
-    if not runs:
-        return dict(status='running', note='The history test (2021-2025) is still running.')
-    result = _json.loads(runs[-1].read_text(encoding='utf-8'))
-    v, a = result['verdict'], result['account']
-    failed = [k for k, ok in v['criteria'].items() if not ok]
-    return dict(status='passed' if v['passed'] else 'failed', passed=v['passed'], failed=failed, trades=a['trades'],
-                win_rate=a.get('win_rate'), account_return=a['account_return'], max_drawdown=a['max_drawdown'],
-                buy_and_hold=a.get('buy_and_hold'), annual_return=a.get('annual_return'),
-                luck_p=v.get('luck', {}).get('p_value'), deflated_sharpe=v.get('deflated_sharpe'))
-
-
-def _style_rules(account, round_length):
-    from quantpilot.accounts.styles_live import MODULES
-    module = MODULES[account['style']]
-    if account['style'] == 'C1':
-        review, shared = f"Pauses every {account.get('review_days', 30)} days for a review with the owner.", SHARED_STYLE_RULES[:1]
-    else:
-        review, shared = f'Pauses after {round_length} trades for a review with the owner.', SHARED_STYLE_RULES
-    rules = [r for r in module.RULES if account.get('park', True) or 'idle money' not in r.lower()]
-    return dict(rules=rules+shared+[review], watches=[], style_name=module.NAME)
-
-
-def _position_view(account, state, f, extra):
-    p = f.get('position')
-    hedge = state.get('hedge')
-    if account.get('style') in ('X1', 'X2') and not p and hedge and hedge.get('open'):
-        f, p = hedge, hedge.get('position') or {}
-    if not p:
-        return None
-    if account.get('style') in ('C1', 'X1', 'X2') and p.get('kind') == 'hedge':
-        cycle = f.get('cycle') or {}
-        return dict(kind='hedge', side='hedge', entry=cycle.get('entry', p.get('entry')), entry_time=p.get('entry_time'),
-                    spot_qty=f.get('spot_qty'), perp_qty=f.get('perp_qty'), margin=f.get('margin'),
-                    funding=cycle.get('funding'), rebalances=cycle.get('rebalances'), target=None, stop=None, playbook='C1')
-    info = extra.get(p['plan'].get('hit_id')) or {}
-    return dict(side='long' if p['side'] == 1 else 'short', quantity=p['quantity'], entry=p['entry'], stop=p['stop'],
-                target=p.get('target'), liquidation=p.get('liquidation'), leverage=p.get('leverage'),
-                entry_time=p['entry_time'], playbook=p['plan'].get('playbook'), style=p['plan'].get('style'),
-                score=info.get('score'), time_machine=info.get('time_machine'), reason=info.get('reason'))
-
-
-def _account_view(cfg, account, state, expectations, reviews, engine=None):
-    from quantpilot.accounts import journal as account_journal
-    from quantpilot.accounts import report as account_report
-    from quantpilot.accounts import config as accounts
-    state = state or {}
-    f = state.get('futures') or {}
-    extra = state.get('extra') or {}
-    own = [r for r in reviews if r['account'] == account['id']]
-    equity = f.get('equity', cfg['balance'])
-    if account.get('style') in ('X1', 'X2') and f:
-        from quantpilot.strategies import bot
-        equity = bot.equity(dict(state, futures=f))
-    report = None
-    if engine is not None:
-        try:
-            held = account_report.hold(engine, state['created']) if state.get('created') else None
-        except Exception:
-            held = None
-        report = account_report.report(account_journal.trades(engine, account['id'], limit=10_000), cfg['balance'],
-                                       equity, held)
-        report['hold'] = held
-    style = account.get('style')
-    text = _style_rules(account, cfg['round_length']) if style else accounts.describe(account, cfg['round_length'])
-    view = dict(id=account['id'], report=report, name=account['name'], status=state.get('status', 'NOT_STARTED'), equity=equity,
-                balance=cfg['balance'], account_return=equity/cfg['balance']-1, round=state.get('round', 1),
-                in_round=state.get('in_round', 0), round_length=cfg['round_length'], round_unit='trades',
-                number=state.get('number', 0), leverage=account.get('leverage'), risk=account.get('risk'),
-                percentile=account.get('percentile'), cutoff_score=account.get('cutoff_score'),
-                full_risk_score=account.get('full_risk_score'), daily_brake=account.get('daily_brake'),
-                halted_day=bool(f.get('halted_day')), floor_hit=bool(f.get('floor_hit')),
-                position=_position_view(account, state, f, extra), pending=bool(f.get('pending')), last=state.get('last'),
-                expectations=expectations.get(account['id']),
-                review={k: own[0][k] for k in ('id', 'round', 'status')} if own else None, **text)
-    if style:
-        view.update(style=style, active=state.get('active'), history_test=_style_history(style, account.get('park', True)))
-        if style in ('X1', 'X2'):
-            view.update(members=state.get('members'), round_unit='trades')
-        if style == 'C1':
-            started = state.get('round_started')
-            days = (pd.Timestamp.now(tz='UTC')-pd.Timestamp(started)).days if started else 0
-            view.update(round_unit='days', round_length=account.get('review_days', 30), in_round=days, leverage=1.0,
-                        risk=None)
-    return view
-
-
-def _accounts_summary():
-    try:
-        return [dict(id=a['id'], name=a['name'], status=a['status'], equity=a['equity'], in_round=a['in_round'],
-                     round=a['round']) for a in rules_accounts()['data']['accounts']]
-    except Exception:
-        return []
-
-
-def rules_accounts():
-    from quantpilot.accounts import journal as account_journal
-    from quantpilot.accounts import review as account_review
-    from quantpilot.accounts import config as accounts
-    from quantpilot.rules import journal
-    from quantpilot.rules import live as rule_live
-    engine, cfg = _rules_db(), accounts.load()
-    expectations = account_review._expectations() if cfg.get('version', 1) < 2 else {}
-    reviews = account_journal.reviews(engine)
-    states = {a['id']: journal.load_account(engine, a['id']) for a in cfg['accounts']}
-    overlay = (journal.load_account(engine, rule_live.ACCOUNT_ID) or {}).get('overlay') or {}
-    retired = []
-    for account_id in cfg.get('retired') or []:
-        old = journal.load_account(engine, account_id) or {}
-        retired.append(dict(id=account_id, status=old.get('status', 'RETIRED'), retired_at=old.get('retired_at'),
-                            equity=(old.get('futures') or {}).get('equity'), trades=old.get('number', 0)))
-    data = dict(accounts=[_account_view(cfg, a, states[a['id']], expectations, reviews, engine) for a in cfg['accounts']],
-                config_hash=cfg['hash'], model_hash=(cfg.get('model') or {}).get('hash'), overlay_time=overlay.get('time'),
-                watch_now=[dict(key=k, label=label, value=overlay.get(k)) for k, label in WATCH_NOW], retired=retired,
-                note='Paper trading is switched off (A15, 2026-11-02). Every past account and its journal is kept here.')
-    observed = max((s['last_bar'] for s in states.values() if s and s.get('last_bar')), default=None)
-    return envelope(data, observed, 'QuantPilot four paper accounts (A10 styles)', max_age=180)
-
-
-def rules_model_health():
-    from quantpilot.monitoring import model_health
-    data = model_health.status(_rules_db())
-    return envelope(data, data['checked_at'], 'QuantPilot model health (A9)', max_age=600)
-
-
-def _model_health_summary():
-    try:
-        data = rules_model_health()['data']
-        return dict(overall=data['overall'], reasons=data['reasons'])
-    except Exception as exc:
-        return dict(overall='UNKNOWN', reasons=[f'Model health could not be read: {type(exc).__name__}'])
-
-
-def rules_decisions(account=None, limit=100):
-    from quantpilot.accounts import journal as account_journal
-    rows = account_journal.decisions(_rules_db(), account, limit)
-    return envelope(dict(decisions=rows), rows[0]['time'] if rows else None, 'QuantPilot account decisions', max_age=86400)
-
-
-def rules_account_trades(account=None, limit=100):
-    from quantpilot.accounts import journal as account_journal
-    rows = list(reversed(account_journal.trades(_rules_db(), account, limit)))
-    return envelope(dict(trades=rows), rows[0]['exit_time'] if rows else None, 'QuantPilot account trades', max_age=86400)
-
-
-def rules_reviews(account=None):
-    from quantpilot.accounts import journal as account_journal
-    rows = account_journal.reviews(_rules_db(), account)
-    return envelope(dict(reviews=rows), rows[0]['created_at'] if rows else None, 'QuantPilot account reviews', max_age=86400)
-
-
-def rules_resume(account_id):
-    """Owner action: start the next round of a paused account. ValueError when it is not paused."""
-    from quantpilot.accounts import review as account_review
-    now = pd.Timestamp.now(tz='UTC')
-    return envelope(account_review.resume(_rules_db(), account_id, now), now.isoformat(), 'QuantPilot four paper accounts (A8)')
-
-
-def rules_journal(limit=100, detail=False):
-    from quantpilot.rules import journal
-    engine = _rules_db()
-    hits = journal.hits(engine, limit=limit)
-    if not detail:
-        for h in hits:
-            h['payload'] = {k: v for k, v in h['payload'].items() if k != 'checks'}
-    data = dict(hits=list(reversed(hits)), trades=list(reversed(journal.trades(engine, limit=limit))),
-                triggers=journal.triggers(engine, limit=limit))
-    observed = data['hits'][0]['time'] if data['hits'] else None
-    return envelope(data, observed, 'QuantPilot rule engine journal', max_age=86400)
-
-
-def rules_research():
-    path, report = _latest_rule_report()
-    if not report:
-        return envelope(dict(status='not_run', note='Run `quantpilot research-playbooks --output DIR`.'), None,
-                        'QuantPilot rule engine research', max_age=400*86400)
-    folder = path.parent
-    names = {'meta-report': 'ml', 'news-report': 'news', 'learner-report': 'learner', 'manage-report': 'manage_rl'}
-    extra = {layer: json.loads((folder/f'{name}.json').read_text(encoding='utf-8'))
-             for name, layer in names.items() if (folder/f'{name}.json').exists()}
-    playbooks = {k: {x: v[x] for x in ('name', 'family', 'side', 'report', 'gate', 'hits', 'tradeable', 'diagnosis')
-                     if x in v} for k, v in report['playbooks'].items()}
-    data = dict(status='complete', run=folder.name, generated=report['generated'], rulebook=report['rulebook'],
-                development=report['development'], trials=report['trials'], hits=report['hits'],
-                passing=report['passing'], playbooks=playbooks,
-                combined={k: v for k, v in report['combined'].items() if k != 'trades'},
-                layers={k: {x: v.get(x) for x in ('summary', 'live', 'generated')} for k, v in extra.items()},
-                holdout_evaluated=(folder/'holdout.lock').exists(), note='Pre-registered (amendment A6); nothing here trades.')
-    return envelope(data, report['generated'], 'QuantPilot rule engine research', max_age=400*86400)
-
-
-def rules_levels():
-    from quantpilot.rules import journal
-    from quantpilot.rules import live as rule_live
-    acct = journal.load_account(_rules_db(), rule_live.ACCOUNT_ID) or {}
-    trades = (acct.get('futures') or {}).get('trades', [])[-50:]
-    markers = [dict(time=t['entry_time'], price=t['entry'], kind='entry', side=t['side'], playbook=t['plan'].get('playbook'))
-               for t in trades]
-    markers += [dict(time=t['exit_time'], price=t['exit'], kind='exit', side=t['side'], playbook=t['plan'].get('playbook'),
-                     reason=t['reason'], net=t['net']) for t in trades]
-    position = (acct.get('futures') or {}).get('position')
-    if position:
-        markers.append(dict(time=position['entry_time'], price=position['entry'], kind='open', side=position['side'],
-                            playbook=position['plan'].get('playbook'), stop=position['stop'], target=position['target']))
-    data = dict(overlay=acct.get('overlay'), markers=sorted(markers, key=lambda m: m['time']))
-    return envelope(data, (acct.get('overlay') or {}).get('time'), 'QuantPilot rule engine levels', max_age=900)
+    rows = journal.accounts(_market_engine())
+    return envelope(dict(accounts=rows, note='Paper trading was switched off on 2026-11-02 (A15). The accounts’ '
+                         'records are kept; nothing trades.'), source='Archived paper accounts', max_age=10**9)
 
 
 # ---- analysis app (A15) ---------------------------------------------------------------------------------------------
-
-def _market_engine():
-    return database(settings.market_database_url) if settings.market_database_url else database()
-
 
 def analysis_snapshot():
     from quantpilot.analysis import snapshot
@@ -777,3 +383,19 @@ def analysis_brief_now():
         raise ValueError('A brief was written less than 15 minutes ago.')
     record = ai.write_brief(engine, snap, reason='requested')
     return envelope(record, record['created_at'], 'Claude market brief (subscription; AI analysis, not advice)')
+
+
+def analysis_levels():
+    """Support, resistance, VWAP bands and the 4h likely range for the chart, from the latest snapshot."""
+    from quantpilot.analysis import snapshot
+    snap = snapshot.latest(_market_engine())
+    overlay = (snap or {}).get('overlay')
+    return envelope(dict(overlay=overlay, markers=[]), (overlay or {}).get('time'), 'Analysis snapshot levels', max_age=900)
+
+
+def analysis_summary():
+    """The compact snapshot Claude reads (no sparklines or curves): for the chat's tools."""
+    from quantpilot.analysis import snapshot
+    snap = snapshot.latest(_market_engine())
+    return envelope(snapshot.compact(snap) if snap else None, snap['built_at'] if snap else None,
+                    'Analysis snapshot (compact)', max_age=900)

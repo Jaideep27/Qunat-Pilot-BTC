@@ -2,8 +2,6 @@ import pandas as pd
 import pytest
 from quantpilot.config import RiskConfig
 from quantpilot.simulation.engine import initial, gate, reduce_event, close_position
-from quantpilot.storage.database import apply_events, portfolio, LedgerEvent
-from sqlalchemy.orm import Session
 
 T = "2024-01-01T00:00:00+00:00"
 def f(p=.9, **kwargs):
@@ -77,20 +75,6 @@ def test_cost_staleness_loss_missing_and_frozen_threshold():
     assert "WEAK_FORECAST" in gate(s,f(.65,threshold=.7),100,T,c)["reasons"]
     with pytest.raises(ValueError): RiskConfig(max_exposure=2)
 
-def test_transactional_retries_restart_and_rollback(account):
-    events=[dict(id="q",kind="quote",time=T,price=100),
-            dict(id="s",kind="signal",time=T,forecast=f()),
-            dict(id="e",kind="quote",time="2024-01-01T00:00:02+00:00",price=100)]
-    first=apply_events(account,events)
-    assert apply_events(account,events) == first
-    assert portfolio(account) == first
-    with Session(account) as session: assert session.query(LedgerEvent).count() == 3
-    with pytest.raises(ValueError):
-        apply_events(account,[dict(id="later",kind="quote",time="2024-01-01T00:00:03+00:00",price=101),
-                              dict(id="bad",kind="unknown",time="2024-01-01T00:00:04+00:00")])
-    assert portfolio(account) == first
-    with Session(account) as session: assert session.get(LedgerEvent,"later") is None
-
 def test_margin_approximation_closes_short():
     s,c=enter(-1)
     s=reduce_event(s,dict(kind="quote",time="2024-01-01T00:05:00+00:00",price=210,mark=210))
@@ -115,30 +99,6 @@ def test_extreme_short_stop_gap_cannot_borrow_free_collateral():
     assert s['cash'] == pytest.approx(10000-collateral)
     assert s['fills'][-1]['margin_adjustment'] > 0
     assert s['fills'][-1]['reason'] == 'MARGIN_APPROXIMATION'
-
-def test_owner_pause_preserves_unprocessed_market_history(account):
-    events = [
-        dict(id="cursor-quote", kind="quote", time=T, price=100),
-        dict(id="cursor-signal", kind="signal", time=T, forecast=f()),
-        dict(id="cursor-entry", kind="quote", time="2024-01-01T00:00:02+00:00", price=100),
-    ]
-    opened = apply_events(account, events)
-    paused = apply_events(account, [dict(id="pause-later", kind="control",
-        time="2024-01-01T00:12:00+00:00", paused=True)])
-    assert paused["last_event"] == opened["last_event"]
-    assert paused["last_control_at"] == "2024-01-01T00:12:00+00:00"
-    reconciled = apply_events(account, [
-        dict(id="missed-funding", kind="funding", time="2024-01-01T00:01:00+00:00", mark=100, rate=.001, replayed=True),
-        dict(id="missed-stop", kind="bar", time="2024-01-01T00:05:00+00:00",
-             price=95, open=95, low=94, high=96, replayed=True),
-    ])
-    assert reconciled["paused"]
-    assert reconciled["position"] is None
-    assert reconciled["funding_total"] < 0
-    assert reconciled["fills"][-1]["replayed"]
-    assert apply_events(account, [dict(id="pause-later", kind="control",
-        time="2024-01-01T00:12:00+00:00", paused=True)]) == reconciled
-
 
 def test_owner_control_cannot_reset_daily_accounting_across_midnight():
     s, _ = enter()

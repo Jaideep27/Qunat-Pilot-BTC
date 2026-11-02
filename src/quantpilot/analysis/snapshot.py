@@ -19,6 +19,8 @@ from quantpilot.storage.database import Base
 LOOKBACK = pd.Timedelta(days=45)
 DAILY_LOOKBACK = pd.Timedelta(days=420)
 KEEP = pd.Timedelta(hours=24)
+# Price lines the chart draws (its Levels toggle): nearest support/resistance, VWAP ±2 SD and the 4h likely range.
+OVERLAY = ('support', 'resistance', 'vwap', 'vwap_upper2', 'vwap_lower2', 'band4_high', 'band4_low')
 REGIMES = {'PANIC': 'Panic: a crash or melt-up is under way', 'HIGH_VOL': 'Wild and choppy (high volatility)',
            'TREND_UP': 'Trending up (intraday)', 'TREND_DOWN': 'Trending down (intraday)',
            'RANGE': 'Moving sideways (no strong intraday trend)'}
@@ -145,6 +147,7 @@ def build(engine, now=None, frames=None, daily_candles=None, side_data=True):
                    volume_24h=_num(last_day.volume.astype(float).sum())),
         regime=dict(id=regime, text=REGIMES.get(regime, '—')),
         timeframes=by_tf, market=mkt, summary=summary, levels=levels(row, price),
+        overlay=dict(time=pf.index[-1].isoformat() if len(pf) else None, **{k: _num(row.get(k)) for k in OVERLAY}),
         range_4h=dict(band=band, forecast=None if not forecast else dict(
             low=None if forecast.get('return_q10') is None or not price else price*(1+forecast['return_q10']),
             high=None if forecast.get('return_q90') is None or not price else price*(1+forecast['return_q90']),

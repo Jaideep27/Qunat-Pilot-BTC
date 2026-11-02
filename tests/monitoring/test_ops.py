@@ -4,7 +4,7 @@ import pandas as pd
 from quantpilot.monitoring import ops
 
 NOW = pd.Timestamp('2026-10-23 12:00', tz='UTC')
-HEALTHY = dict(ready=dict(ready=True), engine_at=NOW-pd.Timedelta(seconds=40), candle_age_s=120.0, model='OK', disk_gb=100.0,
+HEALTHY = dict(ready=dict(ready=True), engine_at=NOW-pd.Timedelta(seconds=40), candle_age_s=120.0, disk_gb=100.0,
                backup_at=NOW-pd.Timedelta(hours=10))
 
 
@@ -24,12 +24,13 @@ def test_check_flags_each_condition():
     assert ops.check(HEALTHY, NOW) == []
     assert keys(ops.check(dict(HEALTHY, ready=None), NOW)) == ['api']
     assert keys(ops.check(dict(HEALTHY, ready=dict(ready=False)), NOW)) == ['api']
-    stale = ops.check(dict(HEALTHY, engine_at=NOW-pd.Timedelta(minutes=9)), NOW)
-    assert keys(stale) == ['engine'] and stale[0]['restart'] and '9 minutes' in stale[0]['text']
+    assert ops.check(dict(HEALTHY, engine_at=NOW-pd.Timedelta(minutes=9)), NOW) == []     # a snapshot every 5 minutes
+    stale = ops.check(dict(HEALTHY, engine_at=NOW-pd.Timedelta(minutes=16)), NOW)
+    assert keys(stale) == ['engine'] and stale[0]['restart'] and '16 minutes' in stale[0]['text']
+    assert stale[0]['text'].startswith('The data and analysis engine')
     data = ops.check(dict(HEALTHY, candle_age_s=30*60.0), NOW)
     assert keys(data) == ['data'] and not data[0]['restart']
     assert keys(ops.check(dict(HEALTHY, candle_age_s=30*60.0, engine_at=None), NOW)) == ['engine']   # data age is not separate news
-    assert keys(ops.check(dict(HEALTHY, model='ALARM'), NOW)) == ['model']
     assert keys(ops.check(dict(HEALTHY, disk_gb=3.2), NOW)) == ['disk']
     assert keys(ops.check(dict(HEALTHY, backup_at=NOW-pd.Timedelta(hours=40)), NOW)) == ['backup']
 
@@ -188,15 +189,6 @@ def test_unreadable_dump_is_rejected(tmp_path):
 def test_missing_offsite_folder_is_reported_not_fatal(tmp_path):
     out = _backup(tmp_path, FakeRun(), offsite=False)
     assert out['ok'] and out['offsite'] == 'missing'
-
-
-def test_the_analysis_engine_gets_its_own_heartbeat_window_and_name():
-    """A15: the analysis snapshot reports every 5 minutes, so the watchdog allows 15 before calling it down."""
-    p = dict(HEALTHY, engine_at=NOW-pd.Timedelta(minutes=9), engine_window=pd.Timedelta(minutes=15),
-             engine_name='The data and analysis engine')
-    assert ops.check(p, NOW) == []
-    late = ops.check(dict(p, engine_at=NOW-pd.Timedelta(minutes=16)), NOW)
-    assert [x['key'] for x in late] == ['engine'] and late[0]['text'].startswith('The data and analysis engine')
 
 
 def test_the_watchdog_probe_reads_readiness_json(monkeypatch):

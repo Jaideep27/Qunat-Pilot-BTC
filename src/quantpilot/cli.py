@@ -26,9 +26,7 @@ def main():
     history.add_argument('--years',type=int,choices=range(1,16),default=None)
     history.add_argument('--all-history',action='store_true',help='Explicitly request all source history instead')
     sub.add_parser('market-coverage',help='Report exact five-year candle coverage from PostgreSQL')
-    sub.add_parser('retire-trading',help='A15: retire every paper account and pause the reference and old paper accounts')
-    status=sub.add_parser('status',help='Read worker-run evidence, forward-paper totals and readiness')
-    status.add_argument('--limit',type=int,choices=range(1,101),default=20)
+    sub.add_parser('status',help='Readiness: database, fresh candles and the analysis snapshot')
     sub.add_parser('doctor',help='Read-only local database, service-version and readiness checks')
     news_collect = sub.add_parser('collect-news', help='Persist publisher feed excerpts independently of market ingestion')
     news_collect.add_argument('--once', action='store_true')
@@ -62,13 +60,6 @@ def main():
     playbooks.add_argument('--prior', action='append', help='Earlier trial registry to count (repeatable)')
     sub.add_parser('research-ml', help='Rule engine M3: walk-forward ML filter on a playbook run (A6 gate)').add_argument(
         '--output', required=True, help='Playbook research run directory')
-    sub.add_parser('research-accounts', help='A8: fit the score model and cutoffs of the four paper accounts').add_argument(
-        '--output', required=True, help='Playbook research run directory')
-    sub.add_parser('model-reference', help='A9: reference statistics of the live score model (drift, data check)').add_argument(
-        '--output', required=True, help='The A8 playbook research run directory')
-    challenger = sub.add_parser('train-challenger', help='A9: fit a shadow challenger score model (never trades)')
-    challenger.add_argument('--output', required=True, help='The A8 playbook research run directory')
-    challenger.add_argument('--min-new', type=int, default=200, help='Resolved live setups required')
     sub.add_parser('research-learner', help='Rule engine M5: walk-forward bandit learner on a playbook run').add_argument(
         '--output', required=True, help='Playbook research run directory')
     manage=sub.add_parser('research-manage', help='Rule engine M5: trade-management RL (tabular Q and PPO) on a run')
@@ -88,10 +79,6 @@ def main():
     restore.add_argument('manifest',help='Path to a locally trusted backup manifest.json')
     collector=sub.add_parser('collect-live',help='Continuously persist public live candles in PostgreSQL')
     collector.add_argument('--once',action='store_true')
-    sub.add_parser("publish-research", help="Publish compact audited research projections to the operational database")
-    sub.add_parser("worker")
-    sub.add_parser("pause")
-    sub.add_parser("resume")
     args = parser.parse_args()
     if args.command == "manifest":
         print(json.dumps(manifest(args.as_of), indent=2))
@@ -115,13 +102,6 @@ def main():
         from quantpilot.research.replay import replay
         result = replay(settings.data_dir, settings.artifact_dir, args.group)
         print(json.dumps({k:v for k,v in result["trading"].items() if k not in ("curve","fills")}, indent=2))
-    elif args.command == "publish-research":
-        from quantpilot.api import services
-        from quantpilot.storage.snapshots import write
-        initialize(database())
-        if not services.coverage()["data"].get("release_ready"):
-            raise ValueError("Cannot publish research without passing coverage")
-        write(database(), {"coverage":services.coverage(), "backtests":services.research()})
     elif args.command == "init-db":
         initialize(database())
         if settings.market_database_url:initialize(database(settings.market_database_url))
@@ -203,23 +183,6 @@ def main():
         report = research(args.output, priors=tuple(args.prior) if args.prior else PRIORS)
         print(json.dumps(dict(passing=report['passing'], trials=report['trials'], hits=report['hits'],
                               combined=report['combined']['account']), indent=2, default=str))
-    elif args.command == 'research-accounts':
-        from quantpilot.accounts.score import run
-        result = run(args.output)
-        print(json.dumps({k: result[k] for k in ('training_setups', 'walk_forward_setups', 'model_hash', 'cutoffs', 'calibration', 'expectations')}, indent=2, default=str))
-    elif args.command == 'model-reference':
-        from quantpilot.monitoring.model_health import run_reference
-        ref = run_reference(args.output)
-        print(json.dumps(dict(model_hash=ref['model_hash'], rows=ref['rows'], critical=len(ref['critical']),
-                              blocked_share=ref['blocked_share'], brier=ref.get('brier'), drift=ref['drift_baseline'] | dict(thresholds=None)), indent=2))
-    elif args.command == 'train-challenger':
-        from quantpilot.accounts import score as account_score
-        from quantpilot.monitoring import model_health
-        from quantpilot.api import services
-        from quantpilot.research.playbooks import load_hits
-        dev = account_score.training_set(load_hits(args.output))
-        info = model_health.train_challenger(dev, model_health.live_training_rows(services._rules_db()), args.min_new)
-        print(json.dumps(info, indent=2))
     elif args.command == 'research-ml':
         from quantpilot.rules.meta import run
         result = run(args.output)
@@ -262,36 +225,14 @@ def main():
                 'reason':str(exc) if isinstance(exc,RecoveryError) else 'Recovery operation failed; inspect local database/tool availability'}))
             raise SystemExit(2) from None
         print(json.dumps(result,indent=2,default=str))
-    elif args.command == 'retire-trading':
-        import pandas as pd
-        from quantpilot.accounts import config as accounts_config, styles_live
-        from quantpilot.rules import journal as rule_journal, live as rule_live
-        from quantpilot.simulation.worker import control
-        engine = database(settings.market_database_url)
-        initialize(engine)
-        now = pd.Timestamp.now(tz='UTC')
-        cfg = accounts_config.load()
-        styles_live.retire(engine, cfg['retired'], now)          # closes any open paper position, keeps the journal
-        ref = rule_journal.load_account(engine, rule_live.ACCOUNT_ID)
-        if ref is not None:
-            ref['futures']['paused'], ref['suspended_at'] = True, now.isoformat()
-            rule_journal.save_account(engine, rule_live.ACCOUNT_ID, ref, now)
-        control(True)                                            # the old model's paper ledger: an owner pause event
-        print(json.dumps(dict(retired=[a for a in cfg['retired'] if (rule_journal.load_account(engine, a) or {}).get('status') == 'RETIRED'],
-                              reference_paused=ref is not None, old_paper_paused=True), indent=2))
     elif args.command == 'status':
         from quantpilot.api import services
-        result=services.operations(args.limit)
+        result=services.operations()
         print(json.dumps(result,indent=2,default=str))
         if not result['data']['ready']:raise SystemExit(2)
     elif args.command == 'collect-live':
         from quantpilot.data.collector import run
         run(once=args.once)
-    else:
-        from quantpilot.simulation.worker import run_worker, control
-        r = run_worker() if args.command == "worker" else control(args.command == "pause")
-        print(json.dumps(dict(equity=r["equity"], position=r["position"], paused=r["paused"],
-                              last_worker=r["last_worker"]), indent=2))
 
 if __name__ == "__main__": main()
 

@@ -1,92 +1,82 @@
-"""Local continuous collector, resumable history, and serialized paper updates."""
+"""The background services, one thread each: market data, news, the macro calendar, forecasts, the outlook and the
+analysis snapshot with Claude's brief. Nothing here trades (paper trading was removed on 2026-11-02, A15)."""
 from concurrent.futures import ThreadPoolExecutor
-import time
-import os
 import json
+import os
+import time
 import pandas as pd
 from filelock import FileLock, Timeout
+from quantpilot.ai import news
+from quantpilot.config import settings
+from quantpilot.data import macro
 from quantpilot.data.collector import run as collect
 from quantpilot.data.history import backfill
-from quantpilot.simulation.worker import run_worker
-from quantpilot.config import settings
+from quantpilot.monitoring.process import process_started
+from quantpilot.research import forecaster
 from quantpilot.storage.database import database, initialize
 from quantpilot.storage.market import feed_status
-from quantpilot.monitoring.operations import next_paper_run
-from quantpilot.research import forecaster
-from quantpilot.data import macro
-from quantpilot.ai import news
-from quantpilot.monitoring.process import process_started
 
 
-def repeating_history():
-    engine=database(settings.market_database_url)
+def log(**fields):
+    print(json.dumps(fields, default=str), flush=True)
+
+
+def every(seconds, job, name):
+    """Run `job` forever, `seconds` apart; a failure is logged and never stops the thread."""
     while True:
-        try:backfill()
-        except Exception as exc:feed_status(engine,'history:overall',dict(status='blocked',error=str(exc)))
+        try:
+            job()
+        except Exception as exc:
+            log(**{name: 'blocked', 'error_type': type(exc).__name__, 'error': str(exc)[:200]})
+        time.sleep(seconds)
+
+
+def history():
+    # Resumable five-year backfill; fills any gap the live collector missed. Failures show on the System page.
+    engine = database(settings.market_database_url)
+    while True:
+        try:
+            backfill()
+        except Exception as exc:
+            feed_status(engine, 'history:overall', dict(status='blocked', error=str(exc)))
         time.sleep(1800)
 
 
 def news_feeds():
-    # Feed collection never waits on reasoning; Codex runs at most once per analysis interval.
-    while True:
-        try:news.run(reasoning=True)
-        except Exception as exc:print(json.dumps(dict(news='blocked',error_type=type(exc).__name__)),flush=True)
-        time.sleep(settings.news_poll_seconds)
-
-
-def news_layer():
-    # Rule engine news layer: article text (isolated Crawl4AI) and impact classification every 15 minutes.
-    # Its own thread: news.run() above never returns.
-    from quantpilot.ai import news_events
-    while True:
-        try:print(json.dumps(dict(news_events=news_events.cycle())),flush=True)
-        except Exception as exc:print(json.dumps(dict(news_events='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
-        time.sleep(900)
-
-
-def account_reviews():
-    # Four paper accounts (A8): Claude explanations of diagnosed trades and the review of every account that has
-    # paused after its round, every 5 minutes. Separate from the minute cycle so a slow Claude call never delays trading.
-    from quantpilot.accounts import review as account_review
-    from quantpilot.monitoring import model_health
-    engine=database(settings.market_database_url)
-    while True:
-        try:print(json.dumps(dict(account_reviews=account_review.run_pending(engine,pd.Timestamp.now(tz='UTC')))),flush=True)
-        except Exception as exc:print(json.dumps(dict(account_reviews='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
-        # A9 model health: written as a feed status so the dashboard and the logs show warnings.
-        try:
-            health=model_health.status(engine)
-            feed_status(engine,'rules:model-health',dict(status='healthy' if health['overall']=='OK' else 'degraded',
-                        overall=health['overall'],reasons=health['reasons'],checked_at=health['checked_at']))
-            print(json.dumps(dict(model_health=health['overall'])),flush=True)
-        except Exception as exc:print(json.dumps(dict(model_health='blocked',error=str(exc)[:200])),flush=True)
-        time.sleep(300)
+    # Feed collection never waits on reasoning; the AI analysis runs at most once per analysis interval.
+    every(settings.news_poll_seconds, lambda: news.run(reasoning=True), 'news')
 
 
 def macro_calendar():
-    # Official schedules change rarely; refresh daily and keep first-release values once stored.
-    while True:
-        try:macro.run()
-        except Exception as exc:print(json.dumps(dict(macro='blocked',error_type=type(exc).__name__)),flush=True)
-        time.sleep(3600)
+    # Official schedules change rarely; first-release values are kept once stored.
+    every(3600, macro.run, 'macro')
+
+
+def forward_research():
+    # Liquidations (stream) and order-book depth (1/min) exist only if recorded as they happen.
+    from quantpilot.data import forward
+    every(60, forward.run, 'forward_research')
 
 
 def shadow_forecasts():
-    # Research forecasts every 15 minutes (minutes 7/22/37/52, after the paper worker); refits once a day.
-    engine=database()
+    # Research forecasts every 15 minutes (minute 7 of each quarter hour); refits once a day.
+    engine = database()
     while True:
-        try:print(json.dumps(dict(forecasts=forecaster.run_cycle(engine)),default=str),flush=True)
-        except Exception as exc:print(json.dumps(dict(forecasts='blocked',error_type=type(exc).__name__)),flush=True)
-        now=pd.Timestamp.now(tz='UTC');target=now.floor('15min')+pd.Timedelta(minutes=7)
-        time.sleep(max(1,((target if target>now else target+pd.Timedelta(minutes=15))-now).total_seconds()))
+        try:
+            log(forecasts=forecaster.run_cycle(engine))
+        except Exception as exc:
+            log(forecasts='blocked', error_type=type(exc).__name__)
+        now = pd.Timestamp.now(tz='UTC')
+        target = now.floor('15min')+pd.Timedelta(minutes=7)
+        time.sleep(max(1, ((target if target > now else target+pd.Timedelta(minutes=15))-now).total_seconds()))
 
 
 def outlook_cycle():
-    # Hourly panel refresh + scheduled questions; scoring every 15 minutes.
-    from quantpilot.outlook import answers
+    # Hourly panel refresh and scheduled questions; answers are scored every 15 minutes.
     from quantpilot.api import services
-    from quantpilot.research.event_study import load_market
+    from quantpilot.outlook import answers
     from quantpilot.outlook.engine import refresh_panel
+    from quantpilot.research.event_study import load_market
     engine, last_refresh = database(), None
     while True:
         try:
@@ -97,90 +87,47 @@ def outlook_cycle():
                 answers.scheduled_cycle(engine, lambda text, ai, source: services.ask(text, ai=ai, source=source), now)
             recent = load_market(database(settings.market_database_url), now-pd.Timedelta(days=8), now)['candles']
             bars = recent.set_index('available_at')[['high', 'low', 'close']].astype(float)
-            print(json.dumps(dict(outlook=dict(scored=answers.evaluate(engine, bars, now)))), flush=True)
+            log(outlook=dict(scored=answers.evaluate(engine, bars, now)))
         except Exception as exc:
-            print(json.dumps(dict(outlook='blocked', error_type=type(exc).__name__)), flush=True)
+            log(outlook='blocked', error_type=type(exc).__name__)
         time.sleep(900)
 
 
-def forward_research():
-    # Liquidations (stream) and order-book depth (1/min) exist only if recorded as they happen.
-    from quantpilot.data import forward as forward_data
-    while True:
-        try:forward_data.run()
-        except Exception as exc:print(json.dumps(dict(forward_research='blocked',error_type=type(exc).__name__)),flush=True)
-        time.sleep(60)
-
-
-def rule_engine():
-    # Rule engine: one cycle a minute (5 s past): the reference futures-v1 paper account, then the four A8 accounts.
-    import httpx
-    from quantpilot.rules import live as rule_live
-    from quantpilot.rules import layers
-    from quantpilot.rules import rl_manage
-    engine=database(settings.market_database_url)
-    with httpx.Client(timeout=15) as client:
-        while True:
-            try:
-                out=rule_live.cycle(engine,client=client,layers=layers.live_layers(),modes=layers.modes(),
-                                    macro_events=macro.events(database()),news_events=layers.news_events(),
-                                    manager=rl_manage.live_manager())
-                print(json.dumps(dict(rules=dict(bars=out['bars'],triggers=out['triggers'],equity=out['equity'],
-                    action=(out['decision'] or {}).get('action'),diagnosed=out['diagnosed'],
-                    accounts=out.get('accounts')))),flush=True)
-            except Exception as exc:
-                print(json.dumps(dict(rules='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
-                try:feed_status(engine,'rules:engine',dict(status='blocked',error=str(exc)[:500]))
-                except Exception:pass
-            now=pd.Timestamp.now(tz='UTC');target=now.floor('min')+pd.Timedelta(seconds=65)
-            time.sleep(max(1,(target-now).total_seconds()))
-
-
 def analysis():
-    # Analysis app (A15): the snapshot every 5 minutes (a minute past each 5m close), then a Claude brief when due.
-    from quantpilot.analysis import ai as analysis_ai
-    from quantpilot.analysis import snapshot as analysis_snapshot
-    engine=database(settings.market_database_url)
+    # The analysis snapshot a minute past every 5m close, then Claude's brief when one is due.
+    from quantpilot.analysis import ai, snapshot
+    engine = database(settings.market_database_url)
     while True:
         try:
-            snap=analysis_snapshot.build(engine)
-            analysis_snapshot.save(engine,snap)
-            feed_status(engine,'analysis:snapshot',dict(status='healthy',built_at=snap['built_at'],data_time=snap['data_time']))
-            reason=analysis_ai.due(engine,snap)
-            brief=analysis_ai.write_brief(engine,snap,reason=reason) if reason else None
-            print(json.dumps(dict(analysis=snap['built_at'],brief=brief and brief['status'])),flush=True)
+            snap = snapshot.build(engine)
+            snapshot.save(engine, snap)
+            feed_status(engine, 'analysis:snapshot', dict(status='healthy', built_at=snap['built_at'], data_time=snap['data_time']))
+            reason = ai.due(engine, snap)
+            brief = ai.write_brief(engine, snap, reason=reason) if reason else None
+            log(analysis=snap['built_at'], brief=brief and brief['status'])
         except Exception as exc:
-            print(json.dumps(dict(analysis='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
-            try:feed_status(engine,'analysis:snapshot',dict(status='blocked',error=str(exc)[:500]))
-            except Exception:pass
-        now=pd.Timestamp.now(tz='UTC');target=now.floor('5min')+pd.Timedelta(minutes=6)
-        time.sleep(max(30,(target-now).total_seconds()))
-def jobs():
-    """The threads to run. Paper trading (old paper account, rule engine accounts, trade reviews) only when
-    `trading_enabled` is set; the owner switched it off on 2026-11-02 (A15). Everything else keeps running."""
-    out=[collect,repeating_history,news_feeds,macro_calendar,shadow_forecasts,outlook_cycle,forward_research,news_layer,analysis]
-    if settings.trading_enabled:out+=[paper,rule_engine,account_reviews]
-    return out
-def paper():
-    engine=database(settings.market_database_url)
-    while True:
-        try:
-            state=run_worker()
-            feed_status(engine,'paper:worker',dict(status='healthy',last_checkpoint=state.get('last_worker')))
-        except Exception as exc:feed_status(engine,'paper:worker',dict(status='blocked',error=str(exc)))
-        time.sleep(max(1,(next_paper_run()-pd.Timestamp.now(tz='UTC')).total_seconds()))
+            log(analysis='blocked', error_type=type(exc).__name__, error=str(exc)[:200])
+            try:
+                feed_status(engine, 'analysis:snapshot', dict(status='blocked', error=str(exc)[:500]))
+            except Exception:
+                pass
+        now = pd.Timestamp.now(tz='UTC')
+        time.sleep(max(30, (now.floor('5min')+pd.Timedelta(minutes=6)-now).total_seconds()))
 
 
-if __name__=='__main__':
-    settings.data_dir.mkdir(exist_ok=True,parents=True)
+JOBS = [collect, history, news_feeds, macro_calendar, forward_research, shadow_forecasts, outlook_cycle, analysis]
+
+
+if __name__ == '__main__':
+    settings.data_dir.mkdir(exist_ok=True, parents=True)
     try:
-        with FileLock(str(settings.data_dir/'data-supervisor.lock'),timeout=0):
-            (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=process_started())),encoding="utf-8")
+        with FileLock(str(settings.data_dir/'data-supervisor.lock'), timeout=0):
+            (settings.data_dir/'data-supervisor-runtime.json').write_text(
+                json.dumps(dict(pid=os.getpid(), started=process_started())), encoding='utf-8')
             initialize(database(settings.market_database_url))
             initialize(database())
-            run=jobs()
-            with ThreadPoolExecutor(max_workers=len(run)) as pool:
-                futures=[pool.submit(job) for job in run]
-                for future in futures:future.result()
+            with ThreadPoolExecutor(max_workers=len(JOBS)) as pool:
+                for future in [pool.submit(job) for job in JOBS]:
+                    future.result()
     except Timeout:
-        print('A data supervisor is already running.',flush=True)
+        print('A data supervisor is already running.', flush=True)

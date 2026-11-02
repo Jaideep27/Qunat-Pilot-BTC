@@ -16,12 +16,11 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Respon
 from starlette.routing import Route
 
 READS = frozenset({
-    'health', 'ready', 'operations', 'candles', 'indicators', 'positioning', 'sentiment', 'news', 'forecasts',
-    'strategy-research', 'rules', 'rules/journal', 'rules/research', 'rules/accounts', 'rules/model-health',
-    'rules/decisions', 'rules/account-trades', 'rules/reviews', 'rules/levels', 'macro', 'coverage', 'predictions',
-    'backtests', 'portfolio', 'decisions', 'market/storage', 'market/candles', 'market/studies',
-    # Analysis app (A15): reads only; the Claude explain/brief POSTs stay local-only.
-    'analysis/snapshot', 'analysis/catalogue', 'analysis/briefs', 'analysis/explanations'})
+    'health', 'ready', 'operations', 'candles', 'positioning', 'sentiment', 'news', 'forecasts', 'strategy-research',
+    'archive', 'macro', 'coverage', 'backtests', 'market/storage', 'market/candles', 'market/studies',
+    # The analysis app: reads only; the Claude explain/brief POSTs stay local-only.
+    'analysis/snapshot', 'analysis/levels', 'analysis/summary', 'analysis/catalogue', 'analysis/briefs',
+    'analysis/explanations'})
 MARKER = '<meta name="quantpilot-public" content="1"/>'
 HEADERS = {
     'Content-Security-Policy': "default-src 'self'; script-src 'self' https://s3.tradingview.com; "
