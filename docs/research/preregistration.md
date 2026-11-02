@@ -402,3 +402,13 @@ Two forward-only intraday families are registered now, before their data exists 
   - The Funding Collector's funding reading and the relative volume are recorded with every decision as context. They are not new trading rules.
 - **Retired:** the six accounts-v2 accounts and the four A8 accounts. Open paper positions are closed at their last price, and their journals stay.
 - **History:** the master's rule is A12 with parking off (one more trial, "X2-nopark"). It is post-hoc, so only the live record can judge it.
+
+**A15 — 2026-11-02, paper trading suspended; the project becomes an analysis app (owner's decision).**
+- The owner switched the project from trading to analysis. No account trades from this date:
+  - accounts-v4 has no accounts and retires `acct-master`;
+  - the rule engine's reference account and the old model's paper account are paused (`quantpilot retire-trading`);
+  - the trading threads (old paper worker, rule engine, trade reviews) stop unless `trading_enabled` is set.
+- Every journal, trade, review and research artifact stays. No new strategy is tested, so this amendment adds **no trials**.
+- The analysis app shows each indicator and strategy as a live read-out (what it says now) next to its existing history verdict. Read-outs are not trading signals and are not scored as trials.
+- Claude writes briefs and explanations from the snapshot's numbers only. They are labelled AI analysis, not advice, and are not used for any decision.
+- The holdout year (2025-10-20 → 2026-10-19) stays untouched.

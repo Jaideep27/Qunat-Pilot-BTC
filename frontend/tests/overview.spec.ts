@@ -29,16 +29,6 @@ async function open(page:Page,overrides:Record<string,unknown>={}){
   return asked;
 }
 
-test('home says plainly what the market is doing, with no research jargon',async({page})=>{
-  await open(page);
-  const market=page.getByRole('region',{name:'Market now'});
-  await expect(market).toContainText('moving sideways');
-  await expect(market).toContainText('about a coin flip (51% up)');
-  await expect(market).toContainText('FOMC rate decision');
-  await expect(market).not.toContainText('Brier');
-  await expect(page.getByRole('region',{name:'Latest headlines'})).toContainText('Bitcoin climbs as ETF flows return');
-});
-
 test('the top-bar ask box jumps to Ask with an instant quant answer',async({page})=>{
   const asked=await open(page);
   await page.keyboard.press('/');
@@ -59,8 +49,9 @@ test('glossary terms explain themselves on hover',async({page})=>{
 });
 
 test('a malformed response shows a message instead of blanking the app',async({page})=>{
-  await open(page,{forecasts:{latest:'not a list'}});
-  await expect(page.getByRole('status').filter({hasText:'could not be displayed'})).toBeVisible();
+  await open(page,{snapshot:'not an object',briefs:{briefs:'not a list'}});
+  await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible({timeout:30000});
+  await expect(page.getByText('No analysis yet')).toBeVisible();
   await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^System/}).click();
   await expect(page.getByRole('heading',{name:'System health',level:1})).toBeVisible({timeout:30000});
 });

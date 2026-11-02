@@ -26,6 +26,7 @@ def main():
     history.add_argument('--years',type=int,choices=range(1,16),default=None)
     history.add_argument('--all-history',action='store_true',help='Explicitly request all source history instead')
     sub.add_parser('market-coverage',help='Report exact five-year candle coverage from PostgreSQL')
+    sub.add_parser('retire-trading',help='A15: retire every paper account and pause the reference and old paper accounts')
     status=sub.add_parser('status',help='Read worker-run evidence, forward-paper totals and readiness')
     status.add_argument('--limit',type=int,choices=range(1,101),default=20)
     sub.add_parser('doctor',help='Read-only local database, service-version and readiness checks')
@@ -261,6 +262,23 @@ def main():
                 'reason':str(exc) if isinstance(exc,RecoveryError) else 'Recovery operation failed; inspect local database/tool availability'}))
             raise SystemExit(2) from None
         print(json.dumps(result,indent=2,default=str))
+    elif args.command == 'retire-trading':
+        import pandas as pd
+        from quantpilot.accounts import config as accounts_config, styles_live
+        from quantpilot.rules import journal as rule_journal, live as rule_live
+        from quantpilot.simulation.worker import control
+        engine = database(settings.market_database_url)
+        initialize(engine)
+        now = pd.Timestamp.now(tz='UTC')
+        cfg = accounts_config.load()
+        styles_live.retire(engine, cfg['retired'], now)          # closes any open paper position, keeps the journal
+        ref = rule_journal.load_account(engine, rule_live.ACCOUNT_ID)
+        if ref is not None:
+            ref['futures']['paused'], ref['suspended_at'] = True, now.isoformat()
+            rule_journal.save_account(engine, rule_live.ACCOUNT_ID, ref, now)
+        control(True)                                            # the old model's paper ledger: an owner pause event
+        print(json.dumps(dict(retired=[a for a in cfg['retired'] if (rule_journal.load_account(engine, a) or {}).get('status') == 'RETIRED'],
+                              reference_paused=ref is not None, old_paper_paused=True), indent=2))
     elif args.command == 'status':
         from quantpilot.api import services
         result=services.operations(args.limit)

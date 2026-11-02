@@ -1,0 +1,9 @@
+# accounts-v4 (A15, 2026-11-02): paper trading switched off by the owner. The project is now an analysis app.
+# No account trades. Every earlier account is retired; their journals, trades and reviews are kept.
+# Turning trading back on needs the owner, a new accounts version and a new amendment. Paper money only.
+version: 4
+round_length: 30
+floor: 5000.0
+balance: 10000.0
+retired: [acct-a, acct-b, acct-c, acct-d, acct-combined, acct-trend-bot, acct-trend, acct-range, acct-breakout, acct-carry, acct-master]
+accounts: []

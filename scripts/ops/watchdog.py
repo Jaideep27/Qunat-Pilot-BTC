@@ -42,7 +42,7 @@ def probes(state, now):
     import httpx
     p = dict(ready=None, engine_at=None, candle_age_s=None, model=None)
     try:
-        ready = httpx.get('http://127.0.0.1:8000/api/v1/ready', timeout=10).json()['data']
+        ready = httpx.get('http://127.0.0.1:8000/api/v1/ready', timeout=60)   # the laptop can be slow when memory is short.json()['data']
         p['ready'] = ready
         p['candle_age_s'] = ((ready.get('checks') or {}).get('completed_candles') or {}).get('age_seconds')
     except Exception:
@@ -53,14 +53,18 @@ def probes(state, now):
         from quantpilot.storage.database import database
         engine = database(settings.market_database_url)
         with engine.connect() as connection:
+            # A15: with paper trading off, the analysis snapshot (every 5 minutes) is the engine heartbeat.
+            beat = 'rules:engine' if settings.trading_enabled else 'analysis:snapshot'
             feeds = dict(connection.execute(select(MarketFeed.id, MarketFeed.updated_at)
-                                            .where(MarketFeed.id.in_(['rules:engine', 'rules:model-health']))).all())
+                                            .where(MarketFeed.id.in_([beat, 'rules:model-health']))).all())
             health = connection.execute(select(MarketFeed.state).where(MarketFeed.id == 'rules:model-health')).scalar()
         engine.dispose()
-        if feeds.get('rules:engine') is not None:
-            t = pd.Timestamp(feeds['rules:engine'])
+        if feeds.get(beat) is not None:
+            t = pd.Timestamp(feeds[beat])
             p['engine_at'] = t.tz_localize('UTC') if t.tzinfo is None else t
-        p['model'] = (health or {}).get('overall')
+        if not settings.trading_enabled:
+            p['engine_window'], p['engine_name'] = pd.Timedelta(minutes=15), 'The data and analysis engine'
+        p['model'] = (health or {}).get('overall') if settings.trading_enabled else None
     except Exception:
         pass
     p['disk_gb'] = shutil.disk_usage(ROOT).free/1e9

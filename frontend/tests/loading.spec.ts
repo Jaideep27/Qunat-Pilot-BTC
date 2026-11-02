@@ -24,7 +24,7 @@ test('overview avoids downloading research and portfolio until their views are o
   await page.getByText('Original release model (2026)').click();
   await expect(page.getByText('Research has not been released')).toBeVisible();
   expect(requested).not.toContain('portfolio');
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Old paper account/}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Old paper account/}).click();
   await expect.poll(()=>requested.includes('portfolio')).toBe(true);
   await expect(page.getByRole('heading',{name:'Execution ledger'})).toBeVisible();
 });

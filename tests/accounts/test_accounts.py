@@ -82,7 +82,12 @@ def test_v2_config_runs_four_different_styles_and_retires_the_a8_accounts():
 
 
 def test_v3_is_one_master_account_and_retires_every_other():
-    v3 = accounts.load()
+    v3 = accounts.load(accounts.V3)            # A14 (retired by A15; still loadable)
     assert v3['version'] == 3 and [(a['id'], a['style'], a['park']) for a in v3['accounts']] == [('acct-master', 'X2', False)]
     assert set(v3['retired']) == {'acct-a', 'acct-b', 'acct-c', 'acct-d', 'acct-combined', 'acct-trend-bot', 'acct-trend',
                                    'acct-range', 'acct-breakout', 'acct-carry'}
+
+
+def test_v4_has_no_accounts_and_retires_the_master_too():
+    v4 = accounts.load()                       # A15: trading switched off
+    assert v4['version'] == 4 and v4['accounts'] == [] and len(v4['retired']) == 11 and 'acct-master' in v4['retired']

@@ -12,7 +12,7 @@ test('trained release renders real market, prediction, research and paper eviden
   await page.screenshot({path:'test-results/release-market.png',fullPage:true});
   const predictionResponse=page.waitForResponse(response=>response.url().endsWith('/api/v1/predictions')&&response.status()===200);
   const portfolioResponse=page.waitForResponse(response=>response.url().endsWith('/api/v1/portfolio')&&response.status()===200);
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Old paper account/}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Old paper account/}).click();
   const decision=(await (await predictionResponse).json()).data;
   await expect(page.getByRole('heading',{name:'Decision gates'})).toBeVisible();
   const reasons=decision.reasons.length?decision.reasons:['ALL_GATES_PASSED'];

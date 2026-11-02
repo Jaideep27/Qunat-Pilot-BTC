@@ -136,6 +136,31 @@ def rule_engine():
             time.sleep(max(1,(target-now).total_seconds()))
 
 
+def analysis():
+    # Analysis app (A15): the snapshot every 5 minutes (a minute past each 5m close), then a Claude brief when due.
+    from quantpilot.analysis import ai as analysis_ai
+    from quantpilot.analysis import snapshot as analysis_snapshot
+    engine=database(settings.market_database_url)
+    while True:
+        try:
+            snap=analysis_snapshot.build(engine)
+            analysis_snapshot.save(engine,snap)
+            feed_status(engine,'analysis:snapshot',dict(status='healthy',built_at=snap['built_at'],data_time=snap['data_time']))
+            reason=analysis_ai.due(engine,snap)
+            brief=analysis_ai.write_brief(engine,snap,reason=reason) if reason else None
+            print(json.dumps(dict(analysis=snap['built_at'],brief=brief and brief['status'])),flush=True)
+        except Exception as exc:
+            print(json.dumps(dict(analysis='blocked',error_type=type(exc).__name__,error=str(exc)[:200])),flush=True)
+            try:feed_status(engine,'analysis:snapshot',dict(status='blocked',error=str(exc)[:500]))
+            except Exception:pass
+        now=pd.Timestamp.now(tz='UTC');target=now.floor('5min')+pd.Timedelta(minutes=6)
+        time.sleep(max(30,(target-now).total_seconds()))
+def jobs():
+    """The threads to run. Paper trading (old paper account, rule engine accounts, trade reviews) only when
+    `trading_enabled` is set; the owner switched it off on 2026-11-02 (A15). Everything else keeps running."""
+    out=[collect,repeating_history,news_feeds,macro_calendar,shadow_forecasts,outlook_cycle,forward_research,news_layer,analysis]
+    if settings.trading_enabled:out+=[paper,rule_engine,account_reviews]
+    return out
 def paper():
     engine=database(settings.market_database_url)
     while True:
@@ -153,8 +178,9 @@ if __name__=='__main__':
             (settings.data_dir/'data-supervisor-runtime.json').write_text(json.dumps(dict(pid=os.getpid(),started=process_started())),encoding="utf-8")
             initialize(database(settings.market_database_url))
             initialize(database())
-            with ThreadPoolExecutor(max_workers=11) as pool:
-                futures=[pool.submit(collect),pool.submit(repeating_history),pool.submit(paper),pool.submit(news_feeds),pool.submit(macro_calendar),pool.submit(shadow_forecasts),pool.submit(outlook_cycle),pool.submit(forward_research),pool.submit(rule_engine),pool.submit(news_layer),pool.submit(account_reviews)]
+            run=jobs()
+            with ThreadPoolExecutor(max_workers=len(run)) as pool:
+                futures=[pool.submit(job) for job in run]
                 for future in futures:future.result()
     except Timeout:
         print('A data supervisor is already running.',flush=True)

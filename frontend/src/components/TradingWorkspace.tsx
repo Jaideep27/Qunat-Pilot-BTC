@@ -5,6 +5,10 @@ import {request,preview,type Candle} from '../lib/api';
 import {subscribeKlines,type LiveTick,type LiveState} from '../lib/liveFeed';
 import '../styles/workspace.css';
 import TradingViewPanel from './TradingViewPanel';
+import {ExplainBox} from './analysis';
+
+// The analysis snapshot reads 15m/1h/4h/1d; the nearest one explains the other chart timeframes.
+const ANALYSIS_TF:Record<string,string>={'5m':'15m','15m':'15m','30m':'1h','1h':'1h','4h':'4h','1d':'1d','1w':'1d'};
 
 type Study={id:string;label:string;pane:'overlay'|'oscillator'};
 type Studies={catalogue:Study[];series:Record<string,{time:number;value:number}[]>;definitions?:string};
@@ -233,6 +237,7 @@ export default function TradingWorkspace(){
           Last database observation: {feed?.state.last_persisted_at||bars.at(-1)?.received_at?new Date(feed?.state.last_persisted_at??bars.at(-1)!.received_at!).toLocaleTimeString():'Waiting'}<br/>
           PostgreSQL writes run independently, targeting every {feed?.state.poll_interval_seconds??5} seconds. Completed candles remain the indicator and prediction inputs.</small><hr/>
         <h3>Active indicators</h3>{selected.map((id,i)=><button className="study-chip" key={id} onClick={()=>setSelected(old=>old.filter(v=>v!==id))}><i style={{background:colors[i%colors.length]}}/>{study.catalogue.find(s=>s.id===id)?.label??id} ×</button>)}
+        <ExplainBox key={timeframe+selected.join()} kind="chart" refId={ANALYSIS_TF[timeframe]??'1h'} timeframe={ANALYSIS_TF[timeframe]??'1h'} studies={selected} label="Explain this chart"/><hr/>
         <h3>Saved drawings ({drawings.length})</h3><p>{pending.length?'Click the second anchor.':tool==='cursor'?'Scroll and drag to explore.':'Click on the price pane to draw.'}</p>
         <button onClick={()=>void loadRef.current(true)} disabled={busy||!bars.length}>Load older candles</button><button onClick={exportCSV} disabled={!bars.length}>Export candles CSV</button><button onClick={screenshot}>Save chart PNG</button>
         <small>Drawings and selected studies are saved in this browser. Market history and live candles are persisted in PostgreSQL. Research remains on its frozen dataset.</small></aside></div>

@@ -80,8 +80,11 @@ def report(engine,market_engine=None,limit=20,now=None,model_version=None,covera
         recent=connection.execute(select(WorkerRun.__table__).order_by(WorkerRun.started_at.desc()).limit(100)).mappings().all()
         totals=dict(connection.execute(select(WorkerRun.status,func.count()).group_by(WorkerRun.status)).all())
     with market_engine.connect() as connection:
-        last_bar=connection.execute(select(func.max(MarketCandle.available_at)).where(
-            MarketCandle.market==PERP,MarketCandle.complete.is_(True),MarketCandle.available_at<=now.to_pydatetime())).scalar()
+        # Newest completed 5m candle via the (market, interval, event_time) index: a max() over available_at
+        # scanned the whole table and took 5-50 s when the laptop was short of memory (watchdog timeouts).
+        last_bar=connection.execute(select(MarketCandle.available_at).where(
+            MarketCandle.market==PERP,MarketCandle.interval=='5m',MarketCandle.complete.is_(True),
+            MarketCandle.available_at<=now.to_pydatetime()).order_by(MarketCandle.event_time.desc()).limit(1)).scalar()
         feed=connection.execute(select(MarketFeed.__table__).where(MarketFeed.id=='live:collector')).mappings().first()
     checkpoint_age=age(state.get('last_worker'));latest=recent[0] if recent else None
     worker='never_run' if checkpoint_age is None else ('healthy' if checkpoint_age<=settings.worker_max_age_seconds else 'stale')
@@ -103,6 +106,8 @@ def report(engine,market_engine=None,limit=20,now=None,model_version=None,covera
         'model':dict(ok=bool(model_version),status='released' if model_version else 'unreleased'),
         'coverage':dict(ok=bool(coverage_ready),status='eligible' if coverage_ready else 'blocked')}
     checks['prediction_inputs']=dict(ok=inputs_ready,status='observed' if inputs_ready else 'unavailable_or_blocked')
+    if not settings.trading_enabled:   # A15: paper trading switched off by the owner; these no longer gate readiness
+        for key in ('paper_worker','run_monitoring','prediction_inputs'):checks[key]=dict(checks[key],ok=True,status='switched_off')
     durations=[row['duration_seconds'] for row in recent if row['status']=='succeeded' and row['duration_seconds'] is not None]
     runs=[]
     for row in recent[:limit]:

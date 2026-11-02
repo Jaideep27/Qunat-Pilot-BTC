@@ -1,6 +1,8 @@
 # QuantPilot BTC
 
-**A research and paper-trading platform for Bitcoin perpetual futures. It collects market data around the clock, runs a rule-based trading engine and four paper accounts live, monitors its own models, and reports every result honestly, including the negative ones.**
+**A Bitcoin analysis app. It collects market data around the clock, reads every indicator and strategy on completed candles, explains what they say in plain words, and has Claude write market briefs and on-demand explanations. Every research result is reported honestly, including the negative ones.**
+
+> **Since 2026-11-02 (amendment A15) nothing trades.** The owner switched the project from paper trading to analysis because no strategy proved an edge after costs. The rule engine, paper accounts and their journals are kept and archived. See [docs/analysis-app.md](docs/analysis-app.md).
 
 > **Paper trading only.** QuantPilot has no exchange order endpoints and no trading keys, and it cannot place a real order. Write endpoints answer only on the local machine. This is a research project, not financial advice.
 

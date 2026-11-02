@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     ask_daily_limit: int = Field(100, ge=1, le=1000)
     chat_daily_limit: int = Field(100, ge=1, le=1000)
     ask_scheduled_ai_per_day: int = Field(6, ge=0, le=48)
+    # Analysis app (A15, 2026-11-02): paper trading is switched off by the owner; the code and journals are kept.
+    trading_enabled: bool = False
+    # Claude on the subscription: automatic market briefs (light) and on-demand "Explain this" (deeper).
+    analysis_brief_model: str = 'claude-haiku-5-5'
+    analysis_explain_model: str = 'claude-sonnet-5-5'
+    analysis_effort: str = 'low'
+    analysis_brief_hours: int = Field(4, ge=1, le=24)
+    analysis_explain_per_hour: int = Field(30, ge=1, le=200)
     api_base: str = 'http://127.0.0.1:8000'
     cors_origins: list[str] = ['http://localhost:5173']
 

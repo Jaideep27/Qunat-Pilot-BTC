@@ -39,24 +39,6 @@ async function mock(page:Page,posted:string[]=[]){
   });
 }
 
-test('home lists every bot with its money and what it is doing, and a tap opens it',async({page})=>{
-  await mock(page);
-  await page.goto('/');
-  await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible({timeout:30000});
-  const list=page.getByRole('region',{name:'Your bots'});
-  for(const name of ['Combined Bot','Trend-Led Bot','Trend Rider','Range Trader','Breakout Hunter','Funding Collector'])await expect(list).toContainText(name);
-  await expect(list).toContainText('$10,123.40');
-  await expect(list).toContainText('Paused for review');
-  await expect(list).toContainText('Earning funding');
-  await expect(page.getByRole('region',{name:'Market now'})).toContainText('about a coin flip');
-  await list.getByRole('button',{name:'Open Trend Rider'}).click();
-  await expect(page.getByRole('heading',{name:'Bots',level:1})).toBeVisible();
-  const card=page.getByRole('region',{name:'Account Trend Rider'});
-  await expect(card).toContainText('Long 0.1 BTC');
-  await expect(card).toContainText('no fixed target');
-  await expect(card).toContainText('stop first 31%');
-});
-
 test('the bots page shows one bot at a time with its rules and history folded away',async({page})=>{
   await mock(page);
   await page.goto('/#bots');
@@ -113,29 +95,6 @@ test('the public view is read-only: no resume, no Ask, and it says so',async({pa
   expect(posted).toEqual([]);
 });
 
-test('more lists the other pages and opens them',async({page})=>{
-  await mock(page);
-  await page.goto('/#more');
-  const more=page.getByRole('list',{name:'More pages'});
-  for(const name of ['Ask','News','Research','Rule engine','System'])await expect(more).toContainText(name);
-  await more.getByRole('button',{name:/Research/}).click();
-  await expect(page).toHaveURL(/#research$/);
-  await expect(page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'More'})).toHaveAttribute('aria-current','page');
-});
-
-test('home and bots fit a phone screen with four tabs',async({page})=>{
-  await mock(page);
-  await page.setViewportSize({width:375,height:812});
-  for(const hash of ['#overview','#bots','#more']){
-    await page.goto('/'+hash);
-    await expect(page.getByRole('heading',{level:1})).toBeVisible({timeout:30000});
-    const width=await page.evaluate(()=>({doc:document.documentElement.clientWidth,scroll:document.scrollingElement!.scrollWidth}));
-    expect(width.scroll,hash).toBeLessThanOrEqual(width.doc+1);
-  }
-  const nav=page.getByRole('navigation',{name:'Main navigation'});
-  for(const tab of ['Home','Bot','Chart','More'])await expect(nav.getByRole('button',{name:tab})).toBeVisible();
-});
-
 test('one master bot: no picker, and every advisor says what it tells the master',async({page})=>{
   const master={accounts:[bot('acct-master','Master Bot','X2',{active:{on:true,reason:'On: the daily trend is up; it waits for another strategy or support to time a long.'},
     members:{regime:'TREND_UP',vote:1,leaders:['T1'],hedge:false,range_trader:'Off: the market is trend up, and Range Trader only trades sideways markets.',
@@ -155,6 +114,4 @@ test('one master bot: no picker, and every advisor says what it tells the master
   await expect(advisors).toContainText('double volume');
   await expect(advisors).toContainText('Funding about +8.8% a year');
   await expect(advisors).toContainText('1.4× the usual');
-  await page.goto('/');
-  await expect(page.getByRole('region',{name:'Your bot'})).toContainText('Master Bot');
 });

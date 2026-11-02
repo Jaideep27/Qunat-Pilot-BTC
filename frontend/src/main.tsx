@@ -6,9 +6,13 @@ import {preview,publicView,type Candle} from './lib/api';
 import {subscribeKlines} from './lib/liveFeed';
 import {Boundary,Loading,money,signedPct,useFlash,useResource} from './components/ui';
 import './styles/styles.css';
+import './styles/analysis.css';
 
 const Overview=lazy(()=>import('./pages/Overview'));
 const Bots=lazy(()=>import('./pages/Bots'));
+const Indicators=lazy(()=>import('./pages/Indicators'));
+const Strategies=lazy(()=>import('./pages/Strategies'));
+const Archive=lazy(()=>import('./pages/Archive'));
 const More=lazy(()=>import('./pages/More'));
 const TradingWorkspace=lazy(()=>import('./components/TradingWorkspace'));
 const Ask=lazy(()=>import('./pages/Ask'));
@@ -118,7 +122,7 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
 }
 
 // Fetch the other pages' code once the first page is idle, so switching tabs is instant.
-const prefetch=()=>[()=>import('./pages/Bots'),()=>import('./pages/More'),()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/Paper'),()=>import('./pages/Rules'),()=>import('./pages/News'),
+const prefetch=()=>[()=>import('./pages/Indicators'),()=>import('./pages/Strategies'),()=>import('./pages/Archive'),()=>import('./pages/More'),()=>import('./pages/Research'),()=>import('./pages/Ask'),()=>import('./pages/Paper'),()=>import('./pages/Rules'),()=>import('./pages/News'),
   ()=>import('./pages/System'),()=>import('./components/TradingWorkspace')].forEach(load=>void load().catch(()=>{}));
 
 function App(){
@@ -160,7 +164,7 @@ function App(){
         {tabs.map((r,i)=>{const Icon=r.icon;const on=tabOf(route)===r.id;return <button key={r.id} type="button" aria-label={r.label}
           aria-current={on?'page':undefined} className={on?'active':''} onClick={()=>go(r.id)} title={`${r.label} · Alt+${i+1}`}>
           <Icon size={18} aria-hidden/><span>{r.label}</span></button>})}</div>
-      <div className="sidebar-foot"><span className="pill pill-accent">Paper only</span><small>Research & simulation. No real-money execution.</small></div>
+      <div className="sidebar-foot"><span className="pill pill-accent">Analysis only</span><small>Research and explanation. No trading, no real money.</small></div>
       <button type="button" className="nav-collapse" onClick={()=>setNarrow(n=>!n)} aria-label={narrow?'Expand sidebar':'Collapse sidebar'}
         title={narrow?'Expand sidebar':'Collapse sidebar'}>{narrow?<ChevronsRight size={16}/>:<ChevronsLeft size={16}/>}</button>
     </nav>
@@ -177,6 +181,9 @@ function App(){
         <Boundary key={route} name="This page"><Suspense fallback={<Loading lines={6}/>}>
           <div className="page-enter">
             {route==='overview'&&<Overview go={go} ask={ask}/>}
+            {route==='indicators'&&<Indicators/>}
+            {route==='strategies'&&<Strategies/>}
+            {route==='archive'&&<Archive go={go}/>}
             {route==='bots'&&<Bots/>}
             {route==='more'&&<More go={go}/>}
             {route==='chart'&&<><div className="page-head"><div><h1>Chart</h1><p>Live Bitcoin price with indicators and drawing tools.</p></div></div><TradingWorkspace/></>}

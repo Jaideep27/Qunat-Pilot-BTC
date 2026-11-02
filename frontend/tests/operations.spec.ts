@@ -44,7 +44,7 @@ test('monitoring outages are retryable and do not hide the paper ledger',async({
   await expect(page.getByText('MONITOR UNAVAILABLE',{exact:true})).toBeVisible();
   options.available=true;await page.getByRole('button',{name:'Retry monitor',exact:true}).click();
   await expect(page.getByRole('table',{name:'Recorded paper worker runs'})).toBeVisible();
-  options.available=false;await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Old paper account/}).click();
+  options.available=false;await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Old paper account/}).click();
   await expect(page.getByRole('heading',{name:'Execution ledger'})).toBeVisible();
 });
 

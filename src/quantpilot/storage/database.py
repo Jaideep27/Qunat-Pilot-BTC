@@ -44,6 +44,7 @@ def initialize(engine):
     from quantpilot.rules import journal  # noqa: F401  register the rule engine journal
     from quantpilot.accounts import journal as account_journal  # noqa: F401  register the four paper accounts (A8)
     from quantpilot.ai import news_events  # noqa: F401  register crawled articles and news classifications
+    from quantpilot.analysis import snapshot as analysis_snapshot, ai as analysis_ai  # noqa: F401  analysis app (A15)
     with serialized(engine) as session:
         Base.metadata.create_all(session.connection())
         if engine.dialect.name == "postgresql":

@@ -5,7 +5,7 @@ test('market to prediction to research to paper audit, with honest unreleased st
   await expect(page.getByText('INTERFACE PREVIEW',{exact:false})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Home',level:1})).toBeVisible();
   await expect(page.getByRole('img',{name:'BTCUSDT five-minute candlestick and volume chart'})).toBeVisible();
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Old paper account/}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Old paper account/}).click();
   await expect(page.getByRole('heading',{name:'Decision gates'})).toBeVisible();
   await expect(page.getByText('MODEL RELEASE BLOCKED',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Research/}).click();
@@ -13,7 +13,7 @@ test('market to prediction to research to paper audit, with honest unreleased st
   await expect(page.getByText('Research has not been released')).toBeVisible();
   await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^System/}).click();
   await expect(page.getByText('Historical coverage',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Old paper account/}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Old paper account/}).click();
   await expect(page.getByRole('heading',{name:'Execution ledger'})).toBeVisible();
   await expect(page.getByText('No fills recorded')).toBeVisible();
   await expect(page.getByText('$10,000.00')).toBeVisible();

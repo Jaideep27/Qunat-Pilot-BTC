@@ -188,3 +188,12 @@ def test_unreadable_dump_is_rejected(tmp_path):
 def test_missing_offsite_folder_is_reported_not_fatal(tmp_path):
     out = _backup(tmp_path, FakeRun(), offsite=False)
     assert out['ok'] and out['offsite'] == 'missing'
+
+
+def test_the_analysis_engine_gets_its_own_heartbeat_window_and_name():
+    """A15: the analysis snapshot reports every 5 minutes, so the watchdog allows 15 before calling it down."""
+    p = dict(HEALTHY, engine_at=NOW-pd.Timedelta(minutes=9), engine_window=pd.Timedelta(minutes=15),
+             engine_name='The data and analysis engine')
+    assert ops.check(p, NOW) == []
+    late = ops.check(dict(p, engine_at=NOW-pd.Timedelta(minutes=16)), NOW)
+    assert [x['key'] for x in late] == ['engine'] and late[0]['text'].startswith('The data and analysis engine')

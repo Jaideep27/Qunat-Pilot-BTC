@@ -243,3 +243,65 @@ def chat_thread_route(thread_id: str):
     if result['data'] is None:
         raise HTTPException(status_code=404, detail='Unknown chat thread')
     return result
+
+
+# ---- analysis app (A15) ---------------------------------------------------------------------------------------------
+
+@app.get('/api/v1/analysis/snapshot')
+def analysis_snapshot_route():
+    return services.analysis_snapshot()
+
+
+@app.get('/api/v1/analysis/catalogue')
+def analysis_catalogue_route():
+    return services.analysis_catalogue()
+
+
+@app.get('/api/v1/analysis/briefs')
+def analysis_briefs_route(limit: Annotated[int, Query(ge=1, le=20)] = 5):
+    return services.analysis_briefs(limit)
+
+
+AnalysisKind = Literal['indicator', 'strategy', 'news', 'chart']
+Timeframe = Literal['15m', '1h', '4h', '1d']
+
+
+@app.get('/api/v1/analysis/explanations')
+def analysis_explanations_route(kind: AnalysisKind, ref: Annotated[str, Query(min_length=1, max_length=80)],
+                                timeframe: Timeframe | None = None):
+    return services.analysis_explanation(kind, ref, timeframe)
+
+
+class ExplainBody(BaseModel):
+    kind: AnalysisKind
+    ref: str = Field(min_length=1, max_length=80)
+    timeframe: Timeframe | None = None
+    studies: list[Annotated[str, Field(max_length=40)]] = Field(default_factory=list, max_length=12)
+
+
+@app.post('/api/v1/analysis/explain')
+def analysis_explain_route(body: ExplainBody, request: Request):
+    # Uses the owner's Claude subscription: this computer only, never the public gateway.
+    local_only(request)
+    from quantpilot.analysis.ai import RateLimited
+    try:
+        return services.analysis_explain(body.kind, body.ref, body.timeframe, body.studies)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except RateLimited as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from None
+    except Exception as exc:
+        if type(exc).__name__ == 'UsageLimitReached':
+            raise HTTPException(status_code=429, detail='Claude usage limit reached; try again later.') from None
+        raise HTTPException(status_code=502, detail='Claude could not write an explanation right now.') from None
+
+
+@app.post('/api/v1/analysis/brief')
+def analysis_brief_route(request: Request):
+    local_only(request)
+    try:
+        return services.analysis_brief_now()
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from None

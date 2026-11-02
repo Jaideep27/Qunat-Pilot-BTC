@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import {request,type Envelope} from '../lib/api';
+import {ExplainBox} from './analysis';
 
 type News={items:{id:string;title:string;url:string;source:string;available_at:string;published_at:string|null;excerpt:string}[];
   feeds:{source:string;status:string;checked_at:string}[];
@@ -21,15 +22,16 @@ export default function NewsPanel(){
     load();const timer=setInterval(load,60000);return()=>{alive=false;clearInterval(timer);};},[]);
   const d=value?.data;
   return <section className="panel" aria-label="News evidence">
-    <div className="panel-heading"><h2>News & macro evidence</h2><span className="subtle-tag">SHADOW RESEARCH</span></div>
+    <div className="panel-heading"><h2>News & macro evidence</h2><span className="subtle-tag">AI ANALYSIS</span></div>
     {error&&<p role="status">{error}</p>}
     {!d&&!error&&<p>Loading news evidence...</p>}
-    {d&&<><p className="panel-source">{d.scope} News reasoning does not change the released trading policy.</p>
+    {d&&<><p className="panel-source">{d.scope} News analysis is explanation only; nothing here trades.</p>
       <div className="indicator-list">{(d.feeds??[]).map(f=><div key={f.source}><span>{f.source}</span><strong>{f.status} · {new Date(f.checked_at).toLocaleString()}</strong></div>)}</div>
       {!(d.items??[]).length&&<p>No news collected yet. Sentiment is unavailable until verified observations arrive.</p>}
       {(d.items??[]).slice(0,12).map(i=><article key={i.id} className='news-item'>
         <a href={/^https?:\/\//.test(i.url)?i.url:undefined} target="_blank" rel="noreferrer">{i.title}</a>
         <p>{i.excerpt}</p><small>{i.source} · Collected {new Date(i.available_at).toLocaleString()} · Publication {i.published_at?new Date(i.published_at).toLocaleString():'unknown'}</small>
+        <ExplainBox kind="news" refId={i.id} label="Explain the impact"/>
       </article>)}
       <h3>Agent analysis</h3>
       {d.providers&&<ul aria-label="News reasoners" className="operations-checks">{Object.entries(d.providers).map(([name,p])=>

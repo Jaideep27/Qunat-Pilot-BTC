@@ -38,10 +38,11 @@ def check(p, now):
     if not ready or not ready.get('ready'):
         out.append(dict(key='api', restart=True, text='The QuantPilot server is not responding.'))
     engine_at = p.get('engine_at')
-    engine_ok = engine_at is not None and now-pd.Timestamp(engine_at) <= ENGINE_STALE
+    window = p.get('engine_window') or ENGINE_STALE      # the analysis engine reports every 5 minutes (A15)
+    engine_ok = engine_at is not None and now-pd.Timestamp(engine_at) <= window
     if not engine_ok:
         since = 'has never reported' if engine_at is None else f'has not reported for {_minutes(now-pd.Timestamp(engine_at))} minutes'
-        out.append(dict(key='engine', restart=True, text=f'The trading and data engine {since}.'))
+        out.append(dict(key='engine', restart=True, text=f"{p.get('engine_name') or 'The trading and data engine'} {since}."))
     age = p.get('candle_age_s')
     if engine_ok and age is not None and age > DATA_STALE_S:
         out.append(dict(key='data', restart=False, text=f'Market data is {int(age//60)} minutes old (the exchange feed may be down).'))

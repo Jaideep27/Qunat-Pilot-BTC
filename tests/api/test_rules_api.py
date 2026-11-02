@@ -39,7 +39,15 @@ def test_rules_endpoints_after_cycles(account):
         assert levels['overlay']['vwap'] > 0 and levels['markers']
 
 
-def test_the_accounts_endpoint_shows_one_master_bot_with_its_advisors(account):
+@pytest.fixture
+def v3(monkeypatch):
+    """The A14 one-Master-Bot config (retired by A15): its account view still works if trading is switched back on."""
+    from quantpilot.accounts import config as accounts_config
+    original = accounts_config.load
+    monkeypatch.setattr(accounts_config, 'load', lambda path=accounts_config.V3: original(path))
+
+
+def test_the_accounts_endpoint_shows_one_master_bot_with_its_advisors(account, v3):
     with TestClient(app) as client:
         data = client.get('/api/v1/rules/accounts').json()['data']
     assert [a['id'] for a in data['accounts']] == ['acct-master']
@@ -52,7 +60,7 @@ def test_the_accounts_endpoint_shows_one_master_bot_with_its_advisors(account):
     assert len(data['retired']) == 10 and {r['id'] for r in data['retired']} >= {'acct-carry', 'acct-combined', 'acct-a'}
 
 
-def test_the_master_shows_its_open_trade_with_the_time_machine_and_its_advisors(account):
+def test_the_master_shows_its_open_trade_with_the_time_machine_and_its_advisors(account, v3):
     from quantpilot.rules import journal
     from quantpilot.strategies import bot
     hit = 'X2:2026-11-01T00:00:00+00:00'
@@ -100,3 +108,9 @@ def test_model_health_endpoint(account):
     assert body['data']['overall'] in ('OK', 'WATCH', 'ALARM') and body['data']['reasons']
     assert {'card', 'calibration', 'drift', 'data_checks', 'challenger'} <= set(body['data'])
 
+
+
+def test_with_trading_off_the_accounts_endpoint_lists_only_the_archive(account):
+    with TestClient(app) as client:
+        data = client.get('/api/v1/rules/accounts').json()['data']
+    assert data['accounts'] == [] and len(data['retired']) == 11 and 'switched off' in data['note']

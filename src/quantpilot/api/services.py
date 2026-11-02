@@ -626,7 +626,7 @@ def rules_accounts():
     data = dict(accounts=[_account_view(cfg, a, states[a['id']], expectations, reviews, engine) for a in cfg['accounts']],
                 config_hash=cfg['hash'], model_hash=(cfg.get('model') or {}).get('hash'), overlay_time=overlay.get('time'),
                 watch_now=[dict(key=k, label=label, value=overlay.get(k)) for k, label in WATCH_NOW], retired=retired,
-                note='Paper money only. Four accounts, four different styles. Each pauses for a review until the owner resumes it.')
+                note='Paper trading is switched off (A15, 2026-11-02). Every past account and its journal is kept here.')
     observed = max((s['last_bar'] for s in states.values() if s and s.get('last_bar')), default=None)
     return envelope(data, observed, 'QuantPilot four paper accounts (A10 styles)', max_age=180)
 
@@ -718,3 +718,62 @@ def rules_levels():
                             playbook=position['plan'].get('playbook'), stop=position['stop'], target=position['target']))
     data = dict(overlay=acct.get('overlay'), markers=sorted(markers, key=lambda m: m['time']))
     return envelope(data, (acct.get('overlay') or {}).get('time'), 'QuantPilot rule engine levels', max_age=900)
+
+
+# ---- analysis app (A15) ---------------------------------------------------------------------------------------------
+
+def _market_engine():
+    return database(settings.market_database_url) if settings.market_database_url else database()
+
+
+def analysis_snapshot():
+    from quantpilot.analysis import snapshot
+    snap = snapshot.latest(_market_engine())
+    return envelope(snap, snap['built_at'] if snap else None, 'Analysis snapshot (completed candles; every 5 minutes)',
+                    max_age=900)
+
+
+def analysis_catalogue():
+    from quantpilot.analysis import catalogue
+    return envelope(catalogue.public(), source='Indicator library')
+
+
+def analysis_briefs(limit=5):
+    from quantpilot.analysis import ai
+    rows = ai.briefs(_market_engine(), limit)
+    return envelope(dict(briefs=rows, model=settings.analysis_brief_model, every_hours=settings.analysis_brief_hours),
+                    rows[0]['created_at'] if rows else None, 'Claude market brief (subscription; AI analysis, not advice)',
+                    max_age=settings.analysis_brief_hours*3600+1800)
+
+
+def analysis_explanation(kind, ref, timeframe=None):
+    from quantpilot.analysis import ai
+    found = ai.cached(_market_engine(), kind, ref, timeframe)
+    return envelope(found, found['created_at'] if found else None, 'Claude explanation (cached)', max_age=86400)
+
+
+def analysis_explain(kind, ref, timeframe=None, studies=None):
+    """One explanation (cached per snapshot). Raises LookupError when there is no snapshot or no such item."""
+    from quantpilot.analysis import ai, snapshot
+    engine = _market_engine()
+    snap = snapshot.latest(engine)
+    if snap is None:
+        raise LookupError('No analysis snapshot yet; the analysis service builds one every 5 minutes.')
+    try:
+        result = ai.explain(engine, snap, kind, ref, timeframe, studies)
+    except KeyError as exc:
+        raise LookupError(f'Unknown {kind}: {exc}') from None
+    return envelope(result, result['created_at'], 'Claude explanation (subscription; AI analysis, not advice)', max_age=86400)
+
+
+def analysis_brief_now():
+    from quantpilot.analysis import ai, snapshot
+    engine = _market_engine()
+    snap = snapshot.latest(engine)
+    if snap is None:
+        raise LookupError('No analysis snapshot yet; the analysis service builds one every 5 minutes.')
+    last = ai.briefs(engine, 1)
+    if last and pd.Timestamp.now(tz='UTC')-pd.Timestamp(last[0]['created_at']) < pd.Timedelta(minutes=15):
+        raise ValueError('A brief was written less than 15 minutes ago.')
+    record = ai.write_brief(engine, snap, reason='requested')
+    return envelope(record, record['created_at'], 'Claude market brief (subscription; AI analysis, not advice)')

@@ -59,7 +59,7 @@ async function noOverflow(page:Page,where:string){
 
 const sizes=[[375,812,'phone'],[768,1024,'tablet portrait'],[1024,768,'tablet landscape'],[1366,768,'laptop'],
   [1280,600,'short window'],[1920,1080,'full HD'],[2560,1080,'ultra-wide']] as const;
-const pages=[['overview','Home'],['bots','Bot'],['more','More'],['chart','Chart'],['ask','Ask'],['research','Research'],['rules','Rule engine'],['paper','Paper trading'],
+const pages=[['overview','Home'],['indicators','Indicators'],['strategies','Strategies'],['archive','Trading history'],['more','More'],['chart','Chart'],['ask','Ask'],['research','Research'],['rules','Rule engine'],['paper','Paper trading'],
   ['news','News'],['system','System health']] as const;
 
 for(const [width,height,name] of sizes){
@@ -112,7 +112,7 @@ test('the command palette and keyboard shortcuts switch pages',async({page})=>{
   await expect(palette).toBeHidden();
   await expect(page.getByRole('heading',{name:'Rule engine',level:1})).toBeVisible();
   await page.keyboard.press('Alt+2');
-  await expect(page.getByRole('heading',{name:'Bots',level:1})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Indicators',level:1})).toBeVisible();
   await page.keyboard.press('Control+k');
   await expect(palette).toBeVisible();
   await page.keyboard.press('Escape');
@@ -143,7 +143,7 @@ test('the sidebar collapses, remembers it and the active marker follows the page
   await expect.poll(async()=>(await nav.boundingBox())!.width).toBeLessThan(wide-100);
   await page.reload();
   await expect(page.getByRole('button',{name:'Expand sidebar'})).toBeVisible({timeout:30_000});
-  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Rule engine/}).click();
+  await page.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('list',{name:'More pages'}).getByRole('button',{name:/^Trading history/}).click();await page.getByRole('list',{name:'Archived pages'}).getByRole('button',{name:/^Rule engine journal/}).click();
   const marker=page.locator('.nav-indicator');
   await expect.poll(async()=>{const m=(await marker.boundingBox())!,b=(await page.getByRole('button',{name:'More',exact:true}).boundingBox())!;
     return Math.abs(m.y-b.y)}).toBeLessThan(2);

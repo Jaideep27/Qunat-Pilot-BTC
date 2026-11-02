@@ -320,8 +320,9 @@ def claude_status():
 LIMIT_MESSAGE = re.compile(r'usage limit|hit your limit|limit reached|rate.?limit', re.I)
 
 
-def claude_json(system, prompt, schema):
-    """`claude -p` on the saved subscription with no tools, MCP servers, hooks, skills or saved session."""
+def claude_json(system, prompt, schema, model=None, effort=None):
+    """`claude -p` on the saved subscription with no tools, MCP servers, hooks, skills or saved session.
+    `model`/`effort` default to the news settings (the analysis app picks Haiku or Sonnet per job)."""
     command = claude_executable()
     if not command:
         raise FileNotFoundError('Claude Code CLI missing')
@@ -329,7 +330,7 @@ def claude_json(system, prompt, schema):
         system_file, hooks = Path(work)/'system.txt', Path(work)/'settings.json'
         system_file.write_text(system, encoding='utf-8')
         hooks.write_text(json.dumps({'disableAllHooks': True}), encoding='utf-8')
-        args = [command, '-p', '--model', settings.news_claude_model, '--effort', settings.news_claude_effort,
+        args = [command, '-p', '--model', model or settings.news_claude_model, '--effort', effort or settings.news_claude_effort,
                 '--output-format', 'json', '--json-schema', json.dumps(schema),
                 '--tools', '', '--strict-mcp-config', '--settings', str(hooks), '--disable-slash-commands',
                 '--no-session-persistence', '--system-prompt-file', str(system_file)]

@@ -8,6 +8,7 @@ from quantpilot.monitoring.operations import WorkerRun,begin_run,finish_run,repo
 from quantpilot.storage.database import portfolio,apply_events,LedgerEvent
 from quantpilot.storage.market import save_frame
 from quantpilot.api.app import app
+from quantpilot.config import settings
 
 
 def test_schedule_aligns_to_utc_quarter_hours_without_backdating():
@@ -79,6 +80,7 @@ def test_new_failure_overrides_fresh_checkpoint_and_success_clears_it(account):
 
 
 def test_readiness_requires_actual_freshness_and_returns_503_for_stale_worker(account,monkeypatch):
+    monkeypatch.setattr(settings,'trading_enabled',True)   # the paper worker gates readiness only while trading runs
     now=pd.Timestamp.now(tz='UTC')
     bar=now.floor('5min')-pd.Timedelta(minutes=5)
     save_frame(account,'candles',pd.DataFrame([dict(event_time=bar,available_at=bar+pd.Timedelta(minutes=5),
@@ -125,3 +127,18 @@ def test_database_failure_is_a_safe_503_not_a_healthy_readiness_result(account,m
         for path in ('/api/v1/operations','/api/v1/ready'):
             result=client.get(path)
             assert result.status_code==503 and 'secret' not in result.text
+
+
+def test_with_trading_switched_off_a_stale_paper_worker_does_not_block_readiness(account,monkeypatch):
+    """A15: the paper worker no longer runs, so readiness must not wait for it (the watchdog would restart forever)."""
+    monkeypatch.setattr(settings,'trading_enabled',False)
+    now=pd.Timestamp.now(tz='UTC')
+    bar=now.floor('5min')-pd.Timedelta(minutes=5)
+    save_frame(account,'candles',pd.DataFrame([dict(event_time=bar,available_at=bar+pd.Timedelta(minutes=5),
+        received_at=now,source='fixture',open=100,high=102,low=99,close=101,volume=1)]))
+    status=report(account,now=now,model_version='fixture-model',coverage_ready=True)
+    assert status['checks']['paper_worker']==dict(status['checks']['paper_worker'],ok=True,status='switched_off')
+    assert status['checks']['prediction_inputs']['status']=='switched_off'
+    assert status['checks']['completed_candles']['status']=='fresh' and status['ready']
+    stale=report(account,now=now+pd.Timedelta(hours=1),model_version='fixture-model',coverage_ready=True)
+    assert stale['checks']['completed_candles']['status']=='stale' and not stale['ready']   # data still gates it
