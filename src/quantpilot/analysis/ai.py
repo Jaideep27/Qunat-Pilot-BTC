@@ -24,8 +24,10 @@ RULES = ('Use only facts and numbers present in the JSON you are given; if somet
          'Never tell the reader to buy, sell, enter, exit or size a trade, and give no price targets beyond the '
          'levels and likely range in the JSON. Say clearly when signals conflict or are weak. '
          'None of the strategies has been proven to make money; do not imply otherwise. Times are UTC.')
+# Target lengths are asked for in words; the schema limits are generous so a slightly long answer is not lost.
 BRIEF_SYSTEM = ('You are a senior market analyst writing a short Bitcoin market brief for the owner of a research '
-                'dashboard. '+RULES)
+                'dashboard. Headline: one line. Summary: 3 to 5 sentences. Each other section: 1 to 3 sentences. '
+                'Up to 4 levels to watch and up to 3 risks. '+RULES)
 EXPLAIN_SYSTEM = ('You are a patient senior market analyst explaining one item on a Bitcoin research dashboard. '
                   'Write 3 to 6 sentences: what it shows right now, why that matters, and what would change the '
                   'picture. '+RULES)
@@ -34,25 +36,25 @@ _lock = threading.Lock()
 
 class Brief(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    headline: str = Field(max_length=160)
+    headline: str = Field(max_length=300)
     overall: Literal['leaning up', 'leaning down', 'mixed', 'quiet']
-    summary: str = Field(max_length=900)
-    trend: str = Field(max_length=500)
-    momentum: str = Field(max_length=500)
-    volatility: str = Field(max_length=500)
-    volume_flow: str = Field(max_length=500)
-    positioning: str = Field(max_length=500)
-    strategies: str = Field(max_length=700)
-    news_calendar: str = Field(max_length=700)
-    levels_to_watch: list[str] = Field(max_length=5)
-    risks: list[str] = Field(max_length=4)
+    summary: str = Field(max_length=3000)
+    trend: str = Field(max_length=2000)
+    momentum: str = Field(max_length=2000)
+    volatility: str = Field(max_length=2000)
+    volume_flow: str = Field(max_length=2000)
+    positioning: str = Field(max_length=2000)
+    strategies: str = Field(max_length=2000)
+    news_calendar: str = Field(max_length=2000)
+    levels_to_watch: list[str] = Field(max_length=8)
+    risks: list[str] = Field(max_length=8)
 
 
 class Explanation(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    title: str = Field(max_length=120)
-    explanation: str = Field(max_length=1500)
-    what_to_watch: list[str] = Field(max_length=3)
+    title: str = Field(max_length=300)
+    explanation: str = Field(max_length=4000)
+    what_to_watch: list[str] = Field(max_length=6)
 
 
 class AnalysisBrief(Base):
