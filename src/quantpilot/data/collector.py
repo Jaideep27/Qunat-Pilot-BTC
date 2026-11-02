@@ -20,8 +20,10 @@ def collect_once(engine=None, client=None):
     for market,base in [(PERP,'https://fapi.binance.com')]:
         path='/fapi/v1/klines'
         with engine.connect() as connection:
+            # 5m only: the rule engine also stored 1m candles here. With the interval this is an index lookup;
+            # without it Postgres scanned all 1.7M rows every 5 seconds and slowed the whole laptop.
             last=connection.execute(select(func.max(MarketCandle.event_time)).where(
-                MarketCandle.market==market,MarketCandle.complete.is_(True))).scalar()
+                MarketCandle.market==market,MarketCandle.interval=='5m',MarketCandle.complete.is_(True))).scalar()
         since=utc(last) if last else now-pd.Timedelta(days=2)
         raw=[]
         while since<now:

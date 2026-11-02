@@ -120,3 +120,25 @@ def test_empty_provider_response_does_not_claim_success_or_erase_history(account
         assert connection.execute(select(func.count()).select_from(MarketCandle)).scalar()==1
         feed=connection.execute(select(MarketFeed.state).where(MarketFeed.id=='live:collector')).scalar_one()
         assert feed['status']=='disconnected'
+
+
+def test_collector_resumes_from_the_last_5m_candle_even_when_newer_1m_candles_exist(account):
+    """The rule engine stored 1m candles in the same table. The collector must look only at 5m candles: with the
+    interval in the filter the query is an index lookup, and a newer 1m bar can never hide missing 5m bars."""
+    now=pd.Timestamp.now(tz='UTC').floor('5min')
+    old=now-pd.Timedelta(hours=2)
+    save_frame(account,'candles',pd.DataFrame([dict(event_time=old,available_at=old+pd.Timedelta(minutes=5),
+        received_at=old,source='fixture',open=100,high=102,low=99,close=101,volume=10)]))
+    with account.connect() as connection:
+        row=dict(connection.execute(select(MarketCandle.__table__)).mappings().first())
+    with account.begin() as connection:
+        connection.execute(MarketCandle.__table__.insert(),[dict(row,interval='1m',event_time=now.to_pydatetime(),
+            available_at=(now+pd.Timedelta(minutes=1)).to_pydatetime())])
+    starts,bar=[],old+pd.Timedelta(minutes=5)
+    def response(request):
+        starts.append(int(request.url.params['startTime']))
+        since=starts[-1]
+        return httpx.Response(200,json=[b for b in [[int(bar.timestamp()*1000),100,102,99,101,10,0,1010,20,6,606,0]] if b[0]>=since])
+    with httpx.Client(transport=httpx.MockTransport(response)) as client:
+        collect_once(account,client)
+    assert starts and starts[0]==int(old.timestamp()*1000)
