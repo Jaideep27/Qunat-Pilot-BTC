@@ -94,7 +94,7 @@ function Palette({open,onClose,go,ask}:{open:boolean;onClose:()=>void;go:(r:Rout
     const q=query.trim().toLowerCase();
     const pages=routes.map((r,i)=>({id:r.id,label:'Go to '+r.label,hint:'Alt+'+(i+1),run:()=>go(r.id)}))
       .filter(a=>!q||a.label.toLowerCase().includes(q));
-    return query.trim()&&!publicView?[...pages,{id:'ask',label:`Ask: “${query.trim()}”`,hint:'Enter',run:()=>ask(query.trim())}]:pages;
+    return query.trim()&&!publicView?[...pages,{id:'ask-question',label:`Ask: “${query.trim()}”`,hint:'Enter',run:()=>ask(query.trim())}]:pages;
   },[query,go,ask]);
   if(!open)return null;
   const choose=(a?:Action)=>{if(a){onClose();a.run()}};

@@ -91,7 +91,8 @@ test('the command palette and keyboard shortcuts switch pages',async({page})=>{
   // The search box takes focus a frame after the palette opens; typing before that loses the first letters (CI).
   await expect(palette.getByRole('textbox',{name:'Search pages or ask'})).toBeFocused();
   await page.keyboard.type('tradi');
-  await expect(palette.getByRole('option').first()).toHaveText(/Go to Trading history/);
+  // Typing 't' first matches every 'Go to …' row and the Ask row together; no stale row may survive the filter.
+  await expect(palette.getByRole('option')).toHaveText([/^Go to Trading history/, /^Ask: “tradi”/]);
   await page.keyboard.press('Enter');
   await expect(palette).toBeHidden();
   await expect(page.getByRole('heading',{name:'Trading history',level:1})).toBeVisible();
