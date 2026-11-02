@@ -88,6 +88,8 @@ test('the command palette and keyboard shortcuts switch pages',async({page})=>{
   await page.keyboard.press('Control+k');
   const palette=page.getByRole('dialog',{name:'Command palette'});
   await expect(palette).toBeVisible();
+  // The search box takes focus a frame after the palette opens; typing before that loses the first letters (CI).
+  await expect(palette.getByRole('textbox',{name:'Search pages or ask'})).toBeFocused();
   await page.keyboard.type('tradi');
   await expect(palette.getByRole('option').first()).toHaveText(/Go to Trading history/);
   await page.keyboard.press('Enter');

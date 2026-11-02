@@ -2,8 +2,6 @@ from alembic import context
 from quantpilot.config import settings
 from quantpilot.storage.database import Base, database
 from quantpilot.storage import market as market_store  # register all migration metadata
-from quantpilot.storage import snapshots
-from quantpilot.monitoring import operations
 from quantpilot.ai import news
 
 target_metadata = Base.metadata
